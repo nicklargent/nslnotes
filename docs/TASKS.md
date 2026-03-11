@@ -67,40 +67,40 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ---
 
-### T1.6 Implement runtime abstraction layer
+### T1.6 Implement runtime abstraction layer ✅
 **Satisfies**: Design §3.4
 **Dependencies**: T1.1, T1.5
 **Acceptance**:
-- [ ] `src/lib/runtime.ts` with `isNative()` detection
-- [ ] Async `readFile`, `writeFile` methods
-- [ ] Uses Tauri `invoke` when native, HTTP fetch when web
-- [ ] Web fallback uses polling for file watching
+- [x] `src/lib/runtime.ts` with `isNative()` detection
+- [x] Async `readFile`, `writeFile` methods
+- [x] Uses Tauri `invoke` when native, HTTP fetch when web
+- [x] Web fallback uses polling for file watching
 
 **Verify**: Read/write file works in both `npm run dev` (web) and `npm run tauri dev` (native)
 
 ---
 
-### T1.7 Implement Tauri file system commands
+### T1.7 Implement Tauri file system commands ✅
 **Satisfies**: Design §3.2, FR-FS-001, FR-FS-002
 **Dependencies**: T1.1
 **Acceptance**:
-- [ ] `src-tauri/src/commands.rs` with `read_file`, `write_file`, `list_directory`, `delete_file`
-- [ ] `verify_directory` command checks read/write permissions
-- [ ] `ensure_directory` creates subdirectories if missing
-- [ ] Commands registered in `main.rs`
+- [x] `src-tauri/src/commands.rs` with `read_file`, `write_file`, `list_directory`, `delete_file`
+- [x] `verify_directory` command checks read/write permissions
+- [x] `ensure_directory` creates subdirectories if missing
+- [x] Commands registered in `lib.rs` (Tauri 2 architecture)
 
 **Verify**: Call commands from frontend via invoke, confirm file operations work
 
 ---
 
-### T1.8 Implement Tauri file watcher
+### T1.8 Implement Tauri file watcher ✅
 **Satisfies**: Design §3.3
 **Dependencies**: T1.7
 **Acceptance**:
-- [ ] `src-tauri/src/watcher.rs` uses `notify` crate
-- [ ] Watches configured root directory recursively
-- [ ] Emits `file-changed` event with path and type (create/modify/delete)
-- [ ] Debounces rapid changes (100ms)
+- [x] `src-tauri/src/watcher.rs` uses `notify` crate
+- [x] Watches configured root directory recursively
+- [x] Emits `file-changed` event with path and type (create/modify/delete)
+- [x] Debounces rapid changes (100ms)
 
 **Verify**: Modify file externally, event received in frontend
 
