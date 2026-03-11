@@ -6,62 +6,62 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ## Phase 1: Foundation
 
-### T1.1 Initialize Tauri + Vite + SolidJS project
+### T1.1 Initialize Tauri + Vite + SolidJS project ✅
 **Satisfies**: Design §2, §9 (folder structure)
 **Dependencies**: None
 **Acceptance**:
-- [ ] `npm create tauri-app` with SolidJS template runs successfully
-- [ ] `npm run tauri dev` starts dev server with hot reload
-- [ ] Project structure matches DESIGN.md §9
+- [x] `npm create tauri-app` with SolidJS template runs successfully
+- [x] `npm run tauri dev` starts dev server with hot reload
+- [x] Project structure matches DESIGN.md §9
 
 **Verify**: `npm run tauri dev` opens window, edits to App.tsx hot-reload
 
 ---
 
-### T1.2 Configure TypeScript strict mode
+### T1.2 Configure TypeScript strict mode ✅
 **Satisfies**: Design §2.2
 **Dependencies**: T1.1
 **Acceptance**:
-- [ ] `tsconfig.json` matches Design §2.2 exactly (strict, noUncheckedIndexedAccess, etc.)
-- [ ] Type errors caught at compile time
+- [x] `tsconfig.json` matches Design §2.2 exactly (strict, noUncheckedIndexedAccess, etc.)
+- [x] Type errors caught at compile time
 
 **Verify**: `npm run typecheck` passes with no errors
 
 ---
 
-### T1.3 Set up Tailwind CSS
+### T1.3 Set up Tailwind CSS ✅
 **Satisfies**: Design §2.1
 **Dependencies**: T1.1
 **Acceptance**:
-- [ ] Tailwind configured with Vite
-- [ ] Utility classes work in components
-- [ ] Unused styles purged in production build
+- [x] Tailwind configured with Vite
+- [x] Utility classes work in components
+- [x] Unused styles purged in production build
 
 **Verify**: Add `class="text-blue-500"` to App.tsx, confirm styling
 
 ---
 
-### T1.4 Set up ESLint + Prettier + Husky
+### T1.4 Set up ESLint + Prettier + Husky ✅
 **Satisfies**: Design §2.4
 **Dependencies**: T1.1
 **Acceptance**:
-- [ ] ESLint with `@typescript-eslint` and `eslint-plugin-solid`
-- [ ] Prettier configured for consistent formatting
-- [ ] Pre-commit hook runs lint-staged
+- [x] ESLint with `@typescript-eslint` and `eslint-plugin-solid`
+- [x] Prettier configured for consistent formatting
+- [x] Pre-commit hook runs lint-staged
 
 **Verify**: Intentional lint error blocks commit
 
 ---
 
-### T1.5 Define core TypeScript interfaces
+### T1.5 Define core TypeScript interfaces ✅
 **Satisfies**: Design §5.1–5.5
 **Dependencies**: T1.2
 **Acceptance**:
-- [ ] `src/types/entities.ts` with Note, Task, Doc, Entity
-- [ ] `src/types/topics.ts` with TopicRef, Topic, TopicDecoration
-- [ ] `src/types/inline.ts` with TodoState, TodoItem, WikiLink
-- [ ] `src/types/stores.ts` with IndexState, ContextState, EditorState
-- [ ] `src/types/task-groups.ts` with TaskGroup, GroupedTasks
+- [x] `src/types/entities.ts` with Note, Task, Doc, Entity
+- [x] `src/types/topics.ts` with TopicRef, Topic, TopicDecoration
+- [x] `src/types/inline.ts` with TodoState, TodoItem, WikiLink
+- [x] `src/types/stores.ts` with IndexState, ContextState, EditorState
+- [x] `src/types/task-groups.ts` with TaskGroup, GroupedTasks
 
 **Verify**: Import types in a test file, TypeScript compiles
 
