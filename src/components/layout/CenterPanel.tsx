@@ -1,6 +1,11 @@
-import { Switch, Match } from "solid-js";
+import { Switch, Match, Show } from "solid-js";
 import { JournalView } from "../journal/JournalView";
+import { TaskDetail } from "../tasks/TaskDetail";
+import { DocView } from "../docs/DocView";
+import { TopicView } from "../topics/TopicView";
+import { contextStore } from "../../stores/contextStore";
 import type { ViewType } from "../../types/stores";
+import type { Task, Doc } from "../../types/entities";
 
 interface CenterPanelProps {
   activeView: ViewType;
@@ -9,7 +14,7 @@ interface CenterPanelProps {
 
 /**
  * Center panel that switches content based on active view (FR-UI-020, FR-UI-021).
- * Supports journal, task, doc, and topic views.
+ * Supports journal, task detail, doc, and topic views.
  */
 export function CenterPanel(props: CenterPanelProps) {
   return (
@@ -19,24 +24,35 @@ export function CenterPanel(props: CenterPanelProps) {
           <JournalView onNewNote={(d) => props.onNewNote(d)} />
         </Match>
         <Match when={props.activeView === "task"}>
-          <div class="p-6">
-            <h2 class="mb-2 text-lg font-semibold text-gray-800">
-              Task Detail
-            </h2>
-            <p class="text-sm text-gray-400">Task detail view placeholder</p>
-          </div>
+          <Show
+            when={
+              contextStore.activeEntity?.type === "task"
+                ? (contextStore.activeEntity as Task)
+                : null
+            }
+            fallback={
+              <div class="p-6 text-sm text-gray-400">No task selected</div>
+            }
+          >
+            {(task) => <TaskDetail task={task()} />}
+          </Show>
         </Match>
         <Match when={props.activeView === "doc"}>
-          <div class="p-6">
-            <h2 class="mb-2 text-lg font-semibold text-gray-800">Document</h2>
-            <p class="text-sm text-gray-400">Doc view placeholder</p>
-          </div>
+          <Show
+            when={
+              contextStore.activeEntity?.type === "doc"
+                ? (contextStore.activeEntity as Doc)
+                : null
+            }
+            fallback={
+              <div class="p-6 text-sm text-gray-400">No document selected</div>
+            }
+          >
+            {(doc) => <DocView doc={doc()} />}
+          </Show>
         </Match>
         <Match when={props.activeView === "topic"}>
-          <div class="p-6">
-            <h2 class="mb-2 text-lg font-semibold text-gray-800">Topic</h2>
-            <p class="text-sm text-gray-400">Topic view placeholder</p>
-          </div>
+          <TopicView />
         </Match>
       </Switch>
     </div>

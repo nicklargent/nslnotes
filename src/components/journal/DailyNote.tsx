@@ -1,8 +1,10 @@
 import { createSignal, createEffect } from "solid-js";
+import { Editor } from "../editor/Editor";
 import { serialize } from "../../lib/frontmatter";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
 import { SettingsService } from "../../services/SettingsService";
+import { parse } from "../../lib/frontmatter";
 import type { Note } from "../../types/entities";
 
 interface DailyNoteProps {
@@ -14,7 +16,7 @@ interface DailyNoteProps {
  * Daily note editor for a single date (FR-ENT-001, FR-ENT-002).
  * If no file exists, renders empty editable area.
  * First keystroke creates the file on disk (lazy creation).
- * Uses a plain textarea for now — TipTap integration in Phase 5.
+ * Uses TipTap Editor component (T5.13).
  */
 export function DailyNote(props: DailyNoteProps) {
   const [content, setContent] = createSignal("");
@@ -27,7 +29,7 @@ export function DailyNote(props: DailyNoteProps) {
     setCreated(!!props.note);
   });
 
-  function handleInput(value: string) {
+  function handleUpdate(value: string) {
     setContent(value);
     const date = props.date;
 
@@ -38,7 +40,7 @@ export function DailyNote(props: DailyNoteProps) {
       return;
     }
 
-    // Debounced save for subsequent edits
+    // Debounced save for subsequent edits (T5.12)
     if (created()) {
       window.clearTimeout(saveTimeout);
       saveTimeout = window.setTimeout(() => {
@@ -49,12 +51,12 @@ export function DailyNote(props: DailyNoteProps) {
 
   return (
     <div class="min-h-[60px] py-1">
-      <textarea
-        class="w-full resize-none border-0 bg-transparent text-sm text-gray-800 placeholder-gray-300 outline-none"
+      <Editor
+        content={content()}
+        mode="outliner"
         placeholder="Start writing..."
-        rows={Math.max(3, content().split("\n").length + 1)}
-        value={content()}
-        onInput={(e) => void handleInput(e.currentTarget.value)}
+        onUpdate={handleUpdate}
+        showModeToggle={false}
       />
     </div>
   );
@@ -80,9 +82,7 @@ async function saveDailyNote(date: string, body: string) {
   if (!exists) return;
 
   const fileContent = await FileService.read(path);
-  const parsed = await import("../../lib/frontmatter").then((m) =>
-    m.parse(fileContent)
-  );
+  const parsed = parse(fileContent);
   if (!parsed) return;
 
   const newContent = serialize(parsed.frontmatter, body);

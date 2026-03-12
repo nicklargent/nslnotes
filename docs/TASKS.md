@@ -563,200 +563,200 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ## Phase 5: Editor Integration
 
-### T5.1 Set up TipTap with SolidJS
+### T5.1 Set up TipTap with SolidJS ✅
 **Satisfies**: Design §2.1, §4.1
 **Dependencies**: T1.1
 **Acceptance**:
-- [ ] TipTap installed and configured
-- [ ] SolidJS-compatible wrapper component
-- [ ] Basic text editing works
+- [x] TipTap installed and configured
+- [x] SolidJS-compatible wrapper component
+- [x] Basic text editing works
 
 **Verify**: Type in editor, content updates
 
 ---
 
-### T5.2 Implement Editor mode wrapper
+### T5.2 Implement Editor mode wrapper ✅
 **Satisfies**: FR-ED-001
 **Dependencies**: T5.1, T2.1
 **Acceptance**:
-- [ ] `Editor.tsx` switches between OutlinerEditor and ProseEditor
-- [ ] Mode toggle button in toolbar
-- [ ] Content preserved on mode switch
+- [x] `Editor.tsx` switches between OutlinerEditor and ProseEditor
+- [x] Mode toggle button in toolbar
+- [x] Content preserved on mode switch
 
 **Verify**: Toggle mode, content intact
 
 ---
 
-### T5.3 Implement ProseEditor
+### T5.3 Implement ProseEditor ✅
 **Satisfies**: FR-ED-020, FR-ED-021
 **Dependencies**: T5.1
 **Acceptance**:
-- [ ] TipTap with standard prose schema (headings, paragraphs, lists, code)
-- [ ] Markdown rendering (bold, italic, links)
-- [ ] Command menu on `/` key
+- [x] TipTap with standard prose schema (headings, paragraphs, lists, code)
+- [x] Markdown rendering (bold, italic, links)
+- [x] Command menu on `/` key
 
 **Verify**: Type markdown, formatting renders correctly
 
 ---
 
-### T5.4 Implement OutlinerEditor block structure
+### T5.4 Implement OutlinerEditor block structure ✅
 **Satisfies**: FR-ED-010
 **Dependencies**: T5.1
 **Acceptance**:
-- [ ] Content rendered as navigable block tree
-- [ ] Each list item is selectable block
-- [ ] Indentation levels visually distinct
-- [ ] Collapse/expand affordance for blocks with children
+- [x] Content rendered as navigable block tree
+- [x] Each list item is selectable block
+- [x] Indentation levels visually distinct
+- [x] Collapse/expand affordance for blocks with children
 
 **Verify**: Open note with nested lists, blocks render correctly
 
 ---
 
-### T5.5 Implement outliner indent/outdent
+### T5.5 Implement outliner indent/outdent ✅
 **Satisfies**: FR-ED-011, FR-ED-012
 **Dependencies**: T5.4
 **Acceptance**:
-- [ ] Tab indents current block and children
-- [ ] Shift+Tab outdents
-- [ ] Cannot outdent past root level
-- [ ] Markdown list syntax updated on disk
+- [x] Tab indents current block and children
+- [x] Shift+Tab outdents
+- [x] Cannot outdent past root level
+- [x] Markdown list syntax updated on disk
 
 **Verify**: Press Tab/Shift+Tab, block moves, file updated
 
 ---
 
-### T5.6 Implement outliner block movement
+### T5.6 Implement outliner block movement ✅
 **Satisfies**: FR-ED-013, FR-ED-014
 **Dependencies**: T5.4
 **Acceptance**:
-- [ ] Alt+Up moves block up within siblings
-- [ ] Alt+Down moves block down
-- [ ] Cannot move past first/last sibling
-- [ ] Children move with parent
+- [x] Alt+Up moves block up within siblings
+- [x] Alt+Down moves block down
+- [x] Cannot move past first/last sibling
+- [x] Children move with parent
 
 **Verify**: Press Alt+Up/Down, block reorders
 
 ---
 
-### T5.7 Implement outliner Enter/Shift+Enter
+### T5.7 Implement outliner Enter/Shift+Enter ✅
 **Satisfies**: FR-ED-015, FR-ED-016
 **Dependencies**: T5.4
 **Acceptance**:
-- [ ] Enter creates new block at same indentation
-- [ ] Shift+Enter inserts line break within block
-- [ ] Cursor moves appropriately
+- [x] Enter creates new block at same indentation
+- [x] Shift+Enter inserts line break within block
+- [x] Cursor moves appropriately
 
 **Verify**: Press Enter, new block; Shift+Enter, line break in same block
 
 ---
 
-### T5.8 Implement CommandMenu
+### T5.8 Implement CommandMenu ✅
 **Satisfies**: FR-ED-017, FR-ED-021
 **Dependencies**: T5.3, T5.4
 **Acceptance**:
-- [ ] Opens on `/` key at cursor position
-- [ ] Dismissible with Escape
-- [ ] Includes: Promote to Task, Promote to Doc, formatting, wikilink, topic
-- [ ] Items filterable by typing
+- [x] Opens on `/` key at cursor position
+- [x] Dismissible with Escape
+- [x] Includes: Promote to Task, Promote to Doc, formatting, wikilink, topic
+- [x] Items filterable by typing
 
 **Verify**: Type `/`, menu appears, select action
 
 ---
 
-### T5.9 Implement TODO rendering
+### T5.9 Implement TODO rendering ✅
 **Satisfies**: FR-ENT-040–042
 **Dependencies**: T5.4, T2.3
 **Acceptance**:
-- [ ] `- TODO` renders with unchecked indicator
-- [ ] `- DOING` renders with in-progress indicator
-- [ ] `- DONE` renders with completed indicator (strikethrough/checkmark)
+- [x] `- TODO` renders with unchecked indicator
+- [x] `- DOING` renders with in-progress indicator
+- [x] `- DONE` renders with completed indicator (strikethrough/checkmark)
 
 **Verify**: Create todos in note, visual indicators appear
 
 ---
 
-### T5.10 Implement TODO state cycling
+### T5.10 Implement TODO state cycling ✅
 **Satisfies**: FR-ENT-043
 **Dependencies**: T5.9
 **Acceptance**:
-- [ ] Click todo checkbox cycles: TODO → DOING → DONE → TODO
-- [ ] Prefix text in file updated
-- [ ] Change persisted to disk
+- [x] Click todo checkbox cycles: TODO → DOING → DONE → TODO
+- [x] Prefix text in file updated
+- [x] Change persisted to disk
 
 **Verify**: Click todo, state cycles, file updated
 
 ---
 
-### T5.11 Implement default editor modes
+### T5.11 Implement default editor modes ✅
 **Satisfies**: FR-ED-002–004
 **Dependencies**: T5.2
 **Acceptance**:
-- [ ] Notes open in Outliner mode
-- [ ] Tasks open in Outliner mode
-- [ ] Docs open in Prose mode
-- [ ] Mode resets on each file open
+- [x] Notes open in Outliner mode
+- [x] Tasks open in Outliner mode
+- [x] Docs open in Prose mode
+- [x] Mode resets on each file open
 
 **Verify**: Open note (outliner), open doc (prose), reopen note (outliner again)
 
 ---
 
-### T5.12 Implement debounced auto-save
+### T5.12 Implement debounced auto-save ✅
 **Satisfies**: Design §4.3 (pendingSave)
 **Dependencies**: T5.2, T1.12
 **Acceptance**:
-- [ ] Changes trigger save after 300ms debounce
-- [ ] isDirty flag tracks unsaved changes
-- [ ] Save clears isDirty and pendingSave
+- [x] Changes trigger save after 300ms debounce
+- [x] isDirty flag tracks unsaved changes
+- [x] Save clears isDirty and pendingSave
 
 **Verify**: Edit, wait 300ms, file saved; edit rapidly, only saves once after pause
 
 ---
 
-### T5.13 Integrate editor into JournalView
+### T5.13 Integrate editor into JournalView ✅
 **Satisfies**: FR-UI-021
 **Dependencies**: T5.2, T4.3
 **Acceptance**:
-- [ ] DailyNote uses Editor component
-- [ ] NamedNoteCard can expand to inline edit
-- [ ] Edits persist to files
+- [x] DailyNote uses Editor component
+- [x] NamedNoteCard can expand to inline edit
+- [x] Edits persist to files
 
 **Verify**: Edit daily note in journal, content saved
 
 ---
 
-### T5.14 Implement TaskDetailView
+### T5.14 Implement TaskDetailView ✅
 **Satisfies**: FR-NAV-030
 **Dependencies**: T5.2, T3.6
 **Acceptance**:
-- [ ] Opens task in center panel with Editor
-- [ ] Shows task metadata (status, due, topics)
-- [ ] Defaults to Outliner mode
-- [ ] Status change buttons (mark done, cancel)
+- [x] Opens task in center panel with Editor
+- [x] Shows task metadata (status, due, topics)
+- [x] Defaults to Outliner mode
+- [x] Status change buttons (mark done, cancel)
 
 **Verify**: Click task in right panel, detail view opens, can edit
 
 ---
 
-### T5.15 Implement DocView
+### T5.15 Implement DocView ✅
 **Satisfies**: FR-NAV-020
 **Dependencies**: T5.2, T3.6
 **Acceptance**:
-- [ ] Opens doc in center panel with Editor
-- [ ] Shows doc title and topics
-- [ ] Defaults to Prose mode
+- [x] Opens doc in center panel with Editor
+- [x] Shows doc title and topics
+- [x] Defaults to Prose mode
 
 **Verify**: Click doc in sidebar, doc opens in prose mode
 
 ---
 
-### T5.16 Implement TopicView
+### T5.16 Implement TopicView ✅
 **Satisfies**: FR-NAV-010–014
 **Dependencies**: T3.6, T2.5
 **Acceptance**:
-- [ ] Shows topic label and note (from topics.yaml)
-- [ ] Lists notes referencing topic (reverse chronological)
-- [ ] Lists docs referencing topic (alphabetical)
-- [ ] If doc has topic in frontmatter, shows at top with preview
+- [x] Shows topic label and note (from topics.yaml)
+- [x] Lists notes referencing topic (reverse chronological)
+- [x] Lists docs referencing topic (alphabetical)
+- [x] If doc has topic in frontmatter, shows at top with preview
 
 **Verify**: Navigate to topic, view shows all references
 
