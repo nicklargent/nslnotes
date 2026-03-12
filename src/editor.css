@@ -169,3 +169,31 @@
 .todo-marker.todo-done {
   color: #22c55e;
 }
+
+/* Wikilinks */
+.wikilink {
+  color: #3b82f6;
+  cursor: pointer;
+  border-bottom: 1px dashed #93c5fd;
+  padding: 0 1px;
+  border-radius: 2px;
+  transition: background-color 0.1s;
+}
+
+.wikilink:hover {
+  background-color: #eff6ff;
+  border-bottom-color: #3b82f6;
+}
+
+/* Topic/person refs */
+.topic-ref {
+  color: #8b5cf6;
+  cursor: pointer;
+  font-weight: 500;
+  transition: color 0.1s;
+}
+
+.topic-ref:hover {
+  color: #7c3aed;
+  text-decoration: underline;
+}

@@ -764,154 +764,154 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ## Phase 6: Entity Workflows
 
-### T6.1 Implement EntityService createDailyNote
+### T6.1 Implement EntityService createDailyNote ✅
 **Satisfies**: FR-ENT-001, FR-ENT-002
 **Dependencies**: T1.12, T1.10, T1.11
 **Acceptance**:
-- [ ] Creates `notes/YYYY-MM-DD.md` with valid frontmatter
-- [ ] Returns existing note if already present
-- [ ] File appears in indexStore
+- [x] Creates `notes/YYYY-MM-DD.md` with valid frontmatter
+- [x] Returns existing note if already present
+- [x] File appears in indexStore
 
 **Verify**: Call createDailyNote, file created, indexed
 
 ---
 
-### T6.2 Implement EntityService createNamedNote
+### T6.2 Implement EntityService createNamedNote ✅
 **Satisfies**: FR-ENT-003, FR-ENT-004
 **Dependencies**: T1.12, T1.9, T1.10
 **Acceptance**:
-- [ ] Creates `notes/YYYY-MM-DD-slug.md`
-- [ ] Frontmatter includes type, date, title, topics (if provided)
-- [ ] Slug generated from title, collisions handled
+- [x] Creates `notes/YYYY-MM-DD-slug.md`
+- [x] Frontmatter includes type, date, title, topics (if provided)
+- [x] Slug generated from title, collisions handled
 
 **Verify**: Call createNamedNote with topics, file created with correct frontmatter
 
 ---
 
-### T6.3 Implement EntityService createTask
+### T6.3 Implement EntityService createTask ✅
 **Satisfies**: FR-ENT-010, FR-INT-010, FR-INT-011
 **Dependencies**: T1.12, T1.9, T1.10
 **Acceptance**:
-- [ ] Creates `tasks/slug.md`
-- [ ] Frontmatter includes type: task, status: open, created, due (opt), topics (opt)
-- [ ] Task appears in right panel
+- [x] Creates `tasks/slug.md`
+- [x] Frontmatter includes type: task, status: open, created, due (opt), topics (opt)
+- [x] Task appears in right panel
 
 **Verify**: Create task via API, file created, appears in task list
 
 ---
 
-### T6.4 Implement CreateTaskModal
+### T6.4 Implement CreateTaskModal ✅
 **Satisfies**: FR-INT-010, FR-INT-011
 **Dependencies**: T6.3, T3.7
 **Acceptance**:
-- [ ] Modal with title (required), due date, topics fields
-- [ ] Confirm creates task and opens in center panel
-- [ ] Cancel closes modal, no changes
+- [x] Modal with title (required), due date, topics fields
+- [x] Confirm creates task and opens in center panel
+- [x] Cancel closes modal, no changes
 
 **Verify**: Click + in right panel, fill modal, task created and opened
 
 ---
 
-### T6.5 Implement task status updates
+### T6.5 Implement task status updates ✅
 **Satisfies**: FR-ENT-011–013
 **Dependencies**: T6.3, T5.14
 **Acceptance**:
-- [ ] `updateTaskStatus(path, status)` updates frontmatter
-- [ ] UI shows visual feedback on status change
-- [ ] Done/cancelled tasks briefly visible, then removed from list
-- [ ] Task file remains with updated status
+- [x] `updateTaskStatus(path, status)` updates frontmatter
+- [x] UI shows visual feedback on status change
+- [x] Done/cancelled tasks briefly visible, then removed from list
+- [x] Task file remains with updated status
 
 **Verify**: Mark task done, brief animation, task disappears from list, file status = done
 
 ---
 
-### T6.6 Implement EntityService createDoc
+### T6.6 Implement EntityService createDoc ✅
 **Satisfies**: FR-ENT-020, FR-INT-040, FR-INT-041
 **Dependencies**: T1.12, T1.9, T1.10
 **Acceptance**:
-- [ ] Creates `docs/slug.md`
-- [ ] Frontmatter includes type: doc, title, created, topics (opt)
-- [ ] Doc appears in sidebar alphabetically
+- [x] Creates `docs/slug.md`
+- [x] Frontmatter includes type: doc, title, created, topics (opt)
+- [x] Doc appears in sidebar alphabetically
 
 **Verify**: Create doc, file created, appears in DocsList
 
 ---
 
-### T6.7 Implement CreateDocModal
+### T6.7 Implement CreateDocModal ✅
 **Satisfies**: FR-INT-040, FR-INT-041
 **Dependencies**: T6.6, T3.5
 **Acceptance**:
-- [ ] Modal with title (required), topics fields
-- [ ] Confirm creates doc and opens in center panel (Prose mode)
-- [ ] Cancel closes modal
+- [x] Modal with title (required), topics fields
+- [x] Confirm creates doc and opens in center panel (Prose mode)
+- [x] Cancel closes modal
 
 **Verify**: Click + in Docs section, fill modal, doc created and opened
 
 ---
 
-### T6.8 Implement promoteToTask
+### T6.8 Implement promoteToTask ✅
 **Satisfies**: FR-INT-001–004
 **Dependencies**: T6.3, T2.3, T5.8
 **Acceptance**:
-- [ ] Selected from command menu on TODO line
-- [ ] Creates task file with slug from TODO text
-- [ ] Inherits topics from source note
-- [ ] Replaces original line with `- [[task:slug]]`
-- [ ] Opens task in center panel
+- [x] Selected from command menu on TODO line
+- [x] Creates task file with slug from TODO text
+- [x] Inherits topics from source note
+- [x] Replaces original line with `- [[task:slug]]`
+- [x] Opens task in center panel
 
 **Verify**: Select TODO, promote, task created, wikilink replaces TODO
 
 ---
 
-### T6.9 Implement promoteToDoc
+### T6.9 Implement promoteToDoc ✅
 **Satisfies**: FR-INT-020–024
 **Dependencies**: T6.6, T5.8
 **Acceptance**:
-- [ ] Selected from command menu on parent bullet
-- [ ] Prompts for title
-- [ ] Prompts to select topics from source note
-- [ ] Creates doc with promoted content
-- [ ] Replaces original content with `[[doc:slug]]`
-- [ ] Opens doc in center panel (Prose mode)
+- [x] Selected from command menu on parent bullet
+- [x] Prompts for title
+- [x] Prompts to select topics from source note
+- [x] Creates doc with promoted content
+- [x] Replaces original content with `[[doc:slug]]`
+- [x] Opens doc in center panel (Prose mode)
 
 **Verify**: Select section, promote, doc created with content, wikilink replaces original
 
 ---
 
-### T6.10 Implement topic/person autocomplete
+### T6.10 Implement topic/person autocomplete ✅
 **Satisfies**: FR-INT-050–053
 **Dependencies**: T2.5, T5.1
 **Acceptance**:
-- [ ] Typing `#` shows active topics, filtered as user types
-- [ ] Typing `@` shows active people
-- [ ] Selecting inserts full reference
-- [ ] Continuing to type without selection creates new topic
+- [x] Typing `#` shows active topics, filtered as user types
+- [x] Typing `@` shows active people
+- [x] Selecting inserts full reference
+- [x] Continuing to type without selection creates new topic
 
 **Verify**: Type `#pro`, suggestions appear, select one, inserted
 
 ---
 
-### T6.11 Implement wikilink navigation
+### T6.11 Implement wikilink navigation ✅
 **Satisfies**: FR-NAV-040, FR-NAV-041
 **Dependencies**: T2.10, T3.9
 **Acceptance**:
-- [ ] Clicking wikilink navigates to target
-- [ ] `[[task:slug]]` → TaskDetailView
-- [ ] `[[doc:slug]]` → DocView
-- [ ] `[[note:YYYY-MM-DD]]` → journal date
-- [ ] Broken links styled distinctly, click shows tooltip
+- [x] Clicking wikilink navigates to target
+- [x] `[[task:slug]]` → TaskDetailView
+- [x] `[[doc:slug]]` → DocView
+- [x] `[[note:YYYY-MM-DD]]` → journal date
+- [x] Broken links styled distinctly, click shows tooltip
 
 **Verify**: Click wikilink, navigates; create broken link, styled differently
 
 ---
 
-### T6.12 Implement wikilink rendering
+### T6.12 Implement wikilink rendering ✅
 **Satisfies**: FR-NAV-040, FR-NAV-041
 **Dependencies**: T5.3, T5.4
 **Acceptance**:
-- [ ] Wikilinks render as clickable inline elements
-- [ ] Show entity title if exists, raw link if broken
-- [ ] Broken links have distinct styling
+- [x] Wikilinks render as clickable inline elements
+- [x] Show entity title if exists, raw link if broken
+- [x] Broken links have distinct styling
 
 **Verify**: Type wikilink, renders as link; broken link styled red
 

@@ -10,6 +10,18 @@ interface CommandMenuItem {
 
 const COMMANDS: CommandMenuItem[] = [
   {
+    id: "promote-to-task",
+    label: "Promote to Task",
+    description: "Create a task from this line",
+    modes: ["outliner"],
+  },
+  {
+    id: "promote-to-doc",
+    label: "Promote to Doc",
+    description: "Create a document from this section",
+    modes: ["outliner", "prose"],
+  },
+  {
     id: "heading1",
     label: "Heading 1",
     description: "Large section heading",
@@ -73,8 +85,9 @@ interface CommandMenuProps {
 }
 
 /**
- * Command menu triggered by / key (T5.8).
+ * Command menu triggered by / key (T5.8, T6.8, T6.9).
  * Shows available actions filtered by current editor mode.
+ * Includes promote-to-task and promote-to-doc actions.
  */
 export function CommandMenu(props: CommandMenuProps) {
   const [filter, setFilter] = createSignal("");

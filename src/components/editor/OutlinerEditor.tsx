@@ -8,7 +8,16 @@ interface OutlinerEditorProps {
   placeholder?: string | undefined;
   onUpdate: (markdown: string) => void;
   onSlashKey?: ((pos: { top: number; left: number }) => void) | undefined;
+  onHashOrAt?:
+    | ((
+        prefix: "#" | "@",
+        pos: { top: number; left: number },
+        cursorPos: number
+      ) => void)
+    | undefined;
   ref?: ((editor: Editor) => void) | undefined;
+  onWikilinkClick?: ((type: string, target: string) => void) | undefined;
+  onTopicClick?: ((ref: string) => void) | undefined;
 }
 
 /**
@@ -107,6 +116,20 @@ export function OutlinerEditor(props: OutlinerEditorProps) {
             return true;
           }
 
+          // # or @ triggers topic autocomplete (T6.10)
+          if ((event.key === "#" || event.key === "@") && props.onHashOrAt) {
+            const coords = view.coordsAtPos(view.state.selection.from);
+            // Defer so the character is inserted first
+            const prefix = event.key as "#" | "@";
+            setTimeout(() => {
+              props.onHashOrAt!(
+                prefix,
+                { top: coords.top, left: coords.left },
+                view.state.selection.from
+              );
+            }, 0);
+          }
+
           // / key opens command menu (T5.8)
           if (event.key === "/" && props.onSlashKey) {
             const coords = view.coordsAtPos(view.state.selection.from);
@@ -138,8 +161,33 @@ export function OutlinerEditor(props: OutlinerEditorProps) {
     editor?.destroy();
   });
 
+  function handleEditorClick(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    // Wikilink click (T6.11)
+    if (target.classList.contains("wikilink")) {
+      e.preventDefault();
+      const linkType = target.dataset["linkType"];
+      const linkTarget = target.dataset["linkTarget"];
+      if (linkType && linkTarget) {
+        props.onWikilinkClick?.(linkType, linkTarget);
+      }
+    }
+    // Topic ref click
+    if (target.classList.contains("topic-ref")) {
+      e.preventDefault();
+      const topic = target.dataset["topic"];
+      if (topic) {
+        props.onTopicClick?.(topic);
+      }
+    }
+  }
+
   return (
-    <div ref={containerRef} class="outliner-editor focus-within:outline-none" />
+    <div
+      ref={containerRef}
+      class="outliner-editor focus-within:outline-none"
+      onClick={handleEditorClick}
+    />
   );
 }
 
@@ -215,11 +263,21 @@ function formatInlineContent(text: string): string {
     return `<span class="todo-marker todo-done" data-todo="DONE">&#9745;</span> <s>${text.slice(5)}</s>`;
   }
 
-  // Bold, italic, code
+  // Bold, italic, code, wikilinks, topics
   let result = text;
   result = result.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   result = result.replace(/\*(.+?)\*/g, "<em>$1</em>");
   result = result.replace(/`([^`]+)`/g, "<code>$1</code>");
+  // Wikilinks (T6.12)
+  result = result.replace(
+    /\[\[(task|doc|note):([^\]]+)\]\]/g,
+    '<span class="wikilink" data-link-type="$1" data-link-target="$2" contenteditable="false">[[$1:$2]]</span>'
+  );
+  // Topic refs (T6.10)
+  result = result.replace(
+    /(?<!\w)([#@][a-z0-9-]+)/gi,
+    '<span class="topic-ref" data-topic="$1">$1</span>'
+  );
 
   return result;
 }

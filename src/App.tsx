@@ -5,6 +5,8 @@ import { LeftSidebar } from "./components/layout/LeftSidebar";
 import { CenterPanel } from "./components/layout/CenterPanel";
 import { RightPanel } from "./components/layout/RightPanel";
 import { CreateNoteModal } from "./components/modals/CreateNoteModal";
+import { CreateTaskModal } from "./components/modals/CreateTaskModal";
+import { CreateDocModal } from "./components/modals/CreateDocModal";
 import {
   SettingsService,
   IndexService,
@@ -133,8 +135,10 @@ function App() {
     return null;
   });
 
-  // CreateNoteModal state
+  // Modal state
   const [noteModalDate, setNoteModalDate] = createSignal<string | null>(null);
+  const [showTaskModal, setShowTaskModal] = createSignal(false);
+  const [showDocModal, setShowDocModal] = createSignal(false);
 
   function handleNewNote(date: string) {
     setNoteModalDate(date);
@@ -165,7 +169,7 @@ function App() {
               onTodayClick={() => NavigationService.goHome()}
               onTopicClick={(ref) => NavigationService.navigateToTopic(ref)}
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
-              onCreateDoc={() => console.log("Create doc")}
+              onCreateDoc={() => setShowDocModal(true)}
             />
           }
           center={
@@ -180,7 +184,7 @@ function App() {
               isHomeState={contextStore.isHomeState}
               highlightedTaskPath={highlightedTaskPath()}
               onTaskClick={(task) => NavigationService.navigateTo(task)}
-              onCreateTask={() => console.log("Create task")}
+              onCreateTask={() => setShowTaskModal(true)}
             />
           }
         />
@@ -190,6 +194,12 @@ function App() {
             onClose={() => setNoteModalDate(null)}
             onCreated={handleNoteCreated}
           />
+        </Show>
+        <Show when={showTaskModal()}>
+          <CreateTaskModal onClose={() => setShowTaskModal(false)} />
+        </Show>
+        <Show when={showDocModal()}>
+          <CreateDocModal onClose={() => setShowDocModal(false)} />
         </Show>
       </Show>
     </>

@@ -1,5 +1,7 @@
-import type { Task } from "../../types/entities";
+import { createSignal, Show } from "solid-js";
+import { EntityService } from "../../services/EntityService";
 import { formatRelativeDate } from "../../lib/dates";
+import type { Task } from "../../types/entities";
 
 interface TaskItemProps {
   task: Task;
@@ -8,26 +10,74 @@ interface TaskItemProps {
 }
 
 /**
- * Single task item in the right panel task list.
- * Shows title and due date display (FR-UI-034).
+ * Single task item in the right panel task list (FR-UI-034, T6.5).
+ * Shows title and due date. Supports status updates with brief visual feedback.
  */
 export function TaskItem(props: TaskItemProps) {
+  const [completing, setCompleting] = createSignal<"done" | "cancelled" | null>(
+    null
+  );
+
+  async function handleStatusChange(
+    e: MouseEvent,
+    status: "done" | "cancelled"
+  ) {
+    e.stopPropagation();
+    setCompleting(status);
+    // Brief delay before updating (FR-ENT-013)
+    await new Promise((r) => setTimeout(r, 600));
+    await EntityService.updateTaskStatus(props.task.path, status);
+    setCompleting(null);
+  }
+
   return (
-    <button
-      class={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm ${
-        props.isHighlighted
-          ? "bg-blue-50 ring-1 ring-blue-200"
-          : "hover:bg-gray-100"
+    <div
+      class={`group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm transition-all ${
+        completing() === "done"
+          ? "bg-green-50 opacity-60"
+          : completing() === "cancelled"
+            ? "bg-gray-50 opacity-60"
+            : props.isHighlighted
+              ? "bg-blue-50 ring-1 ring-blue-200"
+              : "hover:bg-gray-100"
       }`}
-      onClick={() => props.onClick(props.task)}
     >
-      <span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-400" />
-      <span class="flex-1 truncate text-gray-700">{props.task.title}</span>
+      {/* Checkbox button for quick done */}
+      <button
+        class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-gray-300 text-xs text-transparent hover:border-green-400 hover:text-green-500"
+        onClick={(e) => void handleStatusChange(e, "done")}
+        title="Mark done"
+      >
+        <Show when={completing() === "done"} fallback={"\u2713"}>
+          <span class="text-green-500">{"\u2713"}</span>
+        </Show>
+      </button>
+
+      {/* Title */}
+      <button
+        class={`flex-1 truncate text-left ${
+          completing() ? "line-through text-gray-400" : "text-gray-700"
+        }`}
+        onClick={() => props.onClick(props.task)}
+      >
+        {props.task.title}
+      </button>
+
+      {/* Due date */}
       {props.task.due && (
         <span class="flex-shrink-0 text-xs text-gray-400">
           {formatRelativeDate(props.task.due)}
         </span>
       )}
-    </button>
+
+      {/* Cancel button - shown on hover */}
+      <button
+        class="flex-shrink-0 text-xs text-transparent group-hover:text-gray-300 group-hover:hover:text-red-400"
+        onClick={(e) => void handleStatusChange(e, "cancelled")}
+        title="Cancel task"
+      >
+        {"\u2715"}
+      </button>
+    </div>
   );
 }

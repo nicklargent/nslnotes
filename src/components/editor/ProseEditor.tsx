@@ -8,7 +8,16 @@ interface ProseEditorProps {
   placeholder?: string | undefined;
   onUpdate: (markdown: string) => void;
   onSlashKey?: ((pos: { top: number; left: number }) => void) | undefined;
+  onHashOrAt?:
+    | ((
+        prefix: "#" | "@",
+        pos: { top: number; left: number },
+        cursorPos: number
+      ) => void)
+    | undefined;
   ref?: ((editor: Editor) => void) | undefined;
+  onWikilinkClick?: ((type: string, target: string) => void) | undefined;
+  onTopicClick?: ((ref: string) => void) | undefined;
 }
 
 /**
@@ -44,6 +53,20 @@ export function ProseEditor(props: ProseEditorProps) {
       },
       editorProps: {
         handleKeyDown: (_view, event) => {
+          // # or @ triggers topic autocomplete (T6.10)
+          if ((event.key === "#" || event.key === "@") && props.onHashOrAt) {
+            const { view } = editor!;
+            const coords = view.coordsAtPos(view.state.selection.from);
+            const prefix = event.key as "#" | "@";
+            setTimeout(() => {
+              props.onHashOrAt!(
+                prefix,
+                { top: coords.top, left: coords.left },
+                view.state.selection.from
+              );
+            }, 0);
+          }
+
           if (event.key === "/" && props.onSlashKey) {
             const { view } = editor!;
             const coords = view.coordsAtPos(view.state.selection.from);
@@ -71,10 +94,30 @@ export function ProseEditor(props: ProseEditorProps) {
     editor?.destroy();
   });
 
+  function handleEditorClick(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains("wikilink")) {
+      e.preventDefault();
+      const linkType = target.dataset["linkType"];
+      const linkTarget = target.dataset["linkTarget"];
+      if (linkType && linkTarget) {
+        props.onWikilinkClick?.(linkType, linkTarget);
+      }
+    }
+    if (target.classList.contains("topic-ref")) {
+      e.preventDefault();
+      const topic = target.dataset["topic"];
+      if (topic) {
+        props.onTopicClick?.(topic);
+      }
+    }
+  }
+
   return (
     <div
       ref={containerRef}
       class="prose-editor prose prose-sm max-w-none focus-within:outline-none"
+      onClick={handleEditorClick}
     />
   );
 }
@@ -94,6 +137,16 @@ function htmlFromMarkdown(md: string): string {
     .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    // Wikilinks
+    .replace(
+      /\[\[(task|doc|note):([^\]]+)\]\]/g,
+      '<span class="wikilink" data-link-type="$1" data-link-target="$2" contenteditable="false">[[$1:$2]]</span>'
+    )
+    // Topic/person refs
+    .replace(
+      /(?<!\w)([#@][a-z0-9-]+)/gi,
+      '<span class="topic-ref" data-topic="$1">$1</span>'
+    )
     // Inline code
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     // Code blocks
