@@ -58,7 +58,7 @@ export const runtime = {
    * Check if running in native Tauri environment
    */
   isNative: (): boolean => {
-    return "__TAURI__" in window;
+    return "__TAURI_INTERNALS__" in window;
   },
 
   /**

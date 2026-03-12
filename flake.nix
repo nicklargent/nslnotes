@@ -42,6 +42,7 @@
           libsoup_3
           webkitgtk_4_1
           librsvg
+          gsettings-desktop-schemas
 
           # Additional build tools
           gcc
@@ -91,6 +92,9 @@
 
             # Rust source for rust-analyzer
             export RUST_SRC_PATH="${rustToolchain}/lib/rustlib/src/rust/library"
+
+            export XDG_DATA_DIRS="${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:$XDG_DATA_DIRS"
+            export GIO_EXTRA_MODULES="${pkgs.glib-networking}/lib/gio/modules"
 
             # Library paths for Tauri runtime
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
