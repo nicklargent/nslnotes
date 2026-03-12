@@ -320,142 +320,142 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ## Phase 3: Core UI Shell
 
-### T3.1 Implement three-column Layout component
+### T3.1 Implement three-column Layout component ✅
 **Satisfies**: FR-UI-001, FR-UI-002
 **Dependencies**: T1.3, T2.1
 **Acceptance**:
-- [ ] `src/components/layout/Layout.tsx` with CSS Grid
-- [ ] Three columns: left sidebar, center panel, right panel
-- [ ] Columns never collapse or hide
-- [ ] Responsive within desktop sizes (no mobile for v1)
+- [x] `src/components/layout/Layout.tsx` with CSS Grid
+- [x] Three columns: left sidebar, center panel, right panel
+- [x] Columns never collapse or hide
+- [x] Responsive within desktop sizes (no mobile for v1)
 
 **Verify**: Layout visible, resize window, columns remain
 
 ---
 
-### T3.2 Implement LeftSidebar shell
+### T3.2 Implement LeftSidebar shell ✅
 **Satisfies**: FR-UI-010–012
 **Dependencies**: T3.1
 **Acceptance**:
-- [ ] `LeftSidebar.tsx` with Today button, Topics section, Docs section
-- [ ] Section headers visible
-- [ ] Placeholder content for lists
+- [x] `LeftSidebar.tsx` with Today button, Topics section, Docs section
+- [x] Section headers visible
+- [x] Placeholder content for lists
 
 **Verify**: All three sections visible in left sidebar
 
 ---
 
-### T3.3 Implement TodayButton
+### T3.3 Implement TodayButton ✅
 **Satisfies**: FR-UI-010, FR-NAV-001–003
 **Dependencies**: T3.2
 **Acceptance**:
-- [ ] Styled as primary action button
-- [ ] Pinned at top, always visible
-- [ ] Click triggers navigation to home state (connected later)
+- [x] Styled as primary action button
+- [x] Pinned at top, always visible
+- [x] Click triggers navigation to home state (connected later)
 
 **Verify**: Button visible, click logs action (navigation wired in T3.9)
 
 ---
 
-### T3.4 Implement TopicsList component
+### T3.4 Implement TopicsList component ✅
 **Satisfies**: FR-UI-011
 **Dependencies**: T3.2, T2.5
 **Acceptance**:
-- [ ] Renders active topics from indexStore
-- [ ] Sorted by most recently used (default)
-- [ ] TopicItem shows label (from topics.yaml or raw ref)
-- [ ] Distinguishes # topics from @ people visually
+- [x] Renders active topics from indexStore
+- [x] Sorted by most recently used (default)
+- [x] TopicItem shows label (from topics.yaml or raw ref)
+- [x] Distinguishes # topics from @ people visually
 
 **Verify**: Add files with topics, list populates sorted by recency
 
 ---
 
-### T3.5 Implement DocsList component
+### T3.5 Implement DocsList component ✅
 **Satisfies**: FR-UI-012
 **Dependencies**: T3.2, T2.4
 **Acceptance**:
-- [ ] Renders all docs from indexStore
-- [ ] Sorted alphabetically by title (case-insensitive)
-- [ ] + button visible for creating new docs
-- [ ] DocItem shows title
+- [x] Renders all docs from indexStore
+- [x] Sorted alphabetically by title (case-insensitive)
+- [x] + button visible for creating new docs
+- [x] DocItem shows title
 
 **Verify**: Add doc files, list populates alphabetically
 
 ---
 
-### T3.6 Implement CenterPanel shell
+### T3.6 Implement CenterPanel shell ✅
 **Satisfies**: FR-UI-020, FR-UI-021
 **Dependencies**: T3.1, T2.1
 **Acceptance**:
-- [ ] `CenterPanel.tsx` switches content based on contextStore.activeView
-- [ ] Supports 'journal', 'task', 'doc', 'topic' views
-- [ ] Shows placeholder for each view type
+- [x] `CenterPanel.tsx` switches content based on contextStore.activeView
+- [x] Supports 'journal', 'task', 'doc', 'topic' views
+- [x] Shows placeholder for each view type
 
 **Verify**: Manually set activeView in store, panel content changes
 
 ---
 
-### T3.7 Implement RightPanel with TaskList
+### T3.7 Implement RightPanel with TaskList ✅
 **Satisfies**: FR-UI-030–034
 **Dependencies**: T3.1, T2.8
 **Acceptance**:
-- [ ] `RightPanel.tsx` with "Open Tasks" header
-- [ ] + button for creating tasks
-- [ ] TaskGroups component renders RELATED, OVERDUE, THIS_WEEK, LATER sections
-- [ ] RELATED hidden when isHomeState = true
-- [ ] TaskItem shows title, due date display
+- [x] `RightPanel.tsx` with "Open Tasks" header
+- [x] + button for creating tasks
+- [x] TaskGroups component renders RELATED, OVERDUE, THIS_WEEK, LATER sections
+- [x] RELATED hidden when isHomeState = true
+- [x] TaskItem shows title, due date display
 
 **Verify**: Add task files, list populates with correct grouping
 
 ---
 
-### T3.8 Implement task highlight indicator
+### T3.8 Implement task highlight indicator ✅
 **Satisfies**: FR-UI-034
 **Dependencies**: T3.7
 **Acceptance**:
-- [ ] When contextStore.activeEntity is a task, that task highlighted in list
-- [ ] Visual indicator (background, dot, or border)
-- [ ] Does not auto-scroll to highlighted task
+- [x] When contextStore.activeEntity is a task, that task highlighted in list
+- [x] Visual indicator (background, dot, or border)
+- [x] Does not auto-scroll to highlighted task
 
 **Verify**: Navigate to task in center, right panel highlights it
 
 ---
 
-### T3.9 Implement NavigationService
+### T3.9 Implement NavigationService ✅
 **Satisfies**: Design §6.5, FR-NAV-001–003
 **Dependencies**: T2.1, T2.7
 **Acceptance**:
-- [ ] `goHome()` sets activeView='journal', clears relevance, resets scroll
-- [ ] `navigateTo(entity)` sets activeView and activeEntity
-- [ ] `navigateToTopic(ref)` sets activeView='topic' and activeTopic
-- [ ] `updateRelevance()` computes and applies weights to stores
-- [ ] `clearRelevance()` resets all weights
+- [x] `goHome()` sets activeView='journal', clears relevance, resets scroll
+- [x] `navigateTo(entity)` sets activeView and activeEntity
+- [x] `navigateToTopic(ref)` sets activeView='topic' and activeTopic
+- [x] `updateRelevance()` computes and applies weights to stores
+- [x] `clearRelevance()` resets all weights
 
 **Verify**: Call navigation methods, verify store updates
 
 ---
 
-### T3.10 Wire up sidebar navigation clicks
+### T3.10 Wire up sidebar navigation clicks ✅
 **Satisfies**: FR-NAV-010–011, FR-NAV-020, FR-NAV-030
 **Dependencies**: T3.3, T3.4, T3.5, T3.7, T3.9
 **Acceptance**:
-- [ ] Today button calls goHome()
-- [ ] Topic/person item click calls navigateToTopic()
-- [ ] Doc item click calls navigateTo()
-- [ ] Task item click calls navigateTo()
-- [ ] Context weighting updates on each navigation
+- [x] Today button calls goHome()
+- [x] Topic/person item click calls navigateToTopic()
+- [x] Doc item click calls navigateTo()
+- [x] Task item click calls navigateTo()
+- [x] Context weighting updates on each navigation
 
 **Verify**: Click each item type, center panel and relevance update
 
 ---
 
-### T3.11 Implement context-based sidebar reordering
+### T3.11 Implement context-based sidebar reordering ✅
 **Satisfies**: FR-CTX-010–014
 **Dependencies**: T3.4, T3.5, T3.9
 **Acceptance**:
-- [ ] When not home state, related topics float to top of TopicsList
-- [ ] Related docs float to top of DocsList
-- [ ] Home state shows natural order (most recent)
+- [x] When not home state, related topics float to top of TopicsList
+- [x] Related docs float to top of DocsList
+- [x] Home state shows natural order (most recent)
 
 **Verify**: Navigate to entity with topics, sidebar reorders; click Today, resets
 

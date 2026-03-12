@@ -1,6 +1,19 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, createMemo, onMount, onCleanup, Show } from "solid-js";
 import { SetupScreen } from "./components/SetupScreen";
-import { SettingsService } from "./services";
+import { Layout } from "./components/layout/Layout";
+import { LeftSidebar } from "./components/layout/LeftSidebar";
+import { CenterPanel } from "./components/layout/CenterPanel";
+import { RightPanel } from "./components/layout/RightPanel";
+import {
+  SettingsService,
+  IndexService,
+  NavigationService,
+  FileService,
+} from "./services";
+import { indexStore } from "./stores/indexStore";
+import { contextStore } from "./stores/contextStore";
+import type { Topic } from "./types/topics";
+import type { Doc } from "./types/entities";
 
 /**
  * Application state
@@ -9,28 +22,115 @@ type AppState = "loading" | "setup" | "ready";
 
 function App() {
   const [appState, setAppState] = createSignal<AppState>("loading");
-  const [rootPath, setRootPath] = createSignal<string | null>(null);
+  // eslint-disable-next-line solid/reactivity
+  const [, setRootPath] = createSignal<string | null>(null);
+  let unwatchFn: (() => void) | null = null;
 
   onMount(async () => {
-    // Check if the app has been configured
     const configured = await SettingsService.isConfigured();
 
     if (configured) {
       const path = await SettingsService.getRootPath();
       setRootPath(path);
+      if (path) {
+        await IndexService.buildIndex(path);
+        startFileWatcher(path);
+      }
       setAppState("ready");
     } else {
       setAppState("setup");
     }
   });
 
-  /**
-   * Handle setup completion
-   */
-  function handleSetupComplete(path: string) {
+  onCleanup(() => {
+    unwatchFn?.();
+  });
+
+  function startFileWatcher(path: string) {
+    unwatchFn = FileService.onFileChange((event) => {
+      if (event.path.endsWith(".md") || event.path.endsWith(".yaml")) {
+        void IndexService.invalidate(event.path, path);
+      }
+    });
+    void FileService.startWatching(path);
+  }
+
+  async function handleSetupComplete(path: string) {
     setRootPath(path);
+    await IndexService.buildIndex(path);
+    startFileWatcher(path);
     setAppState("ready");
   }
+
+  /**
+   * Active topics, sorted with context-based reordering (T3.11).
+   * When not home state, related topics float to top.
+   */
+  const sortedTopics = createMemo((): Topic[] => {
+    const topics = Array.from(indexStore.topics.values()).filter(
+      (t) => t.isActive
+    );
+
+    if (contextStore.isHomeState) {
+      // Natural order: most recently used
+      return topics.sort((a, b) => {
+        const aTime = a.lastUsed?.getTime() ?? 0;
+        const bTime = b.lastUsed?.getTime() ?? 0;
+        return bTime - aTime;
+      });
+    }
+
+    // Related topics float to top
+    const weights = contextStore.relevanceWeights;
+    return topics.sort((a, b) => {
+      const aWeight = getTopicWeight(a, weights);
+      const bWeight = getTopicWeight(b, weights);
+      if (aWeight !== bWeight) return bWeight - aWeight;
+      const aTime = a.lastUsed?.getTime() ?? 0;
+      const bTime = b.lastUsed?.getTime() ?? 0;
+      return bTime - aTime;
+    });
+  });
+
+  /**
+   * Docs list, sorted with context-based reordering (T3.11).
+   * When not home state, related docs float to top.
+   */
+  const sortedDocs = createMemo((): Doc[] => {
+    const docs = Array.from(indexStore.docs.values());
+
+    if (contextStore.isHomeState) {
+      // Alphabetical by title
+      return docs.sort((a, b) =>
+        a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+      );
+    }
+
+    // Related docs float to top, rest alphabetical
+    const weights = contextStore.relevanceWeights;
+    return docs.sort((a, b) => {
+      const aWeight = weights.get(a.path) ?? 0;
+      const bWeight = weights.get(b.path) ?? 0;
+      if (aWeight !== bWeight) return bWeight - aWeight;
+      return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
+    });
+  });
+
+  /**
+   * Grouped tasks for the right panel.
+   */
+  const groupedTasks = createMemo(() => {
+    return IndexService.getGroupedTasks(contextStore);
+  });
+
+  /**
+   * Path of the currently active task (for highlight indicator).
+   */
+  const highlightedTaskPath = createMemo(() => {
+    const entity = contextStore.activeEntity;
+    if (entity && entity.type === "task") return entity.path;
+    return null;
+  });
 
   return (
     <>
@@ -45,21 +145,42 @@ function App() {
       </Show>
 
       <Show when={appState() === "ready"}>
-        <main class="min-h-screen bg-gray-100 p-4">
-          <div class="mx-auto max-w-4xl">
-            <h1 class="mb-4 text-2xl font-bold text-gray-900">NslNotes</h1>
-            <div class="rounded-lg bg-white p-6 shadow">
-              <p class="mb-2 text-gray-600">Notes directory:</p>
-              <p class="font-mono text-sm text-gray-800">{rootPath()}</p>
-              <p class="mt-4 text-sm text-gray-500">
-                Phase 1 complete! The app is configured and ready for Phase 2.
-              </p>
-            </div>
-          </div>
-        </main>
+        <Layout
+          left={
+            <LeftSidebar
+              topics={sortedTopics()}
+              docs={sortedDocs()}
+              onTodayClick={() => NavigationService.goHome()}
+              onTopicClick={(ref) => NavigationService.navigateToTopic(ref)}
+              onDocClick={(doc) => NavigationService.navigateTo(doc)}
+              onCreateDoc={() => console.log("Create doc")}
+            />
+          }
+          center={<CenterPanel activeView={contextStore.activeView} />}
+          right={
+            <RightPanel
+              groupedTasks={groupedTasks()}
+              isHomeState={contextStore.isHomeState}
+              highlightedTaskPath={highlightedTaskPath()}
+              onTaskClick={(task) => NavigationService.navigateTo(task)}
+              onCreateTask={() => console.log("Create task")}
+            />
+          }
+        />
       </Show>
     </>
   );
+}
+
+/**
+ * Get the relevance weight for a topic based on its references.
+ */
+function getTopicWeight(topic: Topic, weights: Map<string, number>): number {
+  let total = 0;
+  for (const ref of topic.references) {
+    total += weights.get(ref.path) ?? 0;
+  }
+  return total;
 }
 
 export default App;
