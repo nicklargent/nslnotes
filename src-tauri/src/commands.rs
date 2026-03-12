@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use tauri::{AppHandle, Manager};
 
 /// Result of directory verification
 #[derive(Debug, Serialize, Deserialize)]
@@ -8,6 +9,16 @@ pub struct DirectoryStatus {
     pub readable: bool,
     pub writable: bool,
 }
+
+/// Application settings
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+pub struct AppSettings {
+    #[serde(rename = "rootPath")]
+    pub root_path: Option<String>,
+}
+
+/// Settings filename
+const SETTINGS_FILE: &str = "settings.json";
 
 /// Read file contents as string
 #[tauri::command]
@@ -107,4 +118,46 @@ pub async fn ensure_directory(path: String) -> Result<(), String> {
     }
 
     fs::create_dir_all(dir).map_err(|e| format!("Failed to create directory '{}': {}", path, e))
+}
+
+/// Get the settings file path
+fn get_settings_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("Failed to get config directory: {}", e))?;
+
+    // Ensure config directory exists
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+
+    Ok(config_dir.join(SETTINGS_FILE))
+}
+
+/// Load application settings
+#[tauri::command]
+pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
+    let settings_path = get_settings_path(&app)?;
+
+    if !settings_path.exists() {
+        return Ok(AppSettings::default());
+    }
+
+    let content = fs::read_to_string(&settings_path)
+        .map_err(|e| format!("Failed to read settings: {}", e))?;
+
+    serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))
+}
+
+/// Save application settings
+#[tauri::command]
+pub async fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
+    let settings_path = get_settings_path(&app)?;
+
+    let content =
+        serde_json::to_string_pretty(&settings).map_err(|e| format!("Failed to serialize settings: {}", e))?;
+
+    fs::write(&settings_path, content).map_err(|e| format!("Failed to write settings: {}", e))
 }

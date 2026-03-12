@@ -106,80 +106,80 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ---
 
-### T1.9 Implement slug generation utility
+### T1.9 Implement slug generation utility ✅
 **Satisfies**: FR-FS-030, FR-FS-031
 **Dependencies**: T1.5
 **Acceptance**:
-- [ ] `src/lib/slug.ts` with `generateSlug(title: string): string`
-- [ ] Converts to lowercase, replaces spaces with hyphens
-- [ ] Removes special characters, collapses multiple hyphens
-- [ ] `generateUniqueSlug(title, directory)` appends `-2`, `-3` for collisions
+- [x] `src/lib/slug.ts` with `generateSlug(title: string): string`
+- [x] Converts to lowercase, replaces spaces with hyphens
+- [x] Removes special characters, collapses multiple hyphens
+- [x] `generateUniqueSlug(title, directory)` appends `-2`, `-3` for collisions
 
 **Verify**: Unit tests for edge cases: "Hello World!" → "hello-world", collision handling
 
 ---
 
-### T1.10 Implement frontmatter parsing
+### T1.10 Implement frontmatter parsing ✅
 **Satisfies**: FR-FS-040–061
 **Dependencies**: T1.5
 **Acceptance**:
-- [ ] `src/lib/frontmatter.ts` with `parse(content: string): { frontmatter, body }`
-- [ ] `serialize(frontmatter, body): string` for writing
-- [ ] Validates required fields per entity type
-- [ ] Returns typed frontmatter matching entity schemas
+- [x] `src/lib/frontmatter.ts` with `parse(content: string): { frontmatter, body }`
+- [x] `serialize(frontmatter, body): string` for writing
+- [x] Validates required fields per entity type
+- [x] Returns typed frontmatter matching entity schemas
 
 **Verify**: Unit tests for valid/invalid frontmatter, round-trip parse→serialize
 
 ---
 
-### T1.11 Implement date utilities
+### T1.11 Implement date utilities ✅
 **Satisfies**: FR-FS-020–023
 **Dependencies**: None
 **Acceptance**:
-- [ ] `src/lib/dates.ts` with ISO date functions
-- [ ] `toISODate(date: Date): string` returns YYYY-MM-DD
-- [ ] `parseISODate(str: string): Date | null` validates format
-- [ ] `isWithinDays(date, days)` for "THIS WEEK" logic
-- [ ] `getRelativeDays(date)` for overdue calculation
+- [x] `src/lib/dates.ts` with ISO date functions
+- [x] `toISODate(date: Date): string` returns YYYY-MM-DD
+- [x] `parseISODate(str: string): Date | null` validates format
+- [x] `isWithinDays(date, days)` for "THIS WEEK" logic
+- [x] `getRelativeDays(date)` for overdue calculation
 
 **Verify**: Unit tests including edge cases (year boundaries, invalid dates)
 
 ---
 
-### T1.12 Implement FileService
+### T1.12 Implement FileService ✅
 **Satisfies**: Design §6.1, FR-FS-001, FR-FS-002, FR-FS-010–013
 **Dependencies**: T1.6, T1.7, T1.8
 **Acceptance**:
-- [ ] `src/services/FileService.ts` implements Design §6.1 interface
-- [ ] `read`, `write`, `delete`, `exists`, `list`, `stat` methods
-- [ ] `watch` subscribes to file change events
-- [ ] `verifyDirectory` and `ensureDirectory` for root setup
+- [x] `src/services/FileService.ts` implements Design §6.1 interface
+- [x] `read`, `write`, `delete`, `exists`, `list`, `stat` methods
+- [x] `watch` subscribes to file change events
+- [x] `verifyDirectory` and `ensureDirectory` for root setup
 
 **Verify**: Integration test reads/writes files, watch triggers on external changes
 
 ---
 
-### T1.13 Implement settings persistence
+### T1.13 Implement settings persistence ✅
 **Satisfies**: FR-FS-001, FR-FS-002 (root directory config)
 **Dependencies**: T1.7
 **Acceptance**:
-- [ ] Settings stored in Tauri app config folder
-- [ ] `loadSettings()` returns `{ rootPath: string | null }`
-- [ ] `saveSettings(settings)` persists to config
-- [ ] Settings survive app restart
+- [x] Settings stored in Tauri app config folder
+- [x] `loadSettings()` returns `{ rootPath: string | null }`
+- [x] `saveSettings(settings)` persists to config
+- [x] Settings survive app restart
 
 **Verify**: Set root path, restart app, path is remembered
 
 ---
 
-### T1.14 Implement first-launch folder picker
+### T1.14 Implement first-launch folder picker ✅
 **Satisfies**: FR-FS-001, FR-FS-002
 **Dependencies**: T1.13
 **Acceptance**:
-- [ ] On first launch (no saved rootPath), native folder picker opens
-- [ ] Selected path validated for write permissions
-- [ ] If invalid, error shown, picker re-opens
-- [ ] On success, path saved and subdirectories created
+- [x] On first launch (no saved rootPath), native folder picker opens
+- [x] Selected path validated for write permissions
+- [x] If invalid, error shown, picker re-opens
+- [x] On success, path saved and subdirectories created
 
 **Verify**: Delete config, launch app, picker appears, select folder, app loads
 

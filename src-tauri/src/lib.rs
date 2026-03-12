@@ -2,8 +2,8 @@ mod commands;
 mod watcher;
 
 use commands::{
-    delete_file, ensure_directory, file_exists, list_directory, read_file, verify_directory,
-    write_file,
+    delete_file, ensure_directory, file_exists, list_directory, load_settings, read_file,
+    save_settings, verify_directory, write_file,
 };
 use std::sync::{Arc, Mutex};
 use watcher::{get_watcher_status, start_watching, stop_watching, WatcherState};
@@ -18,6 +18,7 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(Mutex::new(WatcherState::default())))
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -30,7 +31,9 @@ pub fn run() {
             ensure_directory,
             start_watching,
             stop_watching,
-            get_watcher_status
+            get_watcher_status,
+            load_settings,
+            save_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
