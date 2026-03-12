@@ -1,5 +1,13 @@
 import { createSignal, createMemo, onMount, onCleanup, Show } from "solid-js";
 import { SetupScreen } from "./components/SetupScreen";
+import { AppErrorBoundary } from "./components/ErrorBoundary";
+import { ToastContainer, showToast } from "./components/Toast";
+import {
+  SidebarSkeleton,
+  JournalSkeleton,
+  TaskListSkeleton,
+} from "./components/LoadingSkeleton";
+import { KeyboardShortcutsModal } from "./components/modals/KeyboardShortcutsModal";
 import { Layout } from "./components/layout/Layout";
 import { LeftSidebar } from "./components/layout/LeftSidebar";
 import { CenterPanel } from "./components/layout/CenterPanel";
@@ -27,26 +35,57 @@ function App() {
   const [appState, setAppState] = createSignal<AppState>("loading");
   // eslint-disable-next-line solid/reactivity
   const [, setRootPath] = createSignal<string | null>(null);
+  const [showShortcuts, setShowShortcuts] = createSignal(false);
   let unwatchFn: (() => void) | null = null;
 
   onMount(async () => {
-    const configured = await SettingsService.isConfigured();
+    try {
+      const configured = await SettingsService.isConfigured();
 
-    if (configured) {
-      const path = await SettingsService.getRootPath();
-      setRootPath(path);
-      if (path) {
-        await IndexService.buildIndex(path);
-        startFileWatcher(path);
+      if (configured) {
+        const path = await SettingsService.getRootPath();
+        setRootPath(path);
+        if (path) {
+          await IndexService.buildIndex(path);
+          startFileWatcher(path);
+        }
+        setAppState("ready");
+      } else {
+        setAppState("setup");
       }
-      setAppState("ready");
-    } else {
+    } catch (err) {
+      showToast(
+        `Failed to initialize: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "error"
+      );
       setAppState("setup");
     }
   });
 
   onCleanup(() => {
     unwatchFn?.();
+  });
+
+  // Global keyboard shortcut: ? for help (T7.6)
+  function handleGlobalKeyDown(e: KeyboardEvent) {
+    if (
+      e.key === "?" &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !(e.target instanceof HTMLInputElement) &&
+      !(e.target instanceof HTMLTextAreaElement) &&
+      !(e.target as HTMLElement)?.closest?.(".tiptap")
+    ) {
+      e.preventDefault();
+      setShowShortcuts((s) => !s);
+    }
+  }
+
+  onMount(() => {
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    onCleanup(() => {
+      document.removeEventListener("keydown", handleGlobalKeyDown);
+    });
   });
 
   function startFileWatcher(path: string) {
@@ -63,11 +102,11 @@ function App() {
     await IndexService.buildIndex(path);
     startFileWatcher(path);
     setAppState("ready");
+    showToast("Notes folder configured successfully", "success");
   }
 
   /**
    * Active topics, sorted with context-based reordering (T3.11).
-   * When not home state, related topics float to top.
    */
   const sortedTopics = createMemo((): Topic[] => {
     const topics = Array.from(indexStore.topics.values()).filter(
@@ -75,7 +114,6 @@ function App() {
     );
 
     if (contextStore.isHomeState) {
-      // Natural order: most recently used
       return topics.sort((a, b) => {
         const aTime = a.lastUsed?.getTime() ?? 0;
         const bTime = b.lastUsed?.getTime() ?? 0;
@@ -83,7 +121,6 @@ function App() {
       });
     }
 
-    // Related topics float to top
     const weights = contextStore.relevanceWeights;
     return topics.sort((a, b) => {
       const aWeight = getTopicWeight(a, weights);
@@ -97,19 +134,16 @@ function App() {
 
   /**
    * Docs list, sorted with context-based reordering (T3.11).
-   * When not home state, related docs float to top.
    */
   const sortedDocs = createMemo((): Doc[] => {
     const docs = Array.from(indexStore.docs.values());
 
     if (contextStore.isHomeState) {
-      // Alphabetical by title
       return docs.sort((a, b) =>
         a.title.toLowerCase().localeCompare(b.title.toLowerCase())
       );
     }
 
-    // Related docs float to top, rest alphabetical
     const weights = contextStore.relevanceWeights;
     return docs.sort((a, b) => {
       const aWeight = weights.get(a.path) ?? 0;
@@ -119,16 +153,10 @@ function App() {
     });
   });
 
-  /**
-   * Grouped tasks for the right panel.
-   */
   const groupedTasks = createMemo(() => {
     return IndexService.getGroupedTasks(contextStore);
   });
 
-  /**
-   * Path of the currently active task (for highlight indicator).
-   */
   const highlightedTaskPath = createMemo(() => {
     const entity = contextStore.activeEntity;
     if (entity && entity.type === "task") return entity.path;
@@ -149,11 +177,13 @@ function App() {
   }
 
   return (
-    <>
+    <AppErrorBoundary>
       <Show when={appState() === "loading"}>
-        <div class="flex min-h-screen items-center justify-center bg-gray-50">
-          <div class="text-gray-500">Loading...</div>
-        </div>
+        <Layout
+          left={<SidebarSkeleton />}
+          center={<JournalSkeleton />}
+          right={<TaskListSkeleton />}
+        />
       </Show>
 
       <Show when={appState() === "setup"}>
@@ -202,7 +232,13 @@ function App() {
           <CreateDocModal onClose={() => setShowDocModal(false)} />
         </Show>
       </Show>
-    </>
+
+      <Show when={showShortcuts()}>
+        <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
+      </Show>
+
+      <ToastContainer />
+    </AppErrorBoundary>
   );
 }
 

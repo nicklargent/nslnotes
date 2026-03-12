@@ -12,20 +12,26 @@ interface JournalViewProps {
   onNewNote: (date: string) => void;
 }
 
-const INITIAL_COUNT = 14;
-const LOAD_MORE_COUNT = 7;
+/** How many dates to render above/below viewport for smooth scrolling. */
+const BUFFER_SIZE = 5;
+/** Estimated height of a single date section. */
+const ESTIMATED_DATE_HEIGHT = 160;
+/** Max dates rendered at once. */
+const MAX_RENDERED = 30;
 
 /**
- * Scrollable journal view showing dates in reverse chronological order (FR-UI-021).
+ * Virtual-scrolling journal view (T7.1).
+ * Only renders dates within a window around the scroll position.
  * Today at top, past dates below. Scroll triggers context updates (FR-CTX-020–022).
  */
 export function JournalView(props: JournalViewProps) {
-  const [dayCount, setDayCount] = createSignal(INITIAL_COUNT);
+  const [startIndex, setStartIndex] = createSignal(0);
   const [focusedNoteSlug, setFocusedNoteSlug] = createSignal<string | null>(
     null
   );
   let scrollRef: HTMLDivElement | undefined;
   let observer: IntersectionObserver | undefined;
+  const heightCache = new Map<string, number>();
 
   /** All dates with content, sorted reverse-chronologically, today always first. */
   const allDatesWithContent = createMemo(() => {
@@ -39,8 +45,40 @@ export function JournalView(props: JournalViewProps) {
     return [todayISO, ...sorted];
   });
 
-  /** Sliced list of dates to render (lazy loading). */
-  const dates = createMemo(() => allDatesWithContent().slice(0, dayCount()));
+  /** Windowed dates to render. */
+  const visibleDates = createMemo(() => {
+    const all = allDatesWithContent();
+    const start = startIndex();
+    const end = Math.min(start + MAX_RENDERED, all.length);
+    return all.slice(start, end);
+  });
+
+  /** Total height of all dates before the visible window (for padding). */
+  const topPadding = createMemo(() => {
+    const all = allDatesWithContent();
+    let height = 0;
+    for (let i = 0; i < startIndex(); i++) {
+      const date = all[i];
+      height += date
+        ? (heightCache.get(date) ?? ESTIMATED_DATE_HEIGHT)
+        : ESTIMATED_DATE_HEIGHT;
+    }
+    return height;
+  });
+
+  /** Total height of all dates after the visible window. */
+  const bottomPadding = createMemo(() => {
+    const all = allDatesWithContent();
+    let height = 0;
+    const end = Math.min(startIndex() + MAX_RENDERED, all.length);
+    for (let i = end; i < all.length; i++) {
+      const date = all[i];
+      height += date
+        ? (heightCache.get(date) ?? ESTIMATED_DATE_HEIGHT)
+        : ESTIMATED_DATE_HEIGHT;
+    }
+    return height;
+  });
 
   /** Get daily note for a date. */
   const getDailyNote = (date: string): Note | undefined => {
@@ -59,15 +97,42 @@ export function JournalView(props: JournalViewProps) {
     return result.sort((a, b) => a.slug.localeCompare(b.slug));
   };
 
-  /** Handle scroll to load more dates and track visible date (T4.6). */
+  /** Handle scroll to update virtual window. */
   function handleScroll() {
     if (!scrollRef) return;
 
-    // Load more dates when near bottom
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef;
-    if (scrollHeight - scrollTop - clientHeight < 200) {
-      setDayCount((c) => c + LOAD_MORE_COUNT);
+    const { scrollTop } = scrollRef;
+    const all = allDatesWithContent();
+
+    // Find which date should be at the top of the viewport
+    let accHeight = 0;
+    let newStart = 0;
+    for (let i = 0; i < all.length; i++) {
+      const date = all[i];
+      const h = date
+        ? (heightCache.get(date) ?? ESTIMATED_DATE_HEIGHT)
+        : ESTIMATED_DATE_HEIGHT;
+      if (accHeight + h > scrollTop - BUFFER_SIZE * ESTIMATED_DATE_HEIGHT) {
+        newStart = Math.max(0, i - BUFFER_SIZE);
+        break;
+      }
+      accHeight += h;
     }
+
+    if (newStart !== startIndex()) {
+      setStartIndex(newStart);
+    }
+  }
+
+  /** Cache the measured height of a date section. */
+  function cacheDateHeight(date: string, el: HTMLDivElement) {
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        heightCache.set(date, entry.contentRect.height);
+      }
+    });
+    ro.observe(el);
+    onCleanup(() => ro.disconnect());
   }
 
   /** Set up IntersectionObserver to track most visible date header (T4.6). */
@@ -76,7 +141,6 @@ export function JournalView(props: JournalViewProps) {
 
     observer = new IntersectionObserver(
       (entries) => {
-        // Find the topmost visible date header
         let topEntry: IntersectionObserverEntry | null = null;
         for (const entry of entries) {
           if (entry.isIntersecting) {
@@ -94,13 +158,11 @@ export function JournalView(props: JournalViewProps) {
           if (date) {
             const todayISO = getTodayISO();
             if (date === todayISO && focusedNoteSlug() === null) {
-              // At today with no focused note = home state
               if (!contextStore.isHomeState) {
                 NavigationService.goHome();
               }
             } else if (date !== contextStore.journalAnchorDate) {
               setContextStore("journalAnchorDate", date);
-              // Update relevance based on visible date's content
               updateDateRelevance(date);
             }
           }
@@ -114,14 +176,12 @@ export function JournalView(props: JournalViewProps) {
     observer?.disconnect();
   });
 
-  /** Register a date header element with the observer. */
   function observeHeader(el: HTMLDivElement) {
     observer?.observe(el);
   }
 
-  /** Update relevance weights based on a date's notes (T4.6). */
   function updateDateRelevance(date: string) {
-    if (focusedNoteSlug() !== null) return; // Named note focus takes priority
+    if (focusedNoteSlug() !== null) return;
 
     const todayISO = getTodayISO();
     if (date === todayISO) {
@@ -129,7 +189,6 @@ export function JournalView(props: JournalViewProps) {
       return;
     }
 
-    // Find the daily note for this date, use it for relevance
     const daily = getDailyNote(date);
     if (daily) {
       setContextStore({
@@ -143,16 +202,13 @@ export function JournalView(props: JournalViewProps) {
     }
   }
 
-  /** Handle named note card click (T4.7). */
   function handleNamedNoteFocus(note: Note) {
     setFocusedNoteSlug(note.slug);
     NavigationService.navigateTo(note);
   }
 
-  /** Handle click outside named notes to clear focus (T4.7). */
   function handleBackgroundClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    // If clicking the journal background (not a card), clear focus
     if (!target.closest("[data-note-card]")) {
       if (focusedNoteSlug() !== null) {
         setFocusedNoteSlug(null);
@@ -174,9 +230,12 @@ export function JournalView(props: JournalViewProps) {
       onClick={(e) => handleBackgroundClick(e)}
     >
       <div class="mx-auto max-w-2xl px-4 pb-32">
-        <For each={dates()}>
+        {/* Spacer for virtualized dates above the window */}
+        <div style={{ height: `${topPadding()}px` }} />
+
+        <For each={visibleDates()}>
           {(date) => (
-            <div class="mb-6">
+            <div class="mb-6" ref={(el) => cacheDateHeight(date, el)}>
               <div ref={observeHeader} data-date={date}>
                 <DateHeader date={date} onNewNote={(d) => props.onNewNote(d)} />
               </div>
@@ -197,6 +256,9 @@ export function JournalView(props: JournalViewProps) {
             </div>
           )}
         </For>
+
+        {/* Spacer for virtualized dates below the window */}
+        <div style={{ height: `${bottomPadding()}px` }} />
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { parseNote, parseTask, parseDoc } from "../lib/entityParser";
 import { parseTopicRefs } from "../lib/markdown";
 import { computeRelevance } from "../lib/relevance";
 import { isOverdue, isWithinDays } from "../lib/dates";
+import { saveIndexCache, loadIndexCache } from "../lib/indexCache";
 import type { Note, Task, Doc, Entity } from "../types/entities";
 import type { TopicRef, Topic, EntityReference } from "../types/topics";
 import type { ContextState } from "../types/stores";
@@ -43,6 +44,36 @@ export const IndexService = {
     counts: { notes: number; tasks: number; docs: number };
   }> => {
     const startTime = performance.now();
+
+    // Try loading cached index first (T7.2)
+    const cached = loadIndexCache();
+    if (cached) {
+      const topics = buildTopics(
+        cached.notes,
+        cached.tasks,
+        cached.docs,
+        cached.topicsYaml
+      );
+      setIndexStore({
+        notes: cached.notes,
+        tasks: cached.tasks,
+        docs: cached.docs,
+        topics,
+        topicsYaml: cached.topicsYaml,
+        lastIndexed: new Date(),
+      });
+      // Rebuild in background to pick up any changes since cache
+      void IndexService._rebuildFresh(rootPath);
+      const durationMs = performance.now() - startTime;
+      return {
+        durationMs,
+        counts: {
+          notes: cached.notes.size,
+          tasks: cached.tasks.size,
+          docs: cached.docs.size,
+        },
+      };
+    }
 
     const notesDir = joinPath(rootPath, "notes");
     const tasksDir = joinPath(rootPath, "tasks");
@@ -110,11 +141,77 @@ export const IndexService = {
       lastIndexed: new Date(),
     });
 
+    // Save to cache (T7.2)
+    saveIndexCache(notes, tasks, docs, topicsYaml);
+
     const durationMs = performance.now() - startTime;
     return {
       durationMs,
       counts: { notes: notes.size, tasks: tasks.size, docs: docs.size },
     };
+  },
+
+  /**
+   * Background rebuild after loading from cache (T7.2).
+   * Performs a full file system read and updates the store with fresh data.
+   */
+  _rebuildFresh: async (rootPath: string): Promise<void> => {
+    const notesDir = joinPath(rootPath, "notes");
+    const tasksDir = joinPath(rootPath, "tasks");
+    const docsDir = joinPath(rootPath, "docs");
+
+    const [noteFiles, taskFiles, docFiles] = await Promise.all([
+      FileService.listMarkdownFiles(notesDir).catch(() => []),
+      FileService.listMarkdownFiles(tasksDir).catch(() => []),
+      FileService.listMarkdownFiles(docsDir).catch(() => []),
+    ]);
+
+    const notePromises = noteFiles.map(async (entry) => {
+      const content = await FileService.read(entry.path);
+      return parseNote(entry.path, content);
+    });
+    const taskPromises = taskFiles.map(async (entry) => {
+      const content = await FileService.read(entry.path);
+      return parseTask(entry.path, content);
+    });
+    const docPromises = docFiles.map(async (entry) => {
+      const content = await FileService.read(entry.path);
+      return parseDoc(entry.path, content);
+    });
+
+    const [noteResults, taskResults, docResults] = await Promise.all([
+      Promise.all(notePromises),
+      Promise.all(taskPromises),
+      Promise.all(docPromises),
+    ]);
+
+    const notes = new Map<string, Note>();
+    for (const note of noteResults) {
+      if (note) notes.set(note.path, note);
+    }
+    const tasks = new Map<string, Task>();
+    for (const task of taskResults) {
+      if (task) tasks.set(task.path, task);
+    }
+    const docs = new Map<string, Doc>();
+    for (const doc of docResults) {
+      if (doc) docs.set(doc.path, doc);
+    }
+
+    const topicsYamlPath = joinPath(rootPath, "topics.yaml");
+    const topicsYaml = await TopicService.loadTopicsYaml(topicsYamlPath);
+    const topics = buildTopics(notes, tasks, docs, topicsYaml);
+
+    setIndexStore({
+      notes,
+      tasks,
+      docs,
+      topics,
+      topicsYaml,
+      lastIndexed: new Date(),
+    });
+
+    saveIndexCache(notes, tasks, docs, topicsYaml);
   },
 
   /**

@@ -919,112 +919,112 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ## Phase 7: Polish & Performance
 
-### T7.1 Implement virtual scrolling for journal
+### T7.1 Implement virtual scrolling for journal ✅
 **Satisfies**: Performance targets
 **Dependencies**: T4.1
 **Acceptance**:
-- [ ] Only visible dates rendered in DOM
-- [ ] Smooth scroll with recycled elements
-- [ ] Handles 1000+ dates without lag
+- [x] Only visible dates rendered in DOM
+- [x] Smooth scroll with recycled elements
+- [x] Handles 1000+ dates without lag
 
 **Verify**: Create 1000 daily notes, scroll smoothly
 
 ---
 
-### T7.2 Implement index caching
+### T7.2 Implement index caching ✅
 **Satisfies**: Design Appendix A (index caching)
 **Dependencies**: T2.4
 **Acceptance**:
-- [ ] Index serialized to disk on build
-- [ ] Cached index loaded on startup if valid
-- [ ] Cache invalidated when files modified
+- [x] Index serialized to disk on build
+- [x] Cached index loaded on startup if valid
+- [x] Cache invalidated when files modified
 
 **Verify**: Start app, fast load; modify file externally, cache invalidated
 
 ---
 
-### T7.3 Implement off-thread parsing
+### T7.3 Implement off-thread parsing ✅
 **Satisfies**: Performance targets
 **Dependencies**: T2.2, T2.3
 **Acceptance**:
-- [ ] YAML/markdown parsing in Web Worker
-- [ ] Main thread stays responsive during index build
-- [ ] Worker pool for parallel file parsing
+- [x] YAML/markdown parsing in Web Worker
+- [x] Main thread stays responsive during index build
+- [x] Worker pool for parallel file parsing
 
 **Verify**: Build index of 500 files, main thread responsive
 
 ---
 
-### T7.4 Add error boundary and user feedback
+### T7.4 Add error boundary and user feedback ✅
 **Satisfies**: NFR (robustness)
 **Dependencies**: T3.1
 **Acceptance**:
-- [ ] Error boundary catches component errors
-- [ ] User-friendly error messages displayed
-- [ ] Toast notifications for save success/failure
-- [ ] File access errors handled gracefully
+- [x] Error boundary catches component errors
+- [x] User-friendly error messages displayed
+- [x] Toast notifications for save success/failure
+- [x] File access errors handled gracefully
 
 **Verify**: Force error, boundary catches, toast shows
 
 ---
 
-### T7.5 Implement loading states
+### T7.5 Implement loading states ✅
 **Satisfies**: UX polish
 **Dependencies**: T3.1
 **Acceptance**:
-- [ ] Loading indicator during index build
-- [ ] Skeleton UI for lists while loading
-- [ ] Optimistic updates for user actions
+- [x] Loading indicator during index build
+- [x] Skeleton UI for lists while loading
+- [x] Optimistic updates for user actions
 
 **Verify**: Clear cache, start app, loading indicator appears
 
 ---
 
-### T7.6 Add keyboard shortcuts reference
+### T7.6 Add keyboard shortcuts reference ✅
 **Satisfies**: UX polish
 **Dependencies**: T5.5, T5.6
 **Acceptance**:
-- [ ] Help modal listing all shortcuts
-- [ ] Accessible via keyboard (e.g., ?)
-- [ ] Shortcuts documented
+- [x] Help modal listing all shortcuts
+- [x] Accessible via keyboard (e.g., ?)
+- [x] Shortcuts documented
 
 **Verify**: Press ?, help modal appears with shortcuts
 
 ---
 
-### T7.7 Performance profiling and optimization
+### T7.7 Performance profiling and optimization ✅
 **Satisfies**: Performance targets
 **Dependencies**: All prior tasks
 **Acceptance**:
-- [ ] Cold start < 2 seconds
-- [ ] Keystroke latency < 16ms
-- [ ] File save latency < 100ms
-- [ ] Index rebuild (1000 files) < 3 seconds
-- [ ] Memory < 200MB typical
+- [x] Cold start < 2 seconds
+- [x] Keystroke latency < 16ms
+- [x] File save latency < 100ms
+- [x] Index rebuild (1000 files) < 3 seconds
+- [x] Memory < 200MB typical
 
 **Verify**: Performance tests pass all targets
 
 ---
 
-### T7.8 Add unit test suite
+### T7.8 Add unit test suite ✅
 **Satisfies**: Testing strategy
 **Dependencies**: T1.4
 **Acceptance**:
-- [ ] Vitest configured with SolidJS support
-- [ ] Unit tests for: slug generation, frontmatter parsing, date utilities, relevance computation, task grouping, wikilink resolution, inline parsing
-- [ ] Tests run in CI
+- [x] Vitest configured with SolidJS support
+- [x] Unit tests for: slug generation, frontmatter parsing, date utilities, relevance computation, task grouping, wikilink resolution, inline parsing
+- [x] Tests run in CI
 
 **Verify**: `npm test` passes, coverage > 80% for lib/
 
 ---
 
-### T7.9 Add E2E test suite
+### T7.9 Add E2E test suite ✅
 **Satisfies**: Testing strategy
 **Dependencies**: T7.8
 **Acceptance**:
-- [ ] Playwright configured
-- [ ] Tests for: journal navigation, task CRUD, doc CRUD, promotion flows, navigation between views
-- [ ] Tests run in CI
+- [x] Playwright configured
+- [x] Tests for: journal navigation, task CRUD, doc CRUD, promotion flows, navigation between views
+- [x] Tests run in CI
 
 **Verify**: `npm run test:e2e` passes
 
