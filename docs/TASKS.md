@@ -187,132 +187,132 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ## Phase 2: Index & Store
 
-### T2.1 Create SolidJS stores
+### T2.1 Create SolidJS stores ✅
 **Satisfies**: Design §4.3
 **Dependencies**: T1.5
 **Acceptance**:
-- [ ] `src/stores/indexStore.ts` with notes, tasks, docs, topics Maps
-- [ ] `src/stores/contextStore.ts` with activeView, activeEntity, isHomeState
-- [ ] `src/stores/editorStore.ts` with activeFile, mode, isDirty
-- [ ] Exported from `src/stores/index.ts`
+- [x] `src/stores/indexStore.ts` with notes, tasks, docs, topics Maps
+- [x] `src/stores/contextStore.ts` with activeView, activeEntity, isHomeState
+- [x] `src/stores/editorStore.ts` with activeFile, mode, isDirty
+- [x] Exported from `src/stores/index.ts`
 
 **Verify**: Import stores in component, reactivity works on update
 
 ---
 
-### T2.2 Implement entity parsing from files
+### T2.2 Implement entity parsing from files ✅
 **Satisfies**: FR-FS-040–061
 **Dependencies**: T1.10, T1.5
 **Acceptance**:
-- [ ] `parseNote(path, content)` returns Note or null (invalid)
-- [ ] `parseTask(path, content)` returns Task or null
-- [ ] `parseDoc(path, content)` returns Doc or null
-- [ ] Extracts all frontmatter fields, validates required ones
+- [x] `parseNote(path, content)` returns Note or null (invalid)
+- [x] `parseTask(path, content)` returns Task or null
+- [x] `parseDoc(path, content)` returns Doc or null
+- [x] Extracts all frontmatter fields, validates required ones
 
 **Verify**: Unit tests for valid notes/tasks/docs, invalid files return null
 
 ---
 
-### T2.3 Implement inline syntax parsing
+### T2.3 Implement inline syntax parsing ✅
 **Satisfies**: FR-ENT-040–043, Design §5.3
 **Dependencies**: T1.5
 **Acceptance**:
-- [ ] `src/lib/markdown.ts` with `parseTodos(content): TodoItem[]`
-- [ ] `parseWikilinks(content): WikiLink[]`
-- [ ] `parseTopicRefs(content): TopicRef[]`
-- [ ] Handles edge cases (escaped, in code blocks)
+- [x] `src/lib/markdown.ts` with `parseTodos(content): TodoItem[]`
+- [x] `parseWikilinks(content): WikiLink[]`
+- [x] `parseTopicRefs(content): TopicRef[]`
+- [x] Handles edge cases (escaped, in code blocks)
 
 **Verify**: Unit tests for `- TODO foo`, `[[task:slug]]`, `#topic`, `@person`
 
 ---
 
-### T2.4 Implement IndexService file enumeration
+### T2.4 Implement IndexService file enumeration ✅
 **Satisfies**: NFR-010, NFR-011
 **Dependencies**: T1.12, T2.2
 **Acceptance**:
-- [ ] `buildIndex(rootPath)` reads all .md files in notes/, tasks/, docs/
-- [ ] Parses each file, filters invalid ones
-- [ ] Populates indexStore with Notes, Tasks, Docs Maps
-- [ ] Returns timing info for performance monitoring
+- [x] `buildIndex(rootPath)` reads all .md files in notes/, tasks/, docs/
+- [x] Parses each file, filters invalid ones
+- [x] Populates indexStore with Notes, Tasks, Docs Maps
+- [x] Returns timing info for performance monitoring
 
 **Verify**: Create test files, call buildIndex, stores populated correctly
 
 ---
 
-### T2.5 Implement topic extraction and aggregation
+### T2.5 Implement topic extraction and aggregation ✅
 **Satisfies**: FR-ENT-030–033
 **Dependencies**: T2.3, T2.4
 **Acceptance**:
-- [ ] Extracts topics from frontmatter AND body content
-- [ ] Builds topics Map with references to all entities
-- [ ] Computes `isActive` based on 90-day rule + open tasks
-- [ ] Stores `lastUsed` date for sorting
+- [x] Extracts topics from frontmatter AND body content
+- [x] Builds topics Map with references to all entities
+- [x] Computes `isActive` based on 90-day rule + open tasks
+- [x] Stores `lastUsed` date for sorting
 
 **Verify**: Index files with topics, verify active/dormant classification
 
 ---
 
-### T2.6 Implement topics.yaml parsing
+### T2.6 Implement topics.yaml parsing ✅
 **Satisfies**: FR-FS-070, FR-FS-071
 **Dependencies**: T1.12, T1.5
 **Acceptance**:
-- [ ] `TopicService.loadTopicsYaml(path)` returns Map<TopicRef, TopicDecoration>
-- [ ] Handles missing file gracefully (returns empty map)
-- [ ] Validates id field has # or @ prefix
-- [ ] Merges with computed topics for display labels
+- [x] `TopicService.loadTopicsYaml(path)` returns Map<TopicRef, TopicDecoration>
+- [x] Handles missing file gracefully (returns empty map)
+- [x] Validates id field has # or @ prefix
+- [x] Merges with computed topics for display labels
 
 **Verify**: Create topics.yaml with labels, verify getLabel returns decoration
 
 ---
 
-### T2.7 Implement relevance computation
+### T2.7 Implement relevance computation ✅
 **Satisfies**: FR-CTX-001–003
 **Dependencies**: T2.5
 **Acceptance**:
-- [ ] `src/lib/relevance.ts` with `computeRelevance(entity): Map<string, number>`
-- [ ] Shared topics contribute to score
-- [ ] Direct wikilinks contribute to score
-- [ ] No ML, fully deterministic
+- [x] `src/lib/relevance.ts` with `computeRelevance(entity): Map<string, number>`
+- [x] Shared topics contribute to score
+- [x] Direct wikilinks contribute to score
+- [x] No ML, fully deterministic
 
 **Verify**: Unit test: entity A shares 2 topics with B → higher score than 1 shared
 
 ---
 
-### T2.8 Implement task grouping logic
+### T2.8 Implement task grouping logic ✅
 **Satisfies**: FR-UI-032, FR-UI-033, Design §5.5
 **Dependencies**: T2.4, T2.7, T1.11
 **Acceptance**:
-- [ ] `IndexService.getGroupedTasks(context)` returns GroupedTasks
-- [ ] RELATED: tasks with relevance > 0 when not home state
-- [ ] OVERDUE: due date < today
-- [ ] THIS_WEEK: due within 7 days
-- [ ] LATER: no due or beyond 7 days
-- [ ] Home state: no RELATED section
+- [x] `IndexService.getGroupedTasks(context)` returns GroupedTasks
+- [x] RELATED: tasks with relevance > 0 when not home state
+- [x] OVERDUE: due date < today
+- [x] THIS_WEEK: due within 7 days
+- [x] LATER: no due or beyond 7 days
+- [x] Home state: no RELATED section
 
 **Verify**: Create tasks with various due dates, verify grouping
 
 ---
 
-### T2.9 Implement file change handling
+### T2.9 Implement file change handling ✅
 **Satisfies**: NFR-011
 **Dependencies**: T1.12, T2.4
 **Acceptance**:
-- [ ] `IndexService.invalidate(path)` re-parses single file
-- [ ] Updates relevant store entries
-- [ ] Recomputes affected topic aggregations
-- [ ] FileService watch triggers invalidate
+- [x] `IndexService.invalidate(path)` re-parses single file
+- [x] Updates relevant store entries
+- [x] Recomputes affected topic aggregations
+- [x] FileService watch triggers invalidate
 
 **Verify**: Modify file externally, UI updates without manual refresh
 
 ---
 
-### T2.10 Implement wikilink resolution
+### T2.10 Implement wikilink resolution ✅
 **Satisfies**: FR-NAV-040, FR-NAV-041
 **Dependencies**: T2.3, T2.4
 **Acceptance**:
-- [ ] `IndexService.resolveWikilink(link): Entity | null`
-- [ ] Resolves `[[task:slug]]`, `[[doc:slug]]`, `[[note:YYYY-MM-DD]]`, `[[note:YYYY-MM-DD-slug]]`
-- [ ] Returns null for broken links
+- [x] `IndexService.resolveWikilink(link): Entity | null`
+- [x] Resolves `[[task:slug]]`, `[[doc:slug]]`, `[[note:YYYY-MM-DD]]`, `[[note:YYYY-MM-DD-slug]]`
+- [x] Returns null for broken links
 
 **Verify**: Unit tests for valid/invalid wikilinks
 

@@ -42,3 +42,9 @@ export {
   addDays,
   isValidISODate,
 } from "./dates";
+
+export { parseNote, parseTask, parseDoc } from "./entityParser";
+
+export { parseTodos, parseWikilinks, parseTopicRefs } from "./markdown";
+
+export { computeRelevance } from "./relevance";

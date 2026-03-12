@@ -8,3 +8,7 @@ export {
 } from "./FileService";
 
 export { SettingsService, type AppSettings } from "./SettingsService";
+
+export { IndexService } from "./IndexService";
+
+export { TopicService } from "./TopicService";
