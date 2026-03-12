@@ -4,6 +4,7 @@ import { Layout } from "./components/layout/Layout";
 import { LeftSidebar } from "./components/layout/LeftSidebar";
 import { CenterPanel } from "./components/layout/CenterPanel";
 import { RightPanel } from "./components/layout/RightPanel";
+import { CreateNoteModal } from "./components/modals/CreateNoteModal";
 import {
   SettingsService,
   IndexService,
@@ -132,6 +133,17 @@ function App() {
     return null;
   });
 
+  // CreateNoteModal state
+  const [noteModalDate, setNoteModalDate] = createSignal<string | null>(null);
+
+  function handleNewNote(date: string) {
+    setNoteModalDate(date);
+  }
+
+  function handleNoteCreated(_slug: string | null) {
+    setNoteModalDate(null);
+  }
+
   return (
     <>
       <Show when={appState() === "loading"}>
@@ -156,7 +168,12 @@ function App() {
               onCreateDoc={() => console.log("Create doc")}
             />
           }
-          center={<CenterPanel activeView={contextStore.activeView} />}
+          center={
+            <CenterPanel
+              activeView={contextStore.activeView}
+              onNewNote={handleNewNote}
+            />
+          }
           right={
             <RightPanel
               groupedTasks={groupedTasks()}
@@ -167,6 +184,13 @@ function App() {
             />
           }
         />
+        <Show when={noteModalDate() !== null}>
+          <CreateNoteModal
+            date={noteModalDate()!}
+            onClose={() => setNoteModalDate(null)}
+            onCreated={handleNoteCreated}
+          />
+        </Show>
       </Show>
     </>
   );

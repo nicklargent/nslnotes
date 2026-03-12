@@ -109,15 +109,19 @@ export const FileService = {
     let filtered = files;
     if (pattern) {
       const regex = globToRegex(pattern);
-      filtered = files.filter((name) => regex.test(name));
+      filtered = files.filter((f) => regex.test(f));
     }
 
     // Convert to FileEntry format
-    return filtered.map((name) => ({
-      name,
-      path: joinPath(dir, name),
-      isDirectory: !name.includes("."), // Simple heuristic - proper stat would be better
-    }));
+    // Runtime returns absolute paths, so extract the filename for `name`
+    return filtered.map((filePath) => {
+      const name = filePath.split("/").pop() ?? filePath;
+      return {
+        name,
+        path: filePath,
+        isDirectory: !name.includes("."), // Simple heuristic - proper stat would be better
+      };
+    });
   },
 
   /**

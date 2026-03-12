@@ -463,99 +463,99 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ## Phase 4: Journal View
 
-### T4.1 Implement JournalView component structure
+### T4.1 Implement JournalView component structure ✅
 **Satisfies**: FR-UI-021
 **Dependencies**: T3.6
 **Acceptance**:
-- [ ] `JournalView.tsx` renders scrollable list of dates
-- [ ] Today's date at top
-- [ ] Dates in reverse chronological order going down
+- [x] `JournalView.tsx` renders scrollable list of dates
+- [x] Today's date at top
+- [x] Dates in reverse chronological order going down
 
 **Verify**: Journal view shows today, scroll down reveals past dates
 
 ---
 
-### T4.2 Implement DateHeader component
+### T4.2 Implement DateHeader component ✅
 **Satisfies**: FR-UI-021, FR-CTX-020–021
 **Dependencies**: T4.1
 **Acceptance**:
-- [ ] Sticky header with date display
-- [ ] + New Note button on each date header
-- [ ] Date format: human readable (e.g., "March 10, 2026" or "Today")
+- [x] Sticky header with date display
+- [x] + New Note button on each date header
+- [x] Date format: human readable (e.g., "March 10, 2026" or "Today")
 
 **Verify**: Scroll journal, date headers stick at top as expected
 
 ---
 
-### T4.3 Implement DailyNote rendering
+### T4.3 Implement DailyNote rendering ✅
 **Satisfies**: FR-ENT-001
 **Dependencies**: T4.1, T2.4
 **Acceptance**:
-- [ ] If daily note exists, renders content
-- [ ] If no file, renders empty editable area
-- [ ] No file created until first keystroke (deferred to T4.5)
+- [x] If daily note exists, renders content
+- [x] If no file, renders empty editable area
+- [x] No file created until first keystroke (deferred to T4.5)
 
 **Verify**: Navigate to date with no file, empty area shown, no file on disk
 
 ---
 
-### T4.4 Implement NamedNoteCard rendering
+### T4.4 Implement NamedNoteCard rendering ✅
 **Satisfies**: FR-ENT-003
 **Dependencies**: T4.1, T2.4
 **Acceptance**:
-- [ ] Named notes for a date render as cards below daily note
-- [ ] Card shows title and preview/excerpt
-- [ ] Multiple named notes for same date all visible
+- [x] Named notes for a date render as cards below daily note
+- [x] Card shows title and preview/excerpt
+- [x] Multiple named notes for same date all visible
 
 **Verify**: Create named note file, card appears in journal
 
 ---
 
-### T4.5 Implement lazy daily note creation
+### T4.5 Implement lazy daily note creation ✅
 **Satisfies**: FR-ENT-002
 **Dependencies**: T4.3, T1.12, T1.10
 **Acceptance**:
-- [ ] First keystroke in empty daily note creates file
-- [ ] File has valid frontmatter (type: note, date)
-- [ ] Subsequent keystrokes update existing file
+- [x] First keystroke in empty daily note creates file
+- [x] File has valid frontmatter (type: note, date)
+- [x] Subsequent keystrokes update existing file
 
 **Verify**: Type in empty daily, file appears in notes/ with correct frontmatter
 
 ---
 
-### T4.6 Implement journal scroll context updates
+### T4.6 Implement journal scroll context updates ✅
 **Satisfies**: FR-CTX-020–022
 **Dependencies**: T4.1, T3.9
 **Acceptance**:
-- [ ] Scroll position tracked via intersection observer
-- [ ] Most visible date header updates journalAnchorDate
-- [ ] Relevance weights update based on visible date's content
-- [ ] Today anchor = home state (no weighting)
+- [x] Scroll position tracked via intersection observer
+- [x] Most visible date header updates journalAnchorDate
+- [x] Relevance weights update based on visible date's content
+- [x] Today anchor = home state (no weighting)
 
 **Verify**: Scroll to past date, sidebar reorders; scroll back to today, resets
 
 ---
 
-### T4.7 Implement named note focus handling
+### T4.7 Implement named note focus handling ✅
 **Satisfies**: FR-CTX-022
 **Dependencies**: T4.4, T3.9
 **Acceptance**:
-- [ ] Clicking into named note card updates context to that note
-- [ ] Relevance weights based on note's topics/links
-- [ ] Clicking outside returns to date-based or home state
+- [x] Clicking into named note card updates context to that note
+- [x] Relevance weights based on note's topics/links
+- [x] Clicking outside returns to date-based or home state
 
 **Verify**: Click named note, sidebar reflects note's topics; click outside, resets
 
 ---
 
-### T4.8 Implement CreateNoteModal
+### T4.8 Implement CreateNoteModal ✅
 **Satisfies**: FR-INT-030–032
 **Dependencies**: T4.2
 **Acceptance**:
-- [ ] Modal with title field (optional), topics field (optional)
-- [ ] Confirm and cancel buttons
-- [ ] If title empty → cursor placed in daily note (no file created)
-- [ ] If title provided → named note file created
+- [x] Modal with title field (optional), topics field (optional)
+- [x] Confirm and cancel buttons
+- [x] If title empty → cursor placed in daily note (no file created)
+- [x] If title provided → named note file created
 
 **Verify**: Open modal from + button, create named note, file created and card appears
 
