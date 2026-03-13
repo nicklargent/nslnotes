@@ -58,10 +58,25 @@ export function loadIndexCache(): {
     const oneHour = 60 * 60 * 1000;
     if (Date.now() - cache.timestamp > oneHour) return null;
 
+    // Ensure modifiedAt is a proper Date after deserialization
+    const rehydrateDate = <T extends { modifiedAt: Date }>(
+      entries: [string, T][]
+    ): [string, T][] =>
+      entries.map(([key, entity]) => [
+        key,
+        {
+          ...entity,
+          modifiedAt:
+            entity.modifiedAt instanceof Date
+              ? entity.modifiedAt
+              : new Date(entity.modifiedAt as unknown as string),
+        },
+      ]);
+
     return {
-      notes: new Map(cache.notes),
-      tasks: new Map(cache.tasks),
-      docs: new Map(cache.docs),
+      notes: new Map(rehydrateDate(cache.notes)),
+      tasks: new Map(rehydrateDate(cache.tasks)),
+      docs: new Map(rehydrateDate(cache.docs)),
       topicsYaml: new Map(cache.topicsYaml),
     };
   } catch {

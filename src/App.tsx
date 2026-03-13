@@ -21,6 +21,7 @@ import {
   NavigationService,
   FileService,
 } from "./services";
+import { clearIndexCache } from "./lib/indexCache";
 import { indexStore } from "./stores/indexStore";
 import { contextStore } from "./stores/contextStore";
 import type { Topic } from "./types/topics";
@@ -46,7 +47,17 @@ function App() {
         const path = await SettingsService.getRootPath();
         setRootPath(path);
         if (path) {
-          await IndexService.buildIndex(path);
+          try {
+            await IndexService.buildIndex(path);
+          } catch (indexErr) {
+            // Index build failed (likely stale cache) — clear cache and retry
+            console.warn(
+              "Index build failed, clearing cache and retrying:",
+              indexErr
+            );
+            clearIndexCache();
+            await IndexService.buildIndex(path);
+          }
           startFileWatcher(path);
         }
         setAppState("ready");
@@ -54,6 +65,7 @@ function App() {
         setAppState("setup");
       }
     } catch (err) {
+      console.error("Initialization error:", err);
       showToast(
         `Failed to initialize: ${err instanceof Error ? err.message : "Unknown error"}`,
         "error"

@@ -511,11 +511,15 @@ function buildTopics(
       topic.references.push(entityRef);
 
       // Update lastUsed
+      const entityModified =
+        entity.modifiedAt instanceof Date
+          ? entity.modifiedAt
+          : new Date(entity.modifiedAt as unknown as string);
       if (
         !topic.lastUsed ||
-        entity.modifiedAt.getTime() > topic.lastUsed.getTime()
+        entityModified.getTime() > topic.lastUsed.getTime()
       ) {
-        topic.lastUsed = entity.modifiedAt;
+        topic.lastUsed = entityModified;
       }
 
       // Count open tasks

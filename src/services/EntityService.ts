@@ -4,6 +4,7 @@ import { SettingsService } from "./SettingsService";
 import { serialize, parse } from "../lib/frontmatter";
 import { generateUniqueSlug } from "../lib/slug";
 import { getTodayISO } from "../lib/dates";
+import { runtime } from "../lib/runtime";
 import { indexStore } from "../stores/indexStore";
 import type { Note, Task, Doc } from "../types/entities";
 import type { TopicRef } from "../types/topics";
@@ -83,7 +84,7 @@ export const EntityService = {
     if (!rootPath) return null;
 
     const tasksDir = `${rootPath}/tasks`;
-    await FileService.ensureDirectory(tasksDir);
+    await runtime.ensureDirectory(tasksDir);
     const slug = await generateUniqueSlug(params.title, tasksDir);
     const path = `${tasksDir}/${slug}.md`;
 
@@ -142,7 +143,7 @@ export const EntityService = {
     if (!rootPath) return null;
 
     const docsDir = `${rootPath}/docs`;
-    await FileService.ensureDirectory(docsDir);
+    await runtime.ensureDirectory(docsDir);
     const slug = await generateUniqueSlug(params.title, docsDir);
     const path = `${docsDir}/${slug}.md`;
 
@@ -175,7 +176,7 @@ export const EntityService = {
     if (!rootPath) return null;
 
     const tasksDir = `${rootPath}/tasks`;
-    await FileService.ensureDirectory(tasksDir);
+    await runtime.ensureDirectory(tasksDir);
     const slug = await generateUniqueSlug(params.todoText, tasksDir);
     const path = `${tasksDir}/${slug}.md`;
 
@@ -211,7 +212,7 @@ export const EntityService = {
     if (!rootPath) return null;
 
     const docsDir = `${rootPath}/docs`;
-    await FileService.ensureDirectory(docsDir);
+    await runtime.ensureDirectory(docsDir);
     const slug = await generateUniqueSlug(params.title, docsDir);
     const path = `${docsDir}/${slug}.md`;
 
