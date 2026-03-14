@@ -1030,6 +1030,106 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 
 ---
 
+## Phase 8: Bug Fixes
+
+### T8.1 Fix DateHeader to show today's date (Bug 4.a) ✅
+**Satisfies**: FR-UI-021
+**Dependencies**: T4.2
+**Acceptance**:
+- [x] Today's header shows "Today — March 13, 2026" instead of just "Today"
+
+**Verify**: Open journal, today's header shows date alongside "Today"
+
+---
+
+### T8.2 Fix sticky date headers (Bug 4.c) ✅
+**Satisfies**: FR-UI-021, FR-CTX-020–021
+**Dependencies**: T4.2
+**Acceptance**:
+- [x] Date headers stick at top of scroll container when scrolling
+
+**Verify**: Scroll journal, date headers stick at top
+
+---
+
+### T8.3 Fix list bullet rendering in ProseEditor (Bug 14.a) ✅
+**Satisfies**: FR-ED-020
+**Dependencies**: T5.3
+**Acceptance**:
+- [x] Unordered lists show disc bullets
+- [x] Ordered lists show numbers
+
+**Verify**: Create list in prose mode, bullets visible
+
+---
+
+### T8.4 Fix URLs and format toggle in ProseEditor (Bug 14.b) ✅
+**Satisfies**: FR-ED-020, FR-ED-021
+**Dependencies**: T8.3
+**Acceptance**:
+- [x] Markdown links `[text](url)` render and work
+- [x] Bold/italic can be toggled off
+- [x] Link extension installed
+
+**Verify**: Add link, click it; toggle bold on/off
+
+---
+
+### T8.5 Fix OutlinerEditor core operations (Bug 13.x) ✅
+**Satisfies**: FR-ED-010–016
+**Dependencies**: T5.4
+**Acceptance**:
+- [x] Tab/Shift+Tab indents/outdents correctly
+- [x] Alt+Up/Down moves blocks
+- [x] Text doesn't reset while typing
+
+**Verify**: Use all keyboard shortcuts, content stays stable
+
+---
+
+### T8.6 Fix TODO rendering and click cycling (Bug 17.x) ✅
+**Satisfies**: FR-ENT-040–043
+**Dependencies**: T8.5
+**Acceptance**:
+- [x] TODO indicators appear immediately after typing
+- [x] Clicking indicator cycles state
+- [x] Works in both editor modes
+
+**Verify**: Type "- TODO test", indicator appears, click cycles state
+
+---
+
+### T8.7 Fix slash command Enter and slash removal (Bug 18.x) ✅
+**Satisfies**: FR-ED-017
+**Dependencies**: T8.5
+**Acceptance**:
+- [x] Enter selects command from menu
+- [x] Slash character removed from text on command select
+
+**Verify**: Type /, use Enter to select, slash removed
+
+---
+
+### T8.8 Fix autocomplete extra # or @ (Bug 20.c) ✅
+**Satisfies**: FR-INT-050–053
+**Dependencies**: T6.10
+**Acceptance**:
+- [x] Selecting autocomplete replaces the typed # or @ prefix
+
+**Verify**: Type #, select topic, no extra # in text
+
+---
+
+### T8.9 Fix wikilink click navigation (Bug 21.x) ✅
+**Satisfies**: FR-NAV-040, FR-NAV-041
+**Dependencies**: T8.5
+**Acceptance**:
+- [x] Clicking wikilinks navigates to target entity
+
+**Verify**: Click wikilink, navigation occurs
+
+---
+
 ## Summary
 
 | Phase | Tasks | Count | Focus |
@@ -1041,8 +1141,9 @@ Tasks are ordered by dependency. Each references requirements (FR-*, NFR-*) and 
 | 5. Editor | T5.1–T5.16 | 16 | TipTap, outliner, prose, views |
 | 6. Workflows | T6.1–T6.12 | 12 | CRUD, promotion, autocomplete |
 | 7. Polish | T7.1–T7.9 | 9 | Performance, testing, UX |
+| 8. Bug Fixes | T8.1–T8.9 | 9 | Runtime bug fixes from testing |
 
-**Total: 80 tasks**
+**Total: 89 tasks**
 
 ---
 

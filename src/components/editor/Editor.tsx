@@ -40,6 +40,7 @@ export function Editor(props: EditorProps) {
     filter: string;
     startPos: number;
   } | null>(null);
+  const [slashPos, setSlashPos] = createSignal<number | null>(null);
   let editorRef: TiptapEditor | undefined;
 
   function toggleMode() {
@@ -47,7 +48,11 @@ export function Editor(props: EditorProps) {
     props.onModeChange?.(newMode);
   }
 
-  function handleSlashKey(pos: { top: number; left: number }) {
+  function handleSlashKey(
+    pos: { top: number; left: number },
+    cursorPos: number
+  ) {
+    setSlashPos(cursorPos);
     setCommandMenuPos(pos);
   }
 
@@ -56,7 +61,8 @@ export function Editor(props: EditorProps) {
     pos: { top: number; left: number },
     cursorPos: number
   ) {
-    setAutocomplete({ pos, prefix, filter: "", startPos: cursorPos });
+    // Subtract 1 to include the # or @ prefix character in the replacement range
+    setAutocomplete({ pos, prefix, filter: "", startPos: cursorPos - 1 });
   }
 
   function handleAutocompleteFilter(filter: string) {
@@ -219,6 +225,20 @@ export function Editor(props: EditorProps) {
     setCommandMenuPos(null);
 
     if (!editorRef) return;
+
+    // Delete the slash character that triggered the menu
+    const sp = slashPos();
+    if (sp !== null) {
+      editorRef
+        .chain()
+        .focus()
+        .command(({ tr }) => {
+          tr.delete(sp, sp + 1);
+          return true;
+        })
+        .run();
+      setSlashPos(null);
+    }
 
     switch (action) {
       case "promote-to-task":

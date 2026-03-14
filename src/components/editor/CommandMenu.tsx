@@ -110,14 +110,17 @@ export function CommandMenu(props: CommandMenuProps) {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex((i) => Math.min(i + 1, cmds.length - 1));
         break;
       case "ArrowUp":
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex((i) => Math.max(i - 1, 0));
         break;
       case "Enter": {
         e.preventDefault();
+        e.stopPropagation();
         const selected = cmds[selectedIndex()];
         if (selected) {
           props.onSelect(selected.id);
@@ -126,13 +129,15 @@ export function CommandMenu(props: CommandMenuProps) {
       }
       case "Escape":
         e.preventDefault();
+        e.stopPropagation();
         props.onClose();
         break;
     }
   }
 
   onMount(() => {
-    document.addEventListener("keydown", handleKeyDown);
+    // Use capture phase to intercept before TipTap handles Enter/Arrow keys
+    document.addEventListener("keydown", handleKeyDown, true);
     function handleClickOutside(e: MouseEvent) {
       if (menuRef && !menuRef.contains(e.target as Node)) {
         props.onClose();
@@ -141,7 +146,7 @@ export function CommandMenu(props: CommandMenuProps) {
     document.addEventListener("mousedown", handleClickOutside);
 
     onCleanup(() => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("mousedown", handleClickOutside);
     });
   });

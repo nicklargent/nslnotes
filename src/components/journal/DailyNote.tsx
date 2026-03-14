@@ -1,4 +1,4 @@
-import { createSignal, createEffect } from "solid-js";
+import { createSignal, createEffect, onCleanup } from "solid-js";
 import { Editor } from "../editor/Editor";
 import { serialize } from "../../lib/frontmatter";
 import { FileService } from "../../services/FileService";
@@ -29,6 +29,8 @@ export function DailyNote(props: DailyNoteProps) {
     setCreated(!!props.note);
   });
 
+  let pendingSave: { date: string; body: string } | null = null;
+
   function handleUpdate(value: string) {
     setContent(value);
     const date = props.date;
@@ -42,12 +44,27 @@ export function DailyNote(props: DailyNoteProps) {
 
     // Debounced save for subsequent edits (T5.12)
     if (created()) {
+      pendingSave = { date, body: value };
       window.clearTimeout(saveTimeout);
       saveTimeout = window.setTimeout(() => {
-        void saveDailyNote(date, value);
+        if (pendingSave) {
+          void saveDailyNote(pendingSave.date, pendingSave.body);
+          pendingSave = null;
+        }
       }, 300);
     }
   }
+
+  // Flush pending saves on cleanup
+  onCleanup(() => {
+    if (saveTimeout) {
+      window.clearTimeout(saveTimeout);
+    }
+    if (pendingSave) {
+      void saveDailyNote(pendingSave.date, pendingSave.body);
+      pendingSave = null;
+    }
+  });
 
   return (
     <div class="min-h-[60px] py-1">

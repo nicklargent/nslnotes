@@ -235,24 +235,30 @@ export function JournalView(props: JournalViewProps) {
 
         <For each={visibleDates()}>
           {(date) => (
-            <div class="mb-6" ref={(el) => cacheDateHeight(date, el)}>
-              <div ref={observeHeader} data-date={date}>
+            <div ref={(el) => cacheDateHeight(date, el)}>
+              <div
+                ref={observeHeader}
+                data-date={date}
+                class="sticky top-0 z-10"
+              >
                 <DateHeader date={date} onNewNote={(d) => props.onNewNote(d)} />
               </div>
 
-              <DailyNote date={date} note={getDailyNote(date)} />
+              <div class="mb-6">
+                <DailyNote date={date} note={getDailyNote(date)} />
 
-              <For each={getNamedNotes(date)}>
-                {(note) => (
-                  <div data-note-card>
-                    <NamedNoteCard
-                      note={note}
-                      isFocused={focusedNoteSlug() === note.slug}
-                      onClick={(n) => handleNamedNoteFocus(n)}
-                    />
-                  </div>
-                )}
-              </For>
+                <For each={getNamedNotes(date)}>
+                  {(note) => (
+                    <div data-note-card>
+                      <NamedNoteCard
+                        note={note}
+                        isFocused={focusedNoteSlug() === note.slug}
+                        onClick={(n) => handleNamedNoteFocus(n)}
+                      />
+                    </div>
+                  )}
+                </For>
+              </div>
             </div>
           )}
         </For>

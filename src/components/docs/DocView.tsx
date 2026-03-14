@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show, For } from "solid-js";
+import { createSignal, createEffect, onCleanup, Show, For } from "solid-js";
 import { Editor } from "../editor/Editor";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
@@ -20,9 +20,17 @@ export function DocView(props: DocViewProps) {
   const [content, setContent] = createSignal("");
   const [mode, setMode] = createSignal<EditorMode>("prose");
   let saveTimeout: number | undefined;
+  let pendingSave: { path: string; body: string } | null = null;
 
   createEffect(() => {
-    setContent(props.doc.content);
+    const docContent = props.doc.content;
+    // Flush any pending save for the previous doc before switching
+    if (pendingSave && pendingSave.path !== props.doc.path) {
+      window.clearTimeout(saveTimeout);
+      void saveDoc(pendingSave.path, pendingSave.body);
+      pendingSave = null;
+    }
+    setContent(docContent);
     setMode("prose"); // T5.11: docs default to prose
     setEditorStore({
       activeFile: props.doc.path,
@@ -32,14 +40,30 @@ export function DocView(props: DocViewProps) {
   });
 
   function handleUpdate(newContent: string) {
+    const docPath = props.doc.path; // Capture eagerly before timeout
     setContent(newContent);
     setEditorStore("isDirty", true);
 
+    pendingSave = { path: docPath, body: newContent };
     window.clearTimeout(saveTimeout);
     saveTimeout = window.setTimeout(() => {
-      void saveDoc(props.doc.path, newContent);
+      if (pendingSave) {
+        void saveDoc(pendingSave.path, pendingSave.body);
+        pendingSave = null;
+      }
     }, 300);
   }
+
+  // Flush pending saves on cleanup (component unmount / doc switch)
+  onCleanup(() => {
+    if (saveTimeout) {
+      window.clearTimeout(saveTimeout);
+    }
+    if (pendingSave) {
+      void saveDoc(pendingSave.path, pendingSave.body);
+      pendingSave = null;
+    }
+  });
 
   function handleModeChange(newMode: EditorMode) {
     setMode(newMode);

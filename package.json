@@ -33,6 +33,7 @@
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-opener": "^2",
     "@tiptap/core": "^3.20.1",
+    "@tiptap/extension-link": "^3.20.1",
     "@tiptap/extension-placeholder": "^3.20.1",
     "@tiptap/extension-task-item": "^3.20.1",
     "@tiptap/extension-task-list": "^3.20.1",

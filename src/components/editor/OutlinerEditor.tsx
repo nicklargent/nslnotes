@@ -2,12 +2,16 @@ import { onMount, onCleanup, createEffect } from "solid-js";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { TextSelection } from "@tiptap/pm/state";
+import { InlineDecorations } from "./InlineDecorations";
 
 interface OutlinerEditorProps {
   content: string;
   placeholder?: string | undefined;
   onUpdate: (markdown: string) => void;
-  onSlashKey?: ((pos: { top: number; left: number }) => void) | undefined;
+  onSlashKey?:
+    | ((pos: { top: number; left: number }, cursorPos: number) => void)
+    | undefined;
   onHashOrAt?:
     | ((
         prefix: "#" | "@",
@@ -29,6 +33,8 @@ export function OutlinerEditor(props: OutlinerEditorProps) {
   let containerRef: HTMLDivElement | undefined;
   let editor: Editor | undefined;
   let skipNextUpdate = false;
+  let lastUserUpdate = 0;
+  let todoRenderTimer: ReturnType<typeof setTimeout> | undefined;
 
   onMount(() => {
     if (!containerRef) return;
@@ -54,6 +60,7 @@ export function OutlinerEditor(props: OutlinerEditorProps) {
         Placeholder.configure({
           placeholder: props.placeholder ?? "Start writing...",
         }),
+        InlineDecorations,
       ],
       content: outlineToHtml(props.content),
       onUpdate: ({ editor: e }) => {
@@ -61,10 +68,89 @@ export function OutlinerEditor(props: OutlinerEditorProps) {
           skipNextUpdate = false;
           return;
         }
+        lastUserUpdate = Date.now();
         const md = htmlToOutline(e.getHTML());
         props.onUpdate(md);
+
+        // Schedule re-render for TODO markers if patterns detected
+        if (/(?:^|\n)\s*- (?:TODO|DOING|DONE) /m.test(md)) {
+          clearTimeout(todoRenderTimer);
+          todoRenderTimer = setTimeout(() => {
+            if (!editor || editor.isDestroyed) return;
+            const { from } = editor.state.selection;
+            skipNextUpdate = true;
+            editor.commands.setContent(outlineToHtml(md));
+            try {
+              const maxPos = editor.state.doc.content.size;
+              const safePos = Math.min(from, maxPos);
+              const $pos = editor.state.doc.resolve(safePos);
+              editor.commands.setTextSelection(TextSelection.near($pos).from);
+            } catch {
+              // cursor restoration failed, acceptable
+            }
+          }, 800);
+        }
       },
       editorProps: {
+        handleClick: (view, pos, event) => {
+          const $pos = view.state.doc.resolve(pos);
+          const nodeText = $pos.parent.textContent;
+          const clickOffset = pos - $pos.start();
+
+          // Check for TODO marker click (Unicode chars ☐✎☑)
+          const todoMatch = /^([\u2610\u270e\u2611])\s/.exec(nodeText);
+          if (todoMatch && clickOffset <= 1) {
+            event.preventDefault();
+            const markerChar = todoMatch[1]!;
+            const nextChar =
+              markerChar === "\u2610"
+                ? "\u270e"
+                : markerChar === "\u270e"
+                  ? "\u2611"
+                  : "\u2610";
+            // Replace just the marker character at the exact position
+            const markerPos = $pos.start();
+            editor!
+              .chain()
+              .focus()
+              .command(({ tr }) => {
+                tr.insertText(nextChar, markerPos, markerPos + 1);
+                return true;
+              })
+              .run();
+            return true;
+          }
+
+          // Check for wikilink click [[type:target]]
+          const wikilinkRegex = /\[\[(task|doc|note):([^\]]+)\]\]/g;
+          let wlMatch;
+          while ((wlMatch = wikilinkRegex.exec(nodeText)) !== null) {
+            if (
+              clickOffset >= wlMatch.index &&
+              clickOffset <= wlMatch.index + wlMatch[0].length
+            ) {
+              event.preventDefault();
+              props.onWikilinkClick?.(wlMatch[1]!, wlMatch[2]!);
+              return true;
+            }
+          }
+
+          // Check for topic ref click (#topic or @person)
+          const topicRegex = /(?<!\w)([#@][a-z0-9-]+)/gi;
+          let topicMatch;
+          while ((topicMatch = topicRegex.exec(nodeText)) !== null) {
+            if (
+              clickOffset >= topicMatch.index &&
+              clickOffset <= topicMatch.index + topicMatch[0].length
+            ) {
+              event.preventDefault();
+              props.onTopicClick?.(topicMatch[1]!);
+              return true;
+            }
+          }
+
+          return false;
+        },
         handleKeyDown: (view, event) => {
           if (!editor) return false;
 
@@ -132,10 +218,14 @@ export function OutlinerEditor(props: OutlinerEditorProps) {
 
           // / key opens command menu (T5.8)
           if (event.key === "/" && props.onSlashKey) {
-            const coords = view.coordsAtPos(view.state.selection.from);
+            const cursorPos = view.state.selection.from;
+            const coords = view.coordsAtPos(cursorPos);
             // Defer so the / character is inserted first
             setTimeout(() => {
-              props.onSlashKey!({ top: coords.top, left: coords.left });
+              props.onSlashKey!(
+                { top: coords.top, left: coords.left },
+                cursorPos
+              );
             }, 0);
           }
 
@@ -150,6 +240,8 @@ export function OutlinerEditor(props: OutlinerEditorProps) {
   createEffect(() => {
     const newContent = props.content;
     if (!editor || editor.isDestroyed) return;
+    // Don't sync back content within 500ms of a user edit to avoid fighting
+    if (Date.now() - lastUserUpdate < 500) return;
     const currentMd = htmlToOutline(editor.getHTML());
     if (currentMd !== newContent) {
       skipNextUpdate = true;
@@ -158,94 +250,81 @@ export function OutlinerEditor(props: OutlinerEditorProps) {
   });
 
   onCleanup(() => {
+    clearTimeout(todoRenderTimer);
     editor?.destroy();
   });
 
-  function handleEditorClick(e: MouseEvent) {
-    const target = e.target as HTMLElement;
-    // Wikilink click (T6.11)
-    if (target.classList.contains("wikilink")) {
-      e.preventDefault();
-      const linkType = target.dataset["linkType"];
-      const linkTarget = target.dataset["linkTarget"];
-      if (linkType && linkTarget) {
-        props.onWikilinkClick?.(linkType, linkTarget);
-      }
-    }
-    // Topic ref click
-    if (target.classList.contains("topic-ref")) {
-      e.preventDefault();
-      const topic = target.dataset["topic"];
-      if (topic) {
-        props.onTopicClick?.(topic);
-      }
-    }
-  }
-
   return (
-    <div
-      ref={containerRef}
-      class="outliner-editor focus-within:outline-none"
-      onClick={handleEditorClick}
-    />
+    <div ref={containerRef} class="outliner-editor focus-within:outline-none" />
   );
 }
 
 /**
  * Convert markdown list content to HTML for TipTap.
  * Handles nested bullet lists with indentation.
+ * Produces correct <ul><li><p>...</p><ul><li>...</li></ul></li></ul> nesting.
  */
 function outlineToHtml(md: string): string {
   if (!md.trim()) return "<ul><li><p></p></li></ul>";
 
   const lines = md.split("\n");
-  const result: string[] = [];
-  const stack: number[] = []; // Track indent levels
+  const items: { level: number; content: string }[] = [];
 
   for (const line of lines) {
     if (line.trim() === "") continue;
 
-    // Detect indentation and content
     const match = /^(\s*)([-*]|\d+\.)\s(.*)$/.exec(line);
     if (match) {
       const indent = match[1]?.length ?? 0;
       const content = match[3] ?? "";
       const level = Math.floor(indent / 2);
-      pushItem(result, stack, level, formatInlineContent(content));
+      items.push({ level, content: formatInlineContent(content) });
     } else {
-      // Non-list line - treat as a top-level item
-      pushItem(result, stack, 0, formatInlineContent(line.trim()));
+      items.push({ level: 0, content: formatInlineContent(line.trim()) });
     }
   }
 
-  // Close remaining open tags
-  while (stack.length > 0) {
+  if (items.length === 0) return "<ul><li><p></p></li></ul>";
+
+  const result: string[] = [];
+  let currentLevel = -1;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]!;
+    if (item.level > currentLevel) {
+      // Open new nested list(s)
+      const levelsToOpen = item.level - currentLevel;
+      for (let j = 0; j < levelsToOpen; j++) {
+        result.push("<ul>");
+      }
+    } else if (item.level < currentLevel) {
+      // Close deeper levels
+      const levelsToClose = currentLevel - item.level;
+      for (let j = 0; j < levelsToClose; j++) {
+        result.push("</li></ul>");
+      }
+      result.push("</li>");
+    } else {
+      // Same level - close previous sibling
+      if (currentLevel >= 0) {
+        result.push("</li>");
+      }
+    }
+
+    result.push(`<li><p>${item.content}</p>`);
+    currentLevel = item.level;
+
+    // If next item is not a child, we don't need to keep the li open for nesting
+    // (the closing will be handled by the next iteration or the final cleanup)
+  }
+
+  // Close all remaining open tags
+  for (let i = currentLevel; i >= 0; i--) {
     result.push("</li></ul>");
-    stack.pop();
   }
 
   const html = result.join("");
   return html || "<ul><li><p></p></li></ul>";
-}
-
-function pushItem(
-  result: string[],
-  stack: number[],
-  level: number,
-  content: string
-) {
-  // Close deeper levels
-  while (stack.length > 0 && (stack[stack.length - 1] ?? -1) >= level) {
-    result.push("</li></ul>");
-    stack.pop();
-  }
-
-  if (stack.length === 0) {
-    result.push(`<ul><li><p>${content}</p>`);
-  } else {
-    result.push(`<ul><li><p>${content}</p>`);
-  }
-  stack.push(level);
 }
 
 /**
@@ -263,21 +342,11 @@ function formatInlineContent(text: string): string {
     return `<span class="todo-marker todo-done" data-todo="DONE">&#9745;</span> <s>${text.slice(5)}</s>`;
   }
 
-  // Bold, italic, code, wikilinks, topics
+  // Bold, italic, code (wikilinks and topic refs kept as plain text — click detected via handleClick)
   let result = text;
   result = result.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   result = result.replace(/\*(.+?)\*/g, "<em>$1</em>");
   result = result.replace(/`([^`]+)`/g, "<code>$1</code>");
-  // Wikilinks (T6.12)
-  result = result.replace(
-    /\[\[(task|doc|note):([^\]]+)\]\]/g,
-    '<span class="wikilink" data-link-type="$1" data-link-target="$2" contenteditable="false">[[$1:$2]]</span>'
-  );
-  // Topic refs (T6.10)
-  result = result.replace(
-    /(?<!\w)([#@][a-z0-9-]+)/gi,
-    '<span class="topic-ref" data-topic="$1">$1</span>'
-  );
 
   return result;
 }
@@ -288,7 +357,7 @@ function formatInlineContent(text: string): string {
 function htmlToOutline(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const lines: string[] = [];
-  processListNode(doc.body, lines, -1);
+  processListNode(doc.body, lines, 0);
   return lines.join("\n");
 }
 
@@ -405,39 +474,53 @@ function moveListItem(
   if (!dispatch) return;
 
   const targetIndex = direction === "up" ? item.index - 1 : item.index + 1;
-
   if (targetIndex < 0 || targetIndex >= item.parent.childCount) return;
 
   const tr = state.tr;
-  const itemStart = item.pos;
-  const itemEnd = itemStart + item.node.nodeSize;
 
-  // Remove the item
-  const itemSlice = state.doc.slice(itemStart, itemEnd);
-  tr.delete(itemStart, itemEnd);
+  // Get the sibling we're swapping with
+  const sibling = item.parent.child(targetIndex);
 
-  // Calculate new position
-  let insertPos: number;
   if (direction === "up") {
-    // Insert before the previous sibling
-    const prevStart = item.parentPos + 1;
-    let pos = prevStart;
-    for (let i = 0; i < targetIndex; i++) {
-      pos += item.parent.child(i).nodeSize;
+    // Calculate sibling position (before current item)
+    let siblingPos = item.pos;
+    for (let i = item.index - 1; i >= targetIndex; i--) {
+      siblingPos -= item.parent.child(i).nodeSize;
     }
-    insertPos = tr.mapping.map(pos);
+
+    // Delete current item, insert before sibling
+    const itemStart = item.pos;
+    const itemEnd = itemStart + item.node.nodeSize;
+    const slice = state.doc.slice(itemStart, itemEnd);
+    tr.delete(itemStart, itemEnd);
+    const mappedSiblingPos = tr.mapping.map(siblingPos);
+    tr.insert(mappedSiblingPos, slice.content);
+
+    // Place cursor inside the moved item
+    try {
+      const $pos = tr.doc.resolve(mappedSiblingPos + 2);
+      tr.setSelection(TextSelection.near($pos));
+    } catch {
+      // fallback: don't move cursor
+    }
   } else {
-    // Insert after the next sibling
-    const prevStart = item.parentPos + 1;
-    let pos = prevStart;
-    for (let i = 0; i <= targetIndex; i++) {
-      if (i !== item.index) {
-        pos += item.parent.child(i).nodeSize;
-      }
+    // Delete sibling (which comes after current item), insert before current item
+    const siblingPos = item.pos + item.node.nodeSize;
+    const siblingEnd = siblingPos + sibling.nodeSize;
+    const slice = state.doc.slice(siblingPos, siblingEnd);
+    tr.delete(siblingPos, siblingEnd);
+    const mappedItemPos = tr.mapping.map(item.pos);
+    tr.insert(mappedItemPos, slice.content);
+
+    // Place cursor inside the original item (now after the inserted sibling)
+    try {
+      const newItemPos = mappedItemPos + sibling.nodeSize;
+      const $pos = tr.doc.resolve(newItemPos + 2);
+      tr.setSelection(TextSelection.near($pos));
+    } catch {
+      // fallback: don't move cursor
     }
-    insertPos = tr.mapping.map(pos);
   }
 
-  tr.insert(insertPos, itemSlice.content);
   dispatch(tr);
 }
