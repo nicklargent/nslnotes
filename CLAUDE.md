@@ -1,13 +1,31 @@
-# NslNotes Development Guide
+# NslNotes
 
-## Context Files
-Always read these at the start of a session before doing any work:
-- docs/REQUIREMENTS.md
-- docs/DESIGN.md  
-- docs/TASKS.md — check here for current progress before starting
+## Architecture
+- **Runtime**: Tauri (Rust backend) + SolidJS frontend
+- **Editor**: TipTap (ProseMirror)
+- **Styling**: Tailwind CSS v4
+- **Build**: Vite
+- **Data**: Plain markdown files with YAML frontmatter, no database
+- **Layout**: Fixed three-column (sidebar, center, right panel)
 
-## Task Tracking
-- docs/TASKS.md is the source of truth for progress
-- After completing any task, mark it with [x] in TASKS.md immediately
-- Never consider a task done until TASKS.md reflects it
-- When completing tasks, always prompt before moving to the next one.
+## Key Paths
+- `src/lib/runtime.ts` — Tauri/web abstraction layer
+- `src/services/` — all business logic (FileService, IndexService, EntityService, etc.)
+- `src/stores/` — SolidJS reactive stores (index, context, editor)
+- `src/components/` — UI organized by feature area
+- `src-tauri/src/` — Rust backend (commands.rs, watcher.rs)
+
+## Web Mode
+- `npm run dev:web` — runs in browser with Vite API plugin for file ops
+- `npm run tauri dev` — runs as native Tauri app
+
+## Specs
+- `docs/PRD.md` — product vision
+- `docs/001-initial/` — original build specs (requirements, design, tasks)
+- Future features: `docs/NNN-feature-name/SPEC.md`
+
+## Conventions
+- TypeScript strict mode, no `any`
+- Services never accessed directly by components — use stores/hooks
+- Files are source of truth, index rebuilt from disk
+- All entity CRUD goes through EntityService
