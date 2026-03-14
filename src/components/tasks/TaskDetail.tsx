@@ -1,10 +1,15 @@
-import { createSignal, createEffect, Show, For } from "solid-js";
+import { createSignal, createEffect, Show } from "solid-js";
 import { Editor } from "../editor/Editor";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
 import { SettingsService } from "../../services/SettingsService";
+import { EntityService } from "../../services/EntityService";
 import { parse, serialize } from "../../lib/frontmatter";
 import { editorStore, setEditorStore } from "../../stores/editorStore";
+import { indexStore } from "../../stores/indexStore";
+import { EditableText } from "../metadata/EditableText";
+import { EditableTopics } from "../metadata/EditableTopics";
+import { EditableDate } from "../metadata/EditableDate";
 import type { Task } from "../../types/entities";
 import type { EditorMode } from "../../types/stores";
 
@@ -20,6 +25,10 @@ export function TaskDetail(props: TaskDetailProps) {
   const [content, setContent] = createSignal("");
   const [mode, setMode] = createSignal<EditorMode>("outliner");
   let saveTimeout: number | undefined;
+
+  // Reactively look up the latest task from index store so metadata edits are reflected
+  const liveTask = () =>
+    (indexStore.tasks.get(props.task.path) as Task | undefined) ?? props.task;
 
   // Sync content when task changes
   createEffect(() => {
@@ -63,7 +72,7 @@ export function TaskDetail(props: TaskDetailProps) {
   }
 
   const statusColor = () => {
-    switch (props.task.status) {
+    switch (liveTask().status) {
       case "open":
         return "bg-blue-100 text-blue-700";
       case "done":
@@ -78,37 +87,44 @@ export function TaskDetail(props: TaskDetailProps) {
       <div class="mx-auto max-w-2xl px-6 py-6">
         {/* Header */}
         <div class="mb-4">
-          <h1 class="text-xl font-semibold text-gray-900">
-            {props.task.title}
-          </h1>
+          <EditableText
+            value={liveTask().title}
+            onSave={(title) =>
+              void EntityService.updateFrontmatter(props.task.path, { title })
+            }
+            class="text-xl font-semibold text-gray-900"
+          />
           <div class="mt-2 flex items-center gap-2">
             <span
               class={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor()}`}
             >
-              {props.task.status}
+              {liveTask().status}
             </span>
-            <Show when={props.task.due}>
-              <span class="text-xs text-gray-500">Due: {props.task.due}</span>
-            </Show>
+            <EditableDate
+              value={liveTask().due}
+              onSave={(due) =>
+                void EntityService.updateFrontmatter(props.task.path, { due })
+              }
+              label="Due"
+            />
             <span class="text-xs text-gray-400">
-              Created: {props.task.created}
+              Created: {liveTask().created}
             </span>
           </div>
-          <Show when={props.task.topics.length > 0}>
-            <div class="mt-2 flex flex-wrap gap-1">
-              <For each={props.task.topics}>
-                {(t) => (
-                  <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
-                    {t}
-                  </span>
-                )}
-              </For>
-            </div>
-          </Show>
+          <div class="mt-2">
+            <EditableTopics
+              topics={liveTask().topics}
+              onSave={(topics) =>
+                void EntityService.updateFrontmatter(props.task.path, {
+                  topics,
+                })
+              }
+            />
+          </div>
         </div>
 
         {/* Status actions */}
-        <Show when={props.task.status === "open"}>
+        <Show when={liveTask().status === "open"}>
           <div class="mb-4 flex gap-2">
             <button
               class="rounded bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100"

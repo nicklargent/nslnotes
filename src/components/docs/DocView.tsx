@@ -1,10 +1,14 @@
-import { createSignal, createEffect, onCleanup, Show, For } from "solid-js";
+import { createSignal, createEffect, onCleanup, Show } from "solid-js";
 import { Editor } from "../editor/Editor";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
 import { SettingsService } from "../../services/SettingsService";
+import { EntityService } from "../../services/EntityService";
 import { parse, serialize } from "../../lib/frontmatter";
 import { editorStore, setEditorStore } from "../../stores/editorStore";
+import { indexStore } from "../../stores/indexStore";
+import { EditableText } from "../metadata/EditableText";
+import { EditableTopics } from "../metadata/EditableTopics";
 import type { Doc } from "../../types/entities";
 import type { EditorMode } from "../../types/stores";
 
@@ -21,6 +25,10 @@ export function DocView(props: DocViewProps) {
   const [mode, setMode] = createSignal<EditorMode>("prose");
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; body: string } | null = null;
+
+  // Reactively look up the latest doc from index store so metadata edits are reflected
+  const liveDoc = () =>
+    (indexStore.docs.get(props.doc.path) as Doc | undefined) ?? props.doc;
 
   createEffect(() => {
     const docContent = props.doc.content;
@@ -75,20 +83,23 @@ export function DocView(props: DocViewProps) {
       <div class="mx-auto max-w-2xl px-6 py-6">
         {/* Header */}
         <div class="mb-4">
-          <h1 class="text-xl font-semibold text-gray-900">{props.doc.title}</h1>
-          <Show when={props.doc.topics.length > 0}>
-            <div class="mt-2 flex flex-wrap gap-1">
-              <For each={props.doc.topics}>
-                {(t) => (
-                  <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
-                    {t}
-                  </span>
-                )}
-              </For>
-            </div>
-          </Show>
+          <EditableText
+            value={liveDoc().title}
+            onSave={(title) =>
+              void EntityService.updateFrontmatter(props.doc.path, { title })
+            }
+            class="text-xl font-semibold text-gray-900"
+          />
+          <div class="mt-2">
+            <EditableTopics
+              topics={liveDoc().topics}
+              onSave={(topics) =>
+                void EntityService.updateFrontmatter(props.doc.path, { topics })
+              }
+            />
+          </div>
           <span class="mt-1 block text-xs text-gray-400">
-            Created: {props.doc.created}
+            Created: {liveDoc().created}
           </span>
         </div>
 
