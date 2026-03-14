@@ -10,7 +10,6 @@ import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import type { Doc } from "../../types/entities";
-import type { EditorMode } from "../../types/stores";
 
 interface DocViewProps {
   doc: Doc;
@@ -18,11 +17,10 @@ interface DocViewProps {
 
 /**
  * Doc view in center panel (T5.15).
- * Shows doc title, topics, and editor in Prose mode by default.
+ * Shows doc title, topics, and editor.
  */
 export function DocView(props: DocViewProps) {
   const [content, setContent] = createSignal("");
-  const [mode, setMode] = createSignal<EditorMode>("prose");
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; body: string } | null = null;
 
@@ -39,10 +37,8 @@ export function DocView(props: DocViewProps) {
       pendingSave = null;
     }
     setContent(docContent);
-    setMode("prose"); // T5.11: docs default to prose
     setEditorStore({
       activeFile: props.doc.path,
-      mode: "prose",
       isDirty: false,
     });
   });
@@ -73,11 +69,6 @@ export function DocView(props: DocViewProps) {
     }
   });
 
-  function handleModeChange(newMode: EditorMode) {
-    setMode(newMode);
-    setEditorStore("mode", newMode);
-  }
-
   return (
     <div class="h-full overflow-y-auto">
       <div class="mx-auto max-w-2xl px-6 py-6">
@@ -107,10 +98,8 @@ export function DocView(props: DocViewProps) {
         <div class="border-t border-gray-100 pt-4">
           <Editor
             content={content()}
-            mode={mode()}
             placeholder="Start writing..."
             onUpdate={handleUpdate}
-            onModeChange={handleModeChange}
           />
         </div>
 

@@ -11,7 +11,6 @@ import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import { EditableDate } from "../metadata/EditableDate";
 import type { Task } from "../../types/entities";
-import type { EditorMode } from "../../types/stores";
 
 interface TaskDetailProps {
   task: Task;
@@ -19,11 +18,10 @@ interface TaskDetailProps {
 
 /**
  * Task detail view in center panel (T5.14).
- * Shows task metadata (status, due, topics) and editor in Outliner mode.
+ * Shows task metadata (status, due, topics) and editor.
  */
 export function TaskDetail(props: TaskDetailProps) {
   const [content, setContent] = createSignal("");
-  const [mode, setMode] = createSignal<EditorMode>("outliner");
   let saveTimeout: number | undefined;
 
   // Reactively look up the latest task from index store so metadata edits are reflected
@@ -33,10 +31,8 @@ export function TaskDetail(props: TaskDetailProps) {
   // Sync content when task changes
   createEffect(() => {
     setContent(props.task.content);
-    setMode("outliner"); // T5.11: tasks default to outliner
     setEditorStore({
       activeFile: props.task.path,
-      mode: "outliner",
       isDirty: false,
     });
   });
@@ -50,11 +46,6 @@ export function TaskDetail(props: TaskDetailProps) {
     saveTimeout = window.setTimeout(() => {
       void saveTask(props.task.path, newContent);
     }, 300);
-  }
-
-  function handleModeChange(newMode: EditorMode) {
-    setMode(newMode);
-    setEditorStore("mode", newMode);
   }
 
   async function handleStatusChange(status: "done" | "cancelled") {
@@ -145,10 +136,8 @@ export function TaskDetail(props: TaskDetailProps) {
         <div class="border-t border-gray-100 pt-4">
           <Editor
             content={content()}
-            mode={mode()}
             placeholder="Add task details..."
             onUpdate={handleUpdate}
-            onModeChange={handleModeChange}
           />
         </div>
 

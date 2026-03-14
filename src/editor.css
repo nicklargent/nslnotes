@@ -100,65 +100,6 @@
   font-weight: 600;
 }
 
-/* Outliner editor */
-.outliner-editor .tiptap {
-  outline: none;
-  min-height: 60px;
-}
-
-.outliner-editor .tiptap p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: #d1d5db;
-  pointer-events: none;
-  height: 0;
-}
-
-.outliner-editor .tiptap ul {
-  list-style: disc;
-  padding-left: 1.25rem;
-  margin: 0;
-}
-
-.outliner-editor .tiptap ul ul {
-  list-style: circle;
-}
-
-.outliner-editor .tiptap ul ul ul {
-  list-style: square;
-}
-
-.outliner-editor .tiptap li {
-  margin: 0.125rem 0;
-  padding: 0.0625rem 0;
-}
-
-.outliner-editor .tiptap li p {
-  margin: 0;
-  line-height: 1.5;
-}
-
-.outliner-editor .tiptap li.outliner-block {
-  border-left: 2px solid transparent;
-  transition: border-color 0.1s;
-}
-
-.outliner-editor .tiptap li.outliner-block:focus-within {
-  border-left-color: #3b82f6;
-}
-
-.outliner-editor .tiptap code {
-  background: #f3f4f6;
-  border-radius: 0.25rem;
-  padding: 0.0625rem 0.25rem;
-  font-size: 0.875em;
-  color: #ef4444;
-}
-
-.outliner-editor .tiptap strong {
-  font-weight: 600;
-}
-
 /* TODO markers */
 .todo-marker {
   cursor: pointer;
@@ -181,16 +122,14 @@
 }
 
 /* Links */
-.prose-editor .tiptap a,
-.outliner-editor .tiptap a {
+.prose-editor .tiptap a {
   color: #2563eb;
   text-decoration: underline;
   text-decoration-color: #93c5fd;
   cursor: pointer;
 }
 
-.prose-editor .tiptap a:hover,
-.outliner-editor .tiptap a:hover {
+.prose-editor .tiptap a:hover {
   text-decoration-color: #2563eb;
 }
 

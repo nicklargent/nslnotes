@@ -36,7 +36,7 @@ Most note-taking tools force a choice between the speed of an outliner and the r
 - **Time is the primary axis.** The journal is home. Everything has a date.
 - **Capture first, structure later.** A TODO in a daily note is fine. Promote it to a task when it earns one — or create a task directly when you already know it deserves one.
 - **Context without modes.** The layout never changes — shared topics and direct links bring related content forward without switching views.
-- **Editor flexibility.** Outliner and prose editor are sensible defaults per file type, but always togglable. The user decides.
+- **Editor flexibility.** A single unified editor handles both structured capture (bullet lists, TODO tracking, block movement) and prose writing (headings, paragraphs, code blocks) without mode switching.
 - **Nothing is hidden, nothing is mandatory.** Dormant topics stay accessible. Metadata is optional sugar.
 
 > **Design Inspiration:** LogSeq's journal-first workflow and outliner speed, combined with Obsidian's plain markdown storage and linking model — rebuilt around a cleaner entity model and a permanently-visible task surface.
@@ -93,7 +93,7 @@ JWT validation is failing for refresh tokens issued before the March deploy.
 
 #### Doc
 
-A standalone reference document. Docs are created explicitly via the sidebar `+` button or by promoting a section from a note. The default editor for docs is the prose editor, though the user can toggle to the outliner at any time. Docs are listed alphabetically in the sidebar.
+A standalone reference document. Docs are created explicitly via the sidebar `+` button or by promoting a section from a note. The editor supports both prose writing and structured bullet lists. Docs are listed alphabetically in the sidebar.
 
 ```yaml
 # docs/deployment-runbook.md
@@ -220,39 +220,18 @@ topics: []          # optional
 
 ## 4. Editor Model
 
-### 4.1 Two Editor Modes
+NslNotes uses a single unified editor built on TipTap/ProseMirror. It handles both structured bullet-list capture and rich prose writing without mode switching. On disk, content is standard markdown — no block IDs, no proprietary format.
 
-NslNotes provides two editor modes. The default mode is determined by file type but the user can toggle between them on any open file at any time. There is no content loss when switching — both modes operate on the same underlying markdown.
+### Keyboard Shortcuts
 
-| Mode | Default For | Best For |
-|------|-------------|----------|
-| Outliner | Notes, Tasks | Rapid capture, bullet-based thinking, block movement, TODO tracking |
-| Prose | Docs | Long-form writing, structured reference material, formatted documents |
-
-The toggle is always visible in the editor toolbar. Switching modes is instantaneous and non-destructive.
-
-### 4.2 Outliner Mode
-
-The outliner renders content as a navigable block tree with keyboard-driven movement gestures. On disk the content is standard indented markdown list syntax — no block IDs, no proprietary format.
-
-- **Tab / Shift-Tab** — indent and outdent the current block and all its children
-- **Alt+Up / Alt+Down** — move a block and all its children up or down within the same parent
-- **Enter** — new block at the same level
+- **Tab / Shift-Tab** — indent and outdent list items
+- **Alt+Up / Alt+Down** — move a list item and its children up or down within the same parent
 - **Shift+Enter** — line break within a block (for multi-line content)
 - **`/`** — opens command menu for promotion actions and formatting
+- **`#`** — topic autocomplete
+- **`@`** — person autocomplete
 
-Because storage is plain indented markdown, any subtree can be selected and copied as clean formatted text — it already is markdown. Pasting into Slack, email, or any other tool works without transformation.
-
-```
-- Status Update
-  - Completed auth refactor
-  - Deployed to staging, monitoring 48h
-  - TODO write release notes
-```
-
-### 4.3 Prose Mode
-
-The prose editor is a standard rich markdown editor — headings, paragraphs, lists, code blocks, tables. It is the natural mode for reference material that will be read more than it is edited. The same `/` command menu is available for inserting wikilinks, topics, and people.
+The editor supports headings, paragraphs, bullet and ordered lists, code blocks, bold, italic, and horizontal rules. Because storage is plain markdown, content can be selected and copied as clean formatted text. Pasting into Slack, email, or any other tool works without transformation.
 
 ---
 
@@ -463,7 +442,7 @@ For content that has grown beyond a note and deserves standalone reference statu
 2. Prompt for title
 3. Content (the bullet and all its children) moves to `docs/slug.md`
 4. Original location is replaced with a wikilink: `[[doc:deployment-runbook]]`
-5. Doc opens in center panel in prose editor mode (togglable)
+5. Doc opens in center panel in editor
 
 ### 9.4 Create New Named Note
 
@@ -478,7 +457,7 @@ For capturing a meeting or any named working session.
 
 1. Click `+` in the Docs section of the left sidebar
 2. Prompt for title and optional topics
-3. File created as `docs/slug.md`, opens in prose editor (togglable)
+3. File created as `docs/slug.md`, opens in editor
 4. Appears alphabetically in Docs sidebar section
 
 ### 9.6 Inline Topic and Person Linking
@@ -526,7 +505,7 @@ For capturing a meeting or any named working session.
 ┌───────────────┬──────────────────────────────────────┬────────────────────┐
 │ Today         │  Fix Auth Bug               [done]   │  Open Tasks   [+]  │
 │               │  Due: Thu Mar 12 · #app-abc          │                    │
-│ Topics        │  [outliner | prose]  <- toggle       │  RELATED           │
+│ Topics        │                                      │  RELATED           │
 │ #app-abc  ←   │                                      │  ▣ Fix auth ●  Thu │  <- highlight
 │ @alice    ←   │  ## Context                          │  ▣ API docs    Fri │
 │ #arch         │  JWT validation failing for refresh  │                    │
@@ -539,7 +518,7 @@ For capturing a meeting or any named working session.
 │               │                                      │                    │
 │               │                                      │  LATER             │
 └───────────────┴──────────────────────────────────────┴────────────────────┘
-  ← = floated up   Task in outliner mode (default, togglable)  Full list
+  ← = floated up   Task in editor                              Full list
 ```
 
 ### 10.3 Topic / Person View
@@ -595,12 +574,12 @@ Explicitly out of scope for the initial build but natural extensions:
 
 ## Appendix: Complete Entity Reference
 
-| Entity | Storage | Has File | Right Panel When Focused | Default Editor |
-|--------|---------|----------|--------------------------|----------------|
-| Note (daily) | `notes/YYYY-MM-DD.md` | Yes | All open tasks (unweighted) | Outliner |
-| Note (named) | `notes/YYYY-MM-DD-slug.md` | Yes | Related tasks (topic + link weighted) | Outliner |
-| Task | `tasks/slug.md` | Yes | Full list, this task highlighted | Outliner |
-| Doc | `docs/slug.md` | Yes | Related tasks (topic + link weighted) | Prose |
-| #topic view | Generated | No | Tasks with that topic | — |
-| @person view | Generated | No | Tasks referencing them | — |
-| Todo | Inline in any file | No | — | — |
+| Entity | Storage | Has File | Right Panel When Focused |
+|--------|---------|----------|--------------------------|
+| Note (daily) | `notes/YYYY-MM-DD.md` | Yes | All open tasks (unweighted) |
+| Note (named) | `notes/YYYY-MM-DD-slug.md` | Yes | Related tasks (topic + link weighted) |
+| Task | `tasks/slug.md` | Yes | Full list, this task highlighted |
+| Doc | `docs/slug.md` | Yes | Related tasks (topic + link weighted) |
+| #topic view | Generated | No | Tasks with that topic |
+| @person view | Generated | No | Tasks referencing them |
+| Todo | Inline in any file | No | — |

@@ -3,6 +3,7 @@ import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
+import { TextSelection } from "@tiptap/pm/state";
 import { InlineDecorations } from "./InlineDecorations";
 
 interface ProseEditorProps {
@@ -123,7 +124,7 @@ export function ProseEditor(props: ProseEditorProps) {
 
           return false;
         },
-        handleKeyDown: (_view, event) => {
+        handleKeyDown: (view, event) => {
           // Tab to indent list items, or wrap paragraph in bullet list
           if (event.key === "Tab" && !event.shiftKey) {
             event.preventDefault();
@@ -139,6 +140,37 @@ export function ProseEditor(props: ProseEditorProps) {
           if (event.key === "Tab" && event.shiftKey) {
             event.preventDefault();
             editor?.chain().focus().liftListItem("listItem").run();
+            return true;
+          }
+
+          // Alt+Up to move block up
+          if (event.key === "ArrowUp" && event.altKey) {
+            event.preventDefault();
+            const { state, dispatch } = view;
+            const { $from } = state.selection;
+            const listItem = findListItemAt(state, $from.pos);
+            if (listItem) {
+              moveListItem(state, dispatch, listItem, "up");
+            }
+            return true;
+          }
+
+          // Alt+Down to move block down
+          if (event.key === "ArrowDown" && event.altKey) {
+            event.preventDefault();
+            const { state, dispatch } = view;
+            const { $from } = state.selection;
+            const listItem = findListItemAt(state, $from.pos);
+            if (listItem) {
+              moveListItem(state, dispatch, listItem, "down");
+            }
+            return true;
+          }
+
+          // Shift+Enter inserts line break within block
+          if (event.key === "Enter" && event.shiftKey) {
+            event.preventDefault();
+            editor?.chain().focus().setHardBreak().run();
             return true;
           }
 
@@ -456,4 +488,84 @@ function liNestedLists(li: Element, listDepth: number): string {
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// List item movement helpers (ported from OutlinerEditor)
+
+interface ListItemInfo {
+  pos: number;
+  node: import("@tiptap/pm/model").Node;
+  index: number;
+  parent: import("@tiptap/pm/model").Node;
+  parentPos: number;
+}
+
+function findListItemAt(
+  state: import("@tiptap/pm/state").EditorState,
+  pos: number
+): ListItemInfo | null {
+  const $pos = state.doc.resolve(pos);
+  for (let depth = $pos.depth; depth >= 0; depth--) {
+    const node = $pos.node(depth);
+    if (node.type.name === "listItem") {
+      const parent = $pos.node(depth - 1);
+      const parentPos = $pos.before(depth - 1);
+      const index = $pos.index(depth - 1);
+      return { pos: $pos.before(depth), node, index, parent, parentPos };
+    }
+  }
+  return null;
+}
+
+function moveListItem(
+  state: import("@tiptap/pm/state").EditorState,
+  dispatch: ((tr: import("@tiptap/pm/state").Transaction) => void) | undefined,
+  item: ListItemInfo,
+  direction: "up" | "down"
+) {
+  if (!dispatch) return;
+
+  const targetIndex = direction === "up" ? item.index - 1 : item.index + 1;
+  if (targetIndex < 0 || targetIndex >= item.parent.childCount) return;
+
+  const tr = state.tr;
+  const sibling = item.parent.child(targetIndex);
+
+  if (direction === "up") {
+    let siblingPos = item.pos;
+    for (let i = item.index - 1; i >= targetIndex; i--) {
+      siblingPos -= item.parent.child(i).nodeSize;
+    }
+
+    const itemStart = item.pos;
+    const itemEnd = itemStart + item.node.nodeSize;
+    const slice = state.doc.slice(itemStart, itemEnd);
+    tr.delete(itemStart, itemEnd);
+    const mappedSiblingPos = tr.mapping.map(siblingPos);
+    tr.insert(mappedSiblingPos, slice.content);
+
+    try {
+      const $pos = tr.doc.resolve(mappedSiblingPos + 2);
+      tr.setSelection(TextSelection.near($pos));
+    } catch {
+      // fallback: don't move cursor
+    }
+  } else {
+    const siblingPos = item.pos + item.node.nodeSize;
+    const siblingEnd = siblingPos + sibling.nodeSize;
+    const slice = state.doc.slice(siblingPos, siblingEnd);
+    tr.delete(siblingPos, siblingEnd);
+    const mappedItemPos = tr.mapping.map(item.pos);
+    tr.insert(mappedItemPos, slice.content);
+
+    try {
+      const newItemPos = mappedItemPos + sibling.nodeSize;
+      const $pos = tr.doc.resolve(newItemPos + 2);
+      tr.setSelection(TextSelection.near($pos));
+    } catch {
+      // fallback: don't move cursor
+    }
+  }
+
+  dispatch(tr);
 }

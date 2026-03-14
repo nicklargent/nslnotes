@@ -6,11 +6,9 @@ import { SettingsService } from "../../services/SettingsService";
 import { EntityService } from "../../services/EntityService";
 import { parse, serialize } from "../../lib/frontmatter";
 import { indexStore } from "../../stores/indexStore";
-import { setEditorStore } from "../../stores/editorStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import type { Note } from "../../types/entities";
-import type { EditorMode } from "../../types/stores";
 
 interface NamedNoteCardProps {
   note: Note;
@@ -24,7 +22,6 @@ interface NamedNoteCardProps {
  */
 export function NamedNoteCard(props: NamedNoteCardProps) {
   const [content, setContent] = createSignal("");
-  const [mode, setMode] = createSignal<EditorMode>("outliner");
   let saveTimeout: number | undefined;
   let lastLocalContent: string | undefined;
 
@@ -40,11 +37,6 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
       setContent(noteContent);
     }
   });
-
-  function handleModeChange(newMode: EditorMode) {
-    setMode(newMode);
-    setEditorStore("mode", newMode);
-  }
 
   function handleUpdate(newContent: string) {
     lastLocalContent = newContent;
@@ -93,11 +85,8 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
       >
         <Editor
           content={content()}
-          mode={mode()}
-          onModeChange={handleModeChange}
           placeholder="Start writing..."
           onUpdate={handleUpdate}
-          showModeToggle={true}
         />
       </div>
 

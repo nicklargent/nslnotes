@@ -70,10 +70,8 @@ export function DailyNote(props: DailyNoteProps) {
     <div class="min-h-[60px] py-1">
       <Editor
         content={content()}
-        mode="outliner"
         placeholder="Start writing..."
         onUpdate={handleUpdate}
-        showModeToggle={false}
       />
     </div>
   );

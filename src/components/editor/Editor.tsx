@@ -1,6 +1,5 @@
 import { createSignal, Show } from "solid-js";
 import { ProseEditor } from "./ProseEditor";
-import { OutlinerEditor } from "./OutlinerEditor";
 import { CommandMenu } from "./CommandMenu";
 import { TopicAutocomplete } from "./TopicAutocomplete";
 import { EntityService } from "../../services/EntityService";
@@ -9,22 +8,17 @@ import { IndexService } from "../../services/IndexService";
 import { PromoteDocModal } from "../modals/PromoteDocModal";
 import { contextStore } from "../../stores/contextStore";
 import type { Editor as TiptapEditor } from "@tiptap/core";
-import type { EditorMode } from "../../types/stores";
 import type { TopicRef } from "../../types/topics";
 import type { WikiLink } from "../../types/inline";
 
 interface EditorProps {
   content: string;
-  mode: EditorMode;
   placeholder?: string | undefined;
   onUpdate: (content: string) => void;
-  onModeChange?: ((mode: EditorMode) => void) | undefined;
-  showModeToggle?: boolean | undefined;
 }
 
 /**
- * Editor mode wrapper (T5.2, T6.8, T6.9).
- * Switches between OutlinerEditor and ProseEditor.
+ * Editor wrapper (T5.2, T6.8, T6.9).
  * Handles command menu actions including promote-to-task/doc.
  */
 export function Editor(props: EditorProps) {
@@ -42,11 +36,6 @@ export function Editor(props: EditorProps) {
   } | null>(null);
   const [slashPos, setSlashPos] = createSignal<number | null>(null);
   let editorRef: TiptapEditor | undefined;
-
-  function toggleMode() {
-    const newMode = props.mode === "outliner" ? "prose" : "outliner";
-    props.onModeChange?.(newMode);
-  }
 
   function handleSlashKey(
     pos: { top: number; left: number },
@@ -279,49 +268,22 @@ export function Editor(props: EditorProps) {
 
   return (
     <div class="editor-wrapper relative">
-      <Show when={props.showModeToggle !== false}>
-        <div class="mb-2 flex items-center justify-end">
-          <button
-            class="rounded px-2 py-0.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            onClick={toggleMode}
-          >
-            {props.mode === "outliner" ? "Outline" : "Prose"}
-          </button>
-        </div>
-      </Show>
-
-      <Show when={props.mode === "outliner"}>
-        <OutlinerEditor
-          content={props.content}
-          placeholder={props.placeholder}
-          onUpdate={handleContentUpdate}
-          onSlashKey={handleSlashKey}
-          onHashOrAt={handleHashOrAt}
-          ref={(e) => (editorRef = e)}
-          onWikilinkClick={handleWikilinkClick}
-          onTopicClick={handleTopicClick}
-        />
-      </Show>
-
-      <Show when={props.mode === "prose"}>
-        <ProseEditor
-          content={props.content}
-          placeholder={props.placeholder}
-          onUpdate={handleContentUpdate}
-          onSlashKey={handleSlashKey}
-          onHashOrAt={handleHashOrAt}
-          ref={(e) => (editorRef = e)}
-          onWikilinkClick={handleWikilinkClick}
-          onTopicClick={handleTopicClick}
-        />
-      </Show>
+      <ProseEditor
+        content={props.content}
+        placeholder={props.placeholder}
+        onUpdate={handleContentUpdate}
+        onSlashKey={handleSlashKey}
+        onHashOrAt={handleHashOrAt}
+        ref={(e) => (editorRef = e)}
+        onWikilinkClick={handleWikilinkClick}
+        onTopicClick={handleTopicClick}
+      />
 
       <Show when={commandMenuPos() !== null}>
         <CommandMenu
           position={commandMenuPos()!}
           onSelect={handleCommandSelect}
           onClose={() => setCommandMenuPos(null)}
-          mode={props.mode}
         />
       </Show>
 

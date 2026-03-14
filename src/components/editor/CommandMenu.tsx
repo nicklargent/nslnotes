@@ -1,11 +1,9 @@
 import { createSignal, For, onMount, onCleanup } from "solid-js";
-import type { EditorMode } from "../../types/stores";
 
 interface CommandMenuItem {
   id: string;
   label: string;
   description: string;
-  modes: EditorMode[];
 }
 
 const COMMANDS: CommandMenuItem[] = [
@@ -13,80 +11,68 @@ const COMMANDS: CommandMenuItem[] = [
     id: "promote-to-task",
     label: "Promote to Task",
     description: "Create a task from this line",
-    modes: ["outliner"],
   },
   {
     id: "promote-to-doc",
     label: "Promote to Doc",
     description: "Create a document from this section",
-    modes: ["outliner", "prose"],
   },
   {
     id: "heading1",
     label: "Heading 1",
     description: "Large section heading",
-    modes: ["prose"],
   },
   {
     id: "heading2",
     label: "Heading 2",
     description: "Medium section heading",
-    modes: ["prose"],
   },
   {
     id: "heading3",
     label: "Heading 3",
     description: "Small section heading",
-    modes: ["prose"],
   },
   {
     id: "bullet-list",
     label: "Bullet List",
     description: "Unordered list",
-    modes: ["prose"],
   },
   {
     id: "ordered-list",
     label: "Ordered List",
     description: "Numbered list",
-    modes: ["prose"],
   },
   {
     id: "code-block",
     label: "Code Block",
     description: "Code snippet",
-    modes: ["prose", "outliner"],
   },
   {
     id: "bold",
     label: "Bold",
     description: "Bold text",
-    modes: ["prose", "outliner"],
   },
   {
     id: "italic",
     label: "Italic",
     description: "Italic text",
-    modes: ["prose", "outliner"],
   },
   {
     id: "divider",
     label: "Divider",
     description: "Horizontal rule",
-    modes: ["prose"],
   },
 ];
 
 interface CommandMenuProps {
   position: { top: number; left: number };
-  mode: EditorMode;
   onSelect: (action: string) => void;
   onClose: () => void;
 }
 
 /**
  * Command menu triggered by / key (T5.8, T6.8, T6.9).
- * Shows available actions filtered by current editor mode.
+ * Shows available actions for the editor.
  * Includes promote-to-task and promote-to-doc actions.
  */
 export function CommandMenu(props: CommandMenuProps) {
@@ -98,9 +84,8 @@ export function CommandMenu(props: CommandMenuProps) {
     const f = filter().toLowerCase();
     return COMMANDS.filter(
       (cmd) =>
-        cmd.modes.includes(props.mode) &&
-        (cmd.label.toLowerCase().includes(f) ||
-          cmd.description.toLowerCase().includes(f))
+        cmd.label.toLowerCase().includes(f) ||
+        cmd.description.toLowerCase().includes(f)
     );
   };
 

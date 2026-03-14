@@ -43,18 +43,11 @@ export interface ContextState {
 }
 
 /**
- * Editor mode
- */
-export type EditorMode = "outliner" | "prose";
-
-/**
  * Editor store state
  */
 export interface EditorState {
   /** Currently open file path */
   activeFile: string | null;
-  /** Current editor mode */
-  mode: EditorMode;
   /** Whether content has unsaved changes */
   isDirty: boolean;
   /** Pending debounced save timeout */

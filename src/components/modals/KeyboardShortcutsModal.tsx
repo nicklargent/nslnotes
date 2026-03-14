@@ -23,19 +23,13 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
-    title: "Outliner",
-    shortcuts: [
-      { keys: "Tab", description: "Indent block" },
-      { keys: "Shift + Tab", description: "Outdent block" },
-      { keys: "Alt + Up", description: "Move block up" },
-      { keys: "Alt + Down", description: "Move block down" },
-      { keys: "Enter", description: "New block at same level" },
-      { keys: "Shift + Enter", description: "Line break within block" },
-    ],
-  },
-  {
     title: "Editor",
     shortcuts: [
+      { keys: "Tab", description: "Indent list item" },
+      { keys: "Shift + Tab", description: "Outdent list item" },
+      { keys: "Alt + Up", description: "Move list item up" },
+      { keys: "Alt + Down", description: "Move list item down" },
+      { keys: "Shift + Enter", description: "Line break within block" },
       { keys: "/", description: "Open command menu" },
       { keys: "#", description: "Topic autocomplete" },
       { keys: "@", description: "Person autocomplete" },
