@@ -124,6 +124,24 @@ export function ProseEditor(props: ProseEditorProps) {
           return false;
         },
         handleKeyDown: (_view, event) => {
+          // Tab to indent list items, or wrap paragraph in bullet list
+          if (event.key === "Tab" && !event.shiftKey) {
+            event.preventDefault();
+            if (editor?.can().sinkListItem("listItem")) {
+              editor.chain().focus().sinkListItem("listItem").run();
+            } else if (!editor?.isActive("listItem")) {
+              editor?.chain().focus().toggleBulletList().run();
+            }
+            return true;
+          }
+
+          // Shift+Tab to outdent / unwrap list items
+          if (event.key === "Tab" && event.shiftKey) {
+            event.preventDefault();
+            editor?.chain().focus().liftListItem("listItem").run();
+            return true;
+          }
+
           // # or @ triggers topic autocomplete (T6.10)
           if ((event.key === "#" || event.key === "@") && props.onHashOrAt) {
             const { view } = editor!;
@@ -174,10 +192,7 @@ export function ProseEditor(props: ProseEditorProps) {
   });
 
   return (
-    <div
-      ref={containerRef}
-      class="prose-editor prose prose-sm max-w-none focus-within:outline-none"
-    />
+    <div ref={containerRef} class="prose-editor focus-within:outline-none" />
   );
 }
 

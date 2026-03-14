@@ -1,4 +1,11 @@
-import { createSignal, createMemo, For, onMount, onCleanup } from "solid-js";
+import {
+  createSignal,
+  createMemo,
+  For,
+  Show,
+  onMount,
+  onCleanup,
+} from "solid-js";
 import { DateHeader } from "./DateHeader";
 import { DailyNote } from "./DailyNote";
 import { NamedNoteCard } from "./NamedNoteCard";
@@ -88,13 +95,16 @@ export function JournalView(props: JournalViewProps) {
     return undefined;
   };
 
-  /** Get named notes for a date. */
-  const getNamedNotes = (date: string): Note[] => {
-    const result: Note[] = [];
+  /** Get named note paths for a date (stable strings for For keying). */
+  const getNamedNotePaths = (date: string): string[] => {
+    const result: { path: string; slug: string }[] = [];
     for (const note of indexStore.notes.values()) {
-      if (note.date === date && !note.isDaily) result.push(note);
+      if (note.date === date && !note.isDaily)
+        result.push({ path: note.path, slug: note.slug });
     }
-    return result.sort((a, b) => a.slug.localeCompare(b.slug));
+    return result
+      .sort((a, b) => a.slug.localeCompare(b.slug))
+      .map((n) => n.path);
   };
 
   /** Handle scroll to update virtual window. */
@@ -247,16 +257,23 @@ export function JournalView(props: JournalViewProps) {
               <div class="mb-6">
                 <DailyNote date={date} note={getDailyNote(date)} />
 
-                <For each={getNamedNotes(date)}>
-                  {(note) => (
-                    <div data-note-card>
-                      <NamedNoteCard
-                        note={note}
-                        isFocused={focusedNoteSlug() === note.slug}
-                        onClick={(n) => handleNamedNoteFocus(n)}
-                      />
-                    </div>
-                  )}
+                <For each={getNamedNotePaths(date)}>
+                  {(path) => {
+                    const note = () => indexStore.notes.get(path);
+                    return (
+                      <Show when={note()}>
+                        {(n) => (
+                          <div data-note-card>
+                            <NamedNoteCard
+                              note={n()}
+                              isFocused={focusedNoteSlug() === n().slug}
+                              onClick={(nn) => handleNamedNoteFocus(nn)}
+                            />
+                          </div>
+                        )}
+                      </Show>
+                    );
+                  }}
                 </For>
               </div>
             </div>
