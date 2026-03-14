@@ -7,6 +7,18 @@ import { runtime } from "../lib/runtime";
 export interface AppSettings {
   /** Root directory path for notes storage */
   rootPath: string | null;
+  /** Left column width in pixels */
+  leftColumnWidth: number | null;
+  /** Right column width in pixels */
+  rightColumnWidth: number | null;
+  /** Base font size in pixels */
+  fontSize: number | null;
+  /** Window width in logical pixels */
+  windowWidth: number | null;
+  /** Window height in logical pixels */
+  windowHeight: number | null;
+  /** Whether window is maximized */
+  windowMaximized: boolean | null;
 }
 
 /**
@@ -14,6 +26,12 @@ export interface AppSettings {
  */
 const DEFAULT_SETTINGS: AppSettings = {
   rootPath: null,
+  leftColumnWidth: null,
+  rightColumnWidth: null,
+  fontSize: null,
+  windowWidth: null,
+  windowHeight: null,
+  windowMaximized: null,
 };
 
 /**

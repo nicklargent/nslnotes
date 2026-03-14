@@ -1,4 +1,11 @@
-import { createSignal, createMemo, onMount, onCleanup, Show } from "solid-js";
+import {
+  createSignal,
+  createMemo,
+  createEffect,
+  onMount,
+  onCleanup,
+  Show,
+} from "solid-js";
 import { SetupScreen } from "./components/SetupScreen";
 import { AppErrorBoundary } from "./components/ErrorBoundary";
 import { ToastContainer, showToast } from "./components/Toast";
@@ -24,6 +31,8 @@ import {
 import { clearIndexCache } from "./lib/indexCache";
 import { indexStore } from "./stores/indexStore";
 import { contextStore } from "./stores/contextStore";
+import { uiStore, setUIStore } from "./stores/uiStore";
+import { debouncedSave } from "./components/layout/Layout";
 import type { Topic } from "./types/topics";
 import type { Doc } from "./types/entities";
 
@@ -39,8 +48,25 @@ function App() {
   const [showShortcuts, setShowShortcuts] = createSignal(false);
   let unwatchFn: (() => void) | null = null;
 
+  // Apply font size to document root reactively
+  createEffect(() => {
+    document.documentElement.style.fontSize = `${uiStore.fontSize}px`;
+  });
+
   onMount(async () => {
     try {
+      // Hydrate UI store from persisted settings
+      const settings = await SettingsService.loadSettings();
+      if (settings.leftColumnWidth != null) {
+        setUIStore("leftColumnWidth", settings.leftColumnWidth);
+      }
+      if (settings.rightColumnWidth != null) {
+        setUIStore("rightColumnWidth", settings.rightColumnWidth);
+      }
+      if (settings.fontSize != null) {
+        setUIStore("fontSize", settings.fontSize);
+      }
+
       const configured = await SettingsService.isConfigured();
 
       if (configured) {
@@ -78,12 +104,28 @@ function App() {
     unwatchFn?.();
   });
 
-  // Global keyboard shortcut: ? for help (T7.6)
+  // Global keyboard shortcuts
   function handleGlobalKeyDown(e: KeyboardEvent) {
+    const mod = e.ctrlKey || e.metaKey;
+
+    // Font size: Ctrl/Cmd + = / -
+    if (mod && (e.key === "=" || e.key === "+")) {
+      e.preventDefault();
+      setUIStore("fontSize", Math.min(24, uiStore.fontSize + 1));
+      debouncedSave();
+      return;
+    }
+    if (mod && e.key === "-") {
+      e.preventDefault();
+      setUIStore("fontSize", Math.max(12, uiStore.fontSize - 1));
+      debouncedSave();
+      return;
+    }
+
+    // ? for help (T7.6)
     if (
       e.key === "?" &&
-      !e.ctrlKey &&
-      !e.metaKey &&
+      !mod &&
       !(e.target instanceof HTMLInputElement) &&
       !(e.target instanceof HTMLTextAreaElement) &&
       !(e.target as HTMLElement)?.closest?.(".tiptap")

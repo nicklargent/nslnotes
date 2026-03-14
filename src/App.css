@@ -1,9 +1,7 @@
 @import "tailwindcss";
 
 /* Base styles */
-html {
-  font-size: 16px;
-}
+/* font-size is set dynamically via uiStore */
 
 body {
   margin: 0;

@@ -15,6 +15,18 @@ pub struct DirectoryStatus {
 pub struct AppSettings {
     #[serde(rename = "rootPath")]
     pub root_path: Option<String>,
+    #[serde(rename = "leftColumnWidth", default)]
+    pub left_column_width: Option<f64>,
+    #[serde(rename = "rightColumnWidth", default)]
+    pub right_column_width: Option<f64>,
+    #[serde(rename = "fontSize", default)]
+    pub font_size: Option<f64>,
+    #[serde(rename = "windowWidth", default)]
+    pub window_width: Option<f64>,
+    #[serde(rename = "windowHeight", default)]
+    pub window_height: Option<f64>,
+    #[serde(rename = "windowMaximized", default)]
+    pub window_maximized: Option<bool>,
 }
 
 /// Settings filename
@@ -121,7 +133,7 @@ pub async fn ensure_directory(path: String) -> Result<(), String> {
 }
 
 /// Get the settings file path
-fn get_settings_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+pub fn get_settings_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let config_dir = app
         .path()
         .app_config_dir()

@@ -1,6 +1,8 @@
 import { TodayButton } from "../sidebar/TodayButton";
 import { TopicsList } from "../sidebar/TopicsList";
 import { DocsList } from "../sidebar/DocsList";
+import { uiStore, setUIStore } from "../../stores/uiStore";
+import { debouncedSave } from "./Layout";
 import type { Topic, TopicRef } from "../../types/topics";
 import type { Doc } from "../../types/entities";
 
@@ -13,11 +15,20 @@ interface LeftSidebarProps {
   onCreateDoc: () => void;
 }
 
+function clampFontSize(size: number): number {
+  return Math.min(24, Math.max(12, size));
+}
+
 /**
- * Left sidebar with Today button, Topics section, and Docs section.
+ * Left sidebar with Today button, Topics section, Docs section, and font size controls.
  * Satisfies FR-UI-010–012.
  */
 export function LeftSidebar(props: LeftSidebarProps) {
+  function changeFontSize(delta: number) {
+    setUIStore("fontSize", clampFontSize(uiStore.fontSize + delta));
+    debouncedSave();
+  }
+
   return (
     <div class="flex h-full flex-col">
       {/* Today button - pinned at top */}
@@ -36,6 +47,29 @@ export function LeftSidebar(props: LeftSidebarProps) {
           onDocClick={(doc) => props.onDocClick(doc)}
           onCreateDoc={() => props.onCreateDoc()}
         />
+      </div>
+
+      {/* Font size controls */}
+      <div class="flex items-center justify-center gap-2 border-t border-gray-200 px-3 py-2">
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+          onClick={() => changeFontSize(-1)}
+          title="Decrease font size"
+        >
+          A&minus;
+        </button>
+        <span class="min-w-[3ch] text-center text-xs text-gray-500">
+          {uiStore.fontSize}
+        </span>
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+          onClick={() => changeFontSize(1)}
+          title="Increase font size"
+        >
+          A+
+        </button>
       </div>
     </div>
   );
