@@ -40,6 +40,18 @@
   line-height: 1.6;
 }
 
+.prose-editor .tiptap > p:last-child:has(> br:only-child) {
+  margin: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.prose-editor .tiptap > p:last-child:empty {
+  margin: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .prose-editor .tiptap ul {
   list-style: disc;
   padding-left: 1.25rem;
