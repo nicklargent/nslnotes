@@ -1,0 +1,144 @@
+/**
+ * Vite plugin that provides file system API endpoints for web mode.
+ * Mirrors the Tauri backend commands so the app can run in a browser.
+ */
+import type { Plugin } from "vite";
+import fs from "node:fs";
+import path from "node:path";
+import { type IncomingMessage, type ServerResponse } from "node:http";
+
+function parseBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk: Buffer) => (body += chunk.toString()));
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
+function getQueryParam(url: string, param: string): string | null {
+  const u = new URL(url, "http://localhost");
+  return u.searchParams.get(param);
+}
+
+function sendJson(res: ServerResponse, data: unknown, status = 200) {
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(data));
+}
+
+function sendError(res: ServerResponse, message: string, status = 500) {
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: message }));
+}
+
+export default function apiPlugin(): Plugin {
+  return {
+    name: "nslnotes-api",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? "";
+        if (!url.startsWith("/api/")) {
+          return next();
+        }
+
+        void handleApi(req, res, url);
+      });
+    },
+  };
+}
+
+async function handleApi(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: string,
+) {
+  try {
+    const pathname = new URL(url, "http://localhost").pathname;
+
+    // GET/PUT/DELETE /api/files
+    if (pathname === "/api/files") {
+      if (req.method === "GET") {
+        const filePath = getQueryParam(url, "path");
+        if (!filePath) return sendError(res, "Missing path param", 400);
+        if (!fs.existsSync(filePath))
+          return sendError(res, "File not found", 404);
+        const content = fs.readFileSync(filePath, "utf-8");
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        return res.end(content);
+      }
+
+      if (req.method === "PUT") {
+        const body = JSON.parse(await parseBody(req)) as {
+          path: string;
+          content: string;
+        };
+        const dir = path.dirname(body.path);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(body.path, body.content, "utf-8");
+        return sendJson(res, { ok: true });
+      }
+
+      if (req.method === "DELETE") {
+        const filePath = getQueryParam(url, "path");
+        if (!filePath) return sendError(res, "Missing path param", 400);
+        if (!fs.existsSync(filePath))
+          return sendError(res, "File not found", 404);
+        fs.unlinkSync(filePath);
+        return sendJson(res, { ok: true });
+      }
+    }
+
+    // GET /api/files/exists
+    if (pathname === "/api/files/exists" && req.method === "GET") {
+      const filePath = getQueryParam(url, "path");
+      if (!filePath) return sendError(res, "Missing path param", 400);
+      return sendJson(res, { exists: fs.existsSync(filePath) });
+    }
+
+    // GET /api/files/list
+    if (pathname === "/api/files/list" && req.method === "GET") {
+      const dirPath = getQueryParam(url, "path");
+      if (!dirPath) return sendError(res, "Missing path param", 400);
+      if (!fs.existsSync(dirPath)) return sendJson(res, []);
+      const entries = fs.readdirSync(dirPath).map((name) => {
+        return path.join(dirPath, name);
+      });
+      return sendJson(res, entries);
+    }
+
+    // GET /api/files/verify
+    if (pathname === "/api/files/verify" && req.method === "GET") {
+      const dirPath = getQueryParam(url, "path");
+      if (!dirPath) return sendError(res, "Missing path param", 400);
+      let readable = false;
+      let writable = false;
+      try {
+        fs.accessSync(dirPath, fs.constants.R_OK);
+        readable = true;
+      } catch {
+        /* not readable */
+      }
+      try {
+        fs.accessSync(dirPath, fs.constants.W_OK);
+        writable = true;
+      } catch {
+        /* not writable */
+      }
+      return sendJson(res, { readable, writable });
+    }
+
+    // POST /api/files/mkdir
+    if (pathname === "/api/files/mkdir" && req.method === "POST") {
+      const body = JSON.parse(await parseBody(req)) as { path: string };
+      fs.mkdirSync(body.path, { recursive: true });
+      return sendJson(res, { ok: true });
+    }
+
+    sendError(res, "Not found", 404);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    sendError(res, message, 500);
+  }
+}

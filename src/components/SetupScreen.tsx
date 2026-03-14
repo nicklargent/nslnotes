@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { open } from "@tauri-apps/plugin-dialog";
+import { runtime } from "../lib/runtime";
 import { FileService } from "../services/FileService";
 import { SettingsService } from "../services/SettingsService";
 
@@ -15,6 +15,8 @@ export function SetupScreen(props: SetupScreenProps) {
   const [error, setError] = createSignal<string | null>(null);
   const [isValidating, setIsValidating] = createSignal(false);
   const [selectedPath, setSelectedPath] = createSignal<string | null>(null);
+  const [manualPath, setManualPath] = createSignal("");
+  const isWeb = !runtime.isNative();
 
   /**
    * Open the native folder picker dialog
@@ -23,6 +25,7 @@ export function SetupScreen(props: SetupScreenProps) {
     setError(null);
 
     try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
       const selected = await open({
         directory: true,
         multiple: false,
@@ -36,6 +39,19 @@ export function SetupScreen(props: SetupScreenProps) {
     } catch (err) {
       setError(`Failed to open folder picker: ${err}`);
     }
+  }
+
+  /**
+   * Handle manual path submission (web mode)
+   */
+  async function handleManualPath() {
+    const path = manualPath().trim();
+    if (!path) {
+      setError("Please enter a folder path");
+      return;
+    }
+    setSelectedPath(path);
+    await validateAndSetup(path);
   }
 
   /**
@@ -106,14 +122,40 @@ export function SetupScreen(props: SetupScreenProps) {
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={selectFolder}
-          disabled={isValidating()}
-          class="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isValidating() ? "Setting up..." : "Choose Folder"}
-        </button>
+        {isWeb ? (
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700">
+              Folder path
+            </label>
+            <input
+              type="text"
+              value={manualPath()}
+              onInput={(e) => setManualPath(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleManualPath();
+              }}
+              placeholder="/home/user/notes"
+              class="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              onClick={() => void handleManualPath()}
+              disabled={isValidating()}
+              class="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isValidating() ? "Setting up..." : "Use This Folder"}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={selectFolder}
+            disabled={isValidating()}
+            class="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isValidating() ? "Setting up..." : "Choose Folder"}
+          </button>
+        )}
 
         <p class="mt-4 text-center text-xs text-gray-400">
           NslNotes will create notes/, tasks/, and docs/ subfolders.

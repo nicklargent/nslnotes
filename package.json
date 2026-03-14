@@ -6,6 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
+    "dev:web": "WEB_MODE=1 vite",
     "build": "vite build",
     "serve": "vite preview",
     "tauri": "tauri",
