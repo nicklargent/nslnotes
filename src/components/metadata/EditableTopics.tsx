@@ -1,4 +1,5 @@
 import { createSignal, Show, For } from "solid-js";
+import { TopicAutocomplete } from "../editor/TopicAutocomplete";
 import type { TopicRef } from "../../types/topics";
 
 interface EditableTopicsProps {
@@ -24,6 +25,14 @@ function parseTopics(input: string): TopicRef[] {
 export function EditableTopics(props: EditableTopicsProps) {
   const [editing, setEditing] = createSignal(false);
   const [draft, setDraft] = createSignal("");
+  const [autocomplete, setAutocomplete] = createSignal<{
+    pos: { top: number; left: number };
+    prefix: "#" | "@";
+    filter: string;
+    tokenStart: number;
+    tokenEnd: number;
+  } | null>(null);
+  let inputRef: HTMLInputElement | undefined;
 
   function startEdit() {
     setDraft(props.topics.join(", "));
@@ -31,6 +40,7 @@ export function EditableTopics(props: EditableTopicsProps) {
   }
 
   function save() {
+    if (autocomplete()) return;
     const parsed = parseTopics(draft());
     const changed =
       parsed.length !== props.topics.length ||
@@ -42,10 +52,87 @@ export function EditableTopics(props: EditableTopicsProps) {
   }
 
   function cancel() {
+    setAutocomplete(null);
     setEditing(false);
   }
 
+  function getTokenAtCursor(): {
+    prefix: "#" | "@";
+    filter: string;
+    tokenStart: number;
+    tokenEnd: number;
+  } | null {
+    if (!inputRef) return null;
+    const text = inputRef.value;
+    const cursor = inputRef.selectionStart ?? text.length;
+
+    // Walk backward from cursor to find the start of the current token
+    let start = cursor;
+    while (start > 0 && !/[,\s]/.test(text.charAt(start - 1))) {
+      start--;
+    }
+
+    const token = text.slice(start, cursor);
+    if (token.length >= 1 && (token[0] === "#" || token[0] === "@")) {
+      return {
+        prefix: token[0] as "#" | "@",
+        filter: token,
+        tokenStart: start,
+        tokenEnd: cursor,
+      };
+    }
+    return null;
+  }
+
+  function updateAutocomplete() {
+    if (!inputRef) return;
+    const token = getTokenAtCursor();
+    if (token) {
+      const rect = inputRef.getBoundingClientRect();
+      setAutocomplete({
+        ...token,
+        pos: { top: rect.bottom, left: rect.left },
+      });
+    } else {
+      setAutocomplete(null);
+    }
+  }
+
+  function handleInput(e: InputEvent & { currentTarget: HTMLInputElement }) {
+    setDraft(e.currentTarget.value);
+    updateAutocomplete();
+  }
+
+  function handleAutocompleteSelect(ref: TopicRef) {
+    const ac = autocomplete();
+    if (!ac || !inputRef) return;
+
+    const text = draft();
+    const newDraft =
+      text.slice(0, ac.tokenStart) + ref + text.slice(ac.tokenEnd);
+    setDraft(newDraft);
+    setAutocomplete(null);
+
+    // Restore focus and cursor position after the inserted ref
+    const newCursor = ac.tokenStart + ref.length;
+    setTimeout(() => {
+      inputRef!.focus();
+      inputRef!.setSelectionRange(newCursor, newCursor);
+    }, 0);
+  }
+
   function handleKeyDown(e: KeyboardEvent) {
+    if (autocomplete()) {
+      // Let TopicAutocomplete handle navigation keys
+      if (["ArrowDown", "ArrowUp", "Enter", "Tab"].includes(e.key)) {
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setAutocomplete(null);
+        return;
+      }
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       save();
@@ -79,16 +166,31 @@ export function EditableTopics(props: EditableTopicsProps) {
         </div>
       }
     >
-      <input
-        type="text"
-        value={draft()}
-        onInput={(e) => setDraft(e.currentTarget.value)}
-        onBlur={save}
-        onKeyDown={handleKeyDown}
-        placeholder="#topic1, @person"
-        class="w-full rounded border border-blue-300 bg-white px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-400"
-        ref={(el) => setTimeout(() => el.focus(), 0)}
-      />
+      <div class="relative">
+        <input
+          type="text"
+          value={draft()}
+          onInput={handleInput}
+          onBlur={save}
+          onKeyDown={handleKeyDown}
+          onClick={updateAutocomplete}
+          placeholder="#topic1, @person"
+          class="w-full rounded border border-blue-300 bg-white px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-400"
+          ref={(el) => {
+            inputRef = el;
+            setTimeout(() => el.focus(), 0);
+          }}
+        />
+        <Show when={autocomplete()}>
+          <TopicAutocomplete
+            position={autocomplete()!.pos}
+            prefix={autocomplete()!.prefix}
+            filter={autocomplete()!.filter}
+            onSelect={handleAutocompleteSelect}
+            onClose={() => setAutocomplete(null)}
+          />
+        </Show>
+      </div>
     </Show>
   );
 }
