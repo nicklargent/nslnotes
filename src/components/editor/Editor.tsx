@@ -1,6 +1,7 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, Show, onCleanup } from "solid-js";
 import { ProseEditor } from "./ProseEditor";
 import { CommandMenu } from "./CommandMenu";
+import { BubbleMenu } from "./BubbleMenu";
 import { TopicAutocomplete } from "./TopicAutocomplete";
 import { EntityService } from "../../services/EntityService";
 import { NavigationService } from "../../services/NavigationService";
@@ -36,12 +37,20 @@ export function Editor(props: EditorProps) {
     startPos: number;
   } | null>(null);
   const [slashPos, setSlashPos] = createSignal<number | null>(null);
+  const [showBubbleMenu, setShowBubbleMenu] = createSignal(false);
   let editorRef: TiptapEditor | undefined;
+  let blurTimeout: ReturnType<typeof setTimeout> | undefined;
+  let bubbleMenuRef: HTMLDivElement | undefined;
+
+  onCleanup(() => {
+    if (blurTimeout) clearTimeout(blurTimeout);
+  });
 
   function handleSlashKey(
     pos: { top: number; left: number },
     cursorPos: number
   ) {
+    setShowBubbleMenu(false);
     setSlashPos(cursorPos);
     setCommandMenuPos(pos);
   }
@@ -51,6 +60,7 @@ export function Editor(props: EditorProps) {
     pos: { top: number; left: number },
     cursorPos: number
   ) {
+    setShowBubbleMenu(false);
     // Subtract 1 to include the # or @ prefix character in the replacement range
     setAutocomplete({ pos, prefix, filter: "", startPos: cursorPos - 1 });
   }
@@ -277,9 +287,32 @@ export function Editor(props: EditorProps) {
         onSlashKey={handleSlashKey}
         onHashOrAt={handleHashOrAt}
         ref={(e) => (editorRef = e)}
+        onSelectionChange={(hasSelection) => {
+          if (hasSelection && !commandMenuPos() && !autocomplete()) {
+            setShowBubbleMenu(true);
+          } else {
+            setShowBubbleMenu(false);
+          }
+        }}
+        onEditorBlur={(event) => {
+          const relatedTarget = event?.relatedTarget as HTMLElement | null;
+          if (relatedTarget && bubbleMenuRef?.contains(relatedTarget)) return;
+          blurTimeout = setTimeout(() => setShowBubbleMenu(false), 200);
+        }}
+        onEditorFocus={() => {
+          if (blurTimeout) clearTimeout(blurTimeout);
+        }}
         onWikilinkClick={handleWikilinkClick}
         onTopicClick={handleTopicClick}
       />
+
+      <Show when={showBubbleMenu() && editorRef}>
+        <BubbleMenu
+          editor={editorRef!}
+          onClose={() => setShowBubbleMenu(false)}
+          ref={(el) => (bubbleMenuRef = el)}
+        />
+      </Show>
 
       <Show when={commandMenuPos() !== null}>
         <CommandMenu

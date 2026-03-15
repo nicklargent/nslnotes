@@ -22,6 +22,9 @@ interface ProseEditorProps {
       ) => void)
     | undefined;
   ref?: ((editor: Editor) => void) | undefined;
+  onSelectionChange?: ((hasSelection: boolean) => void) | undefined;
+  onEditorBlur?: ((event: FocusEvent) => void) | undefined;
+  onEditorFocus?: (() => void) | undefined;
   onWikilinkClick?: ((type: string, target: string) => void) | undefined;
   onTopicClick?: ((ref: string) => void) | undefined;
 }
@@ -48,8 +51,35 @@ export function ProseEditor(props: ProseEditorProps) {
         Placeholder.configure({
           placeholder: props.placeholder ?? "Start writing...",
         }),
-        Link.configure({
-          openOnClick: true,
+        Link.extend({
+          renderHTML({ HTMLAttributes }) {
+            // Render without href/target to prevent browser navigation.
+            // Store href as data-href; mark attributes retain the real href.
+            const attrs = HTMLAttributes as Record<string, unknown>;
+            return ["a", { "data-href": attrs["href"] }, 0];
+          },
+          parseHTML() {
+            return [
+              {
+                tag: "a[href]",
+                getAttrs: (node: string | HTMLElement) => {
+                  if (typeof node === "string") return false;
+                  const href = node.getAttribute("href");
+                  return href ? { href } : false;
+                },
+              },
+              {
+                tag: "a[data-href]",
+                getAttrs: (node: string | HTMLElement) => {
+                  if (typeof node === "string") return false;
+                  const href = node.getAttribute("data-href");
+                  return href ? { href } : false;
+                },
+              },
+            ];
+          },
+        }).configure({
+          openOnClick: false,
           autolink: true,
           linkOnPaste: true,
         }),
@@ -71,6 +101,20 @@ export function ProseEditor(props: ProseEditorProps) {
           const $pos = view.state.doc.resolve(pos);
           const nodeText = $pos.parent.textContent;
           const clickOffset = pos - $pos.start();
+
+          // Cmd/Ctrl+click to open links
+          if (event.metaKey || event.ctrlKey) {
+            const marks = $pos.marks();
+            const linkMark = marks.find((m) => m.type.name === "link");
+            if (linkMark) {
+              const href = linkMark.attrs["href"] as string | undefined;
+              if (href) {
+                event.preventDefault();
+                window.open(href, "_blank");
+                return true;
+              }
+            }
+          }
 
           // Check for TODO marker click (Unicode chars ☐✎☑)
           const todoMatch = /^([\u2610\u25a3\u2611])\s/.exec(nodeText);
@@ -96,31 +140,33 @@ export function ProseEditor(props: ProseEditorProps) {
             return true;
           }
 
-          // Check for wikilink click [[type:target]]
-          const wikilinkRegex = /\[\[(task|doc|note):([^\]]+)\]\]/g;
-          let wlMatch;
-          while ((wlMatch = wikilinkRegex.exec(nodeText)) !== null) {
-            if (
-              clickOffset >= wlMatch.index &&
-              clickOffset <= wlMatch.index + wlMatch[0].length
-            ) {
-              event.preventDefault();
-              props.onWikilinkClick?.(wlMatch[1]!, wlMatch[2]!);
-              return true;
+          // Check for wikilink click [[type:target]] — only navigate on Cmd/Ctrl+click
+          if (event.metaKey || event.ctrlKey) {
+            const wikilinkRegex = /\[\[(task|doc|note):([^\]]+)\]\]/g;
+            let wlMatch;
+            while ((wlMatch = wikilinkRegex.exec(nodeText)) !== null) {
+              if (
+                clickOffset >= wlMatch.index &&
+                clickOffset <= wlMatch.index + wlMatch[0].length
+              ) {
+                event.preventDefault();
+                props.onWikilinkClick?.(wlMatch[1]!, wlMatch[2]!);
+                return true;
+              }
             }
-          }
 
-          // Check for topic ref click (#topic or @person)
-          const topicRegex = /(?<!\w)([#@][a-z0-9-]+)/gi;
-          let topicMatch;
-          while ((topicMatch = topicRegex.exec(nodeText)) !== null) {
-            if (
-              clickOffset >= topicMatch.index &&
-              clickOffset <= topicMatch.index + topicMatch[0].length
-            ) {
-              event.preventDefault();
-              props.onTopicClick?.(topicMatch[1]!);
-              return true;
+            // Check for topic ref click (#topic or @person)
+            const topicRegex = /(?<!\w)([#@][a-z0-9-]+)/gi;
+            let topicMatch;
+            while ((topicMatch = topicRegex.exec(nodeText)) !== null) {
+              if (
+                clickOffset >= topicMatch.index &&
+                clickOffset <= topicMatch.index + topicMatch[0].length
+              ) {
+                event.preventDefault();
+                props.onTopicClick?.(topicMatch[1]!);
+                return true;
+              }
             }
           }
 
@@ -193,19 +239,86 @@ export function ProseEditor(props: ProseEditorProps) {
           if (event.key === "/" && props.onSlashKey) {
             const { view } = editor!;
             const cursorPos = view.state.selection.from;
-            const coords = view.coordsAtPos(cursorPos);
-            // Defer so the / character is inserted first
-            setTimeout(() => {
-              props.onSlashKey!(
-                { top: coords.top, left: coords.left },
-                cursorPos
-              );
-            }, 0);
+            // Only trigger command menu if / is at start of line or after whitespace
+            const $pos = view.state.doc.resolve(cursorPos);
+            const textBefore = $pos.parent.textBetween(
+              0,
+              $pos.parentOffset,
+              ""
+            );
+            if (textBefore.length === 0 || /\s$/.test(textBefore)) {
+              const coords = view.coordsAtPos(cursorPos);
+              // Defer so the / character is inserted first
+              setTimeout(() => {
+                props.onSlashKey!(
+                  { top: coords.top, left: coords.left },
+                  cursorPos
+                );
+              }, 0);
+            }
           }
           return false;
         },
       },
     });
+
+    // Prevent native <a> click navigation — links are opened via Cmd/Ctrl+click.
+    // Use capture phase to intercept before ProseMirror or browser default handling.
+    function handleLinkClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      const anchor = target.tagName === "A" ? target : target.closest("a");
+      if (anchor && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+      }
+    }
+    containerRef.addEventListener("click", handleLinkClick, true);
+
+    // Show pointer cursor on Cmd/Ctrl hold over clickable elements
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Control" || e.key === "Meta") {
+        containerRef!.classList.add("ctrl-held");
+      }
+    }
+    function handleKeyUp(e: KeyboardEvent) {
+      if (e.key === "Control" || e.key === "Meta") {
+        containerRef!.classList.remove("ctrl-held");
+      }
+    }
+    function handleBlurWindow() {
+      containerRef!.classList.remove("ctrl-held");
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlurWindow);
+
+    onCleanup(() => {
+      containerRef!.removeEventListener("click", handleLinkClick, true);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlurWindow);
+    });
+
+    // Surface editor events to parent without exposing TipTap internals.
+    // Capture callbacks at registration time to avoid SolidJS reactivity warnings.
+    const onSelectionChange = props.onSelectionChange;
+    if (onSelectionChange) {
+      editor.on("selectionUpdate", ({ editor: ed }) => {
+        const { from, to } = ed.state.selection;
+        onSelectionChange(from !== to);
+      });
+    }
+    const onEditorBlur = props.onEditorBlur;
+    if (onEditorBlur) {
+      editor.on("blur", ({ event }) => {
+        onEditorBlur(event as FocusEvent);
+      });
+    }
+    const onEditorFocus = props.onEditorFocus;
+    if (onEditorFocus) {
+      editor.on("focus", () => {
+        onEditorFocus();
+      });
+    }
 
     props.ref?.(editor);
   });
@@ -266,7 +379,7 @@ function htmlFromMarkdown(md: string): string {
       return `<pre><code>${escapeHtml(content.trim())}</code></pre>`;
     });
 
-  // TODO/DOING/DONE markers in list items (handles indented items too)
+  // TODO/DOING/DONE markers (in list items and plain paragraphs)
   html = html
     .replace(
       /^(\s*[-*] )TODO /gm,
@@ -282,6 +395,23 @@ function htmlFromMarkdown(md: string): string {
     )
     .replace(
       /^(\s*[-*] <span class="todo-marker todo-done"[^>]*>&#9745;<\/span> <s>)(.+)$/gm,
+      "$1$2</s>"
+    )
+    // Top-level TODO/DOING/DONE (not in list items)
+    .replace(
+      /^TODO /gm,
+      '<span class="todo-marker todo-open" data-todo="TODO">&#9744;</span> '
+    )
+    .replace(
+      /^DOING /gm,
+      '<span class="todo-marker todo-doing" data-todo="DOING">&#9635;</span> '
+    )
+    .replace(
+      /^DONE /gm,
+      '<span class="todo-marker todo-done" data-todo="DONE">&#9745;</span> <s>'
+    )
+    .replace(
+      /^(<span class="todo-marker todo-done"[^>]*>&#9745;<\/span> <s>)(.+)$/gm,
       "$1$2</s>"
     );
 
@@ -411,7 +541,8 @@ function nodeToMarkdown(node: Node, listDepth: number): string {
           break;
         }
         case "a": {
-          const href = el.getAttribute("href") ?? "";
+          const href =
+            el.getAttribute("href") || el.getAttribute("data-href") || "";
           const text = nodeToMarkdown(el, listDepth);
           result += `[${text}](${href})`;
           break;

@@ -138,17 +138,24 @@
   color: #2563eb;
   text-decoration: underline;
   text-decoration-color: #93c5fd;
-  cursor: pointer;
+  cursor: text;
 }
 
 .prose-editor .tiptap a:hover {
   text-decoration-color: #2563eb;
 }
 
+/* Pointer cursor on Cmd/Ctrl hold for clickable elements */
+.prose-editor.ctrl-held .tiptap a,
+.prose-editor.ctrl-held .tiptap .wikilink,
+.prose-editor.ctrl-held .tiptap .topic-ref {
+  cursor: pointer;
+}
+
 /* Wikilinks */
 .wikilink {
   color: #3b82f6;
-  cursor: pointer;
+  cursor: text;
   border-bottom: 1px dashed #93c5fd;
   padding: 0 1px;
   border-radius: 2px;
@@ -163,7 +170,7 @@
 /* Topic/person refs */
 .topic-ref {
   color: #8b5cf6;
-  cursor: pointer;
+  cursor: text;
   font-weight: 500;
   transition: color 0.1s;
 }
@@ -187,4 +194,20 @@
 
 .animate-slide-up {
   animation: slide-up 0.2s ease-out;
+}
+
+/* Bubble menu animation */
+@keyframes bubble-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -100%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%) translateY(0);
+  }
+}
+
+.animate-bubble-up {
+  animation: bubble-up 0.15s ease-out;
 }

@@ -42,17 +42,6 @@ export const InlineDecorations = Extension.create({
             if (!node.isTextblock) return;
             const text = node.textContent;
 
-            // Check if inside a list item
-            const $pos = newState.doc.resolve(pos);
-            let inListItem = false;
-            for (let d = $pos.depth; d >= 0; d--) {
-              if ($pos.node(d).type.name === "listItem") {
-                inListItem = true;
-                break;
-              }
-            }
-            if (!inListItem) return;
-
             // Match TODO/DOING/DONE text that needs replacing with Unicode
             const textMatch = /^(TODO|DOING|DONE) /.exec(text);
             if (textMatch) {
@@ -135,6 +124,51 @@ export const InlineDecorations = Extension.create({
               changed = true;
             }
           }
+
+          return changed ? tr : null;
+        },
+      }),
+      // Plugin to convert markdown link syntax [text](url) into link marks
+      new Plugin({
+        key: new PluginKey("markdownLinkConvert"),
+        appendTransaction(
+          transactions: readonly Transaction[],
+          _oldState,
+          newState
+        ) {
+          if (!transactions.some((tr) => tr.docChanged)) return null;
+
+          const linkMark = newState.schema.marks["link"];
+          if (!linkMark) return null;
+
+          const tr = newState.tr;
+          let changed = false;
+
+          newState.doc.descendants((node, pos) => {
+            if (changed) return false; // Only process first match per transaction
+            if (!node.isTextblock) return undefined;
+            const text = node.textContent;
+
+            // Match [text](url) but not [[wikilinks]]
+            const mdLinkRegex = /(?<!\[)\[([^\]]+)\]\(([^)]+)\)/g;
+            const match = mdLinkRegex.exec(text);
+            if (match) {
+              const fullMatch = match[0]!;
+              const linkText = match[1]!;
+              const href = match[2]!;
+
+              const from = pos + 1 + match.index;
+              const to = from + fullMatch.length;
+
+              // Replace markdown syntax with linked text + trailing space to break mark
+              const mark = linkMark.create({ href });
+              const linkedText = newState.schema.text(linkText, [mark]);
+              tr.replaceWith(from, to, [linkedText, newState.schema.text(" ")]);
+              changed = true;
+              return false;
+            }
+            return undefined;
+          });
 
           return changed ? tr : null;
         },
