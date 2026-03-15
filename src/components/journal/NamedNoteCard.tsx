@@ -13,6 +13,7 @@ import type { Note } from "../../types/entities";
 interface NamedNoteCardProps {
   note: Note;
   isFocused: boolean;
+  autofocus?: boolean;
   onClick: (note: Note) => void;
 }
 
@@ -86,6 +87,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
         <Editor
           content={content()}
           placeholder="Start writing..."
+          autofocus={props.autofocus}
           onUpdate={handleUpdate}
         />
       </div>

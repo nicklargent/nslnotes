@@ -10,6 +10,7 @@ import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import { EditableDate } from "../metadata/EditableDate";
+import { consumeAutofocus } from "../draft/DraftView";
 import type { Task } from "../../types/entities";
 
 interface TaskDetailProps {
@@ -22,6 +23,7 @@ interface TaskDetailProps {
  */
 export function TaskDetail(props: TaskDetailProps) {
   const [content, setContent] = createSignal("");
+  const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
 
   // Reactively look up the latest task from index store so metadata edits are reflected
@@ -137,6 +139,7 @@ export function TaskDetail(props: TaskDetailProps) {
           <Editor
             content={content()}
             placeholder="Add task details..."
+            autofocus={shouldAutofocus}
             onUpdate={handleUpdate}
           />
         </div>

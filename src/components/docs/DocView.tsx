@@ -9,6 +9,7 @@ import { editorStore, setEditorStore } from "../../stores/editorStore";
 import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
+import { consumeAutofocus } from "../draft/DraftView";
 import type { Doc } from "../../types/entities";
 
 interface DocViewProps {
@@ -21,6 +22,7 @@ interface DocViewProps {
  */
 export function DocView(props: DocViewProps) {
   const [content, setContent] = createSignal("");
+  const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; body: string } | null = null;
 
@@ -99,6 +101,7 @@ export function DocView(props: DocViewProps) {
           <Editor
             content={content()}
             placeholder="Start writing..."
+            autofocus={shouldAutofocus}
             onUpdate={handleUpdate}
           />
         </div>

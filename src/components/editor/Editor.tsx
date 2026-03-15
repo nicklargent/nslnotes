@@ -14,6 +14,7 @@ import type { WikiLink } from "../../types/inline";
 interface EditorProps {
   content: string;
   placeholder?: string | undefined;
+  autofocus?: boolean | undefined;
   onUpdate: (content: string) => void;
 }
 
@@ -271,6 +272,7 @@ export function Editor(props: EditorProps) {
       <ProseEditor
         content={props.content}
         placeholder={props.placeholder}
+        autofocus={props.autofocus}
         onUpdate={handleContentUpdate}
         onSlashKey={handleSlashKey}
         onHashOrAt={handleHashOrAt}

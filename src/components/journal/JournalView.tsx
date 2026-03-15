@@ -9,6 +9,7 @@ import {
 import { DateHeader } from "./DateHeader";
 import { DailyNote } from "./DailyNote";
 import { NamedNoteCard } from "./NamedNoteCard";
+import { DraftNoteCard } from "./DraftNoteCard";
 import { getTodayISO } from "../../lib/dates";
 import { indexStore } from "../../stores/indexStore";
 import { contextStore, setContextStore } from "../../stores/contextStore";
@@ -17,6 +18,8 @@ import type { Note } from "../../types/entities";
 
 interface JournalViewProps {
   onNewNote: (date: string) => void;
+  draftDate: string | null;
+  onDraftClear: () => void;
 }
 
 /** How many dates to render above/below viewport for smooth scrolling. */
@@ -34,6 +37,9 @@ const MAX_RENDERED = 30;
 export function JournalView(props: JournalViewProps) {
   const [startIndex, setStartIndex] = createSignal(0);
   const [focusedNoteSlug, setFocusedNoteSlug] = createSignal<string | null>(
+    null
+  );
+  const [autofocusNotePath, setAutofocusNotePath] = createSignal<string | null>(
     null
   );
   let scrollRef: HTMLDivElement | undefined;
@@ -267,6 +273,7 @@ export function JournalView(props: JournalViewProps) {
                             <NamedNoteCard
                               note={n()}
                               isFocused={focusedNoteSlug() === n().slug}
+                              autofocus={autofocusNotePath() === n().path}
                               onClick={(nn) => handleNamedNoteFocus(nn)}
                             />
                           </div>
@@ -275,6 +282,22 @@ export function JournalView(props: JournalViewProps) {
                     );
                   }}
                 </For>
+
+                <Show when={props.draftDate === date}>
+                  <div data-note-card>
+                    <DraftNoteCard
+                      date={date}
+                      onCommit={(note) => {
+                        setAutofocusNotePath(note.path);
+                        props.onDraftClear();
+                        handleNamedNoteFocus(note);
+                        // Clear after render so the NamedNoteCard picks it up on mount
+                        setTimeout(() => setAutofocusNotePath(null), 0);
+                      }}
+                      onCancel={() => props.onDraftClear()}
+                    />
+                  </div>
+                </Show>
               </div>
             </div>
           )}

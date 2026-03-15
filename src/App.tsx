@@ -19,9 +19,6 @@ import { Layout } from "./components/layout/Layout";
 import { LeftSidebar } from "./components/layout/LeftSidebar";
 import { CenterPanel } from "./components/layout/CenterPanel";
 import { RightPanel } from "./components/layout/RightPanel";
-import { CreateNoteModal } from "./components/modals/CreateNoteModal";
-import { CreateTaskModal } from "./components/modals/CreateTaskModal";
-import { CreateDocModal } from "./components/modals/CreateDocModal";
 import {
   SettingsService,
   IndexService,
@@ -30,7 +27,7 @@ import {
 } from "./services";
 import { clearIndexCache } from "./lib/indexCache";
 import { indexStore } from "./stores/indexStore";
-import { contextStore } from "./stores/contextStore";
+import { contextStore, setContextStore } from "./stores/contextStore";
 import { uiStore, setUIStore } from "./stores/uiStore";
 import { debouncedSave } from "./components/layout/Layout";
 import type { Topic } from "./types/topics";
@@ -217,17 +214,10 @@ function App() {
     return null;
   });
 
-  // Modal state
-  const [noteModalDate, setNoteModalDate] = createSignal<string | null>(null);
-  const [showTaskModal, setShowTaskModal] = createSignal(false);
-  const [showDocModal, setShowDocModal] = createSignal(false);
+  const [noteDraftDate, setNoteDraftDate] = createSignal<string | null>(null);
 
   function handleNewNote(date: string) {
-    setNoteModalDate(date);
-  }
-
-  function handleNoteCreated(_slug: string | null) {
-    setNoteModalDate(null);
+    setNoteDraftDate(date);
   }
 
   return (
@@ -253,13 +243,15 @@ function App() {
               onTodayClick={() => NavigationService.goHome()}
               onTopicClick={(ref) => NavigationService.navigateToTopic(ref)}
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
-              onCreateDoc={() => setShowDocModal(true)}
+              onCreateDoc={() => setContextStore("draft", { type: "doc" })}
             />
           }
           center={
             <CenterPanel
               activeView={contextStore.activeView}
               onNewNote={handleNewNote}
+              noteDraftDate={noteDraftDate()}
+              onNoteDraftClear={() => setNoteDraftDate(null)}
             />
           }
           right={
@@ -268,23 +260,10 @@ function App() {
               isHomeState={contextStore.isHomeState}
               highlightedTaskPath={highlightedTaskPath()}
               onTaskClick={(task) => NavigationService.navigateTo(task)}
-              onCreateTask={() => setShowTaskModal(true)}
+              onCreateTask={() => setContextStore("draft", { type: "task" })}
             />
           }
         />
-        <Show when={noteModalDate() !== null}>
-          <CreateNoteModal
-            date={noteModalDate()!}
-            onClose={() => setNoteModalDate(null)}
-            onCreated={handleNoteCreated}
-          />
-        </Show>
-        <Show when={showTaskModal()}>
-          <CreateTaskModal onClose={() => setShowTaskModal(false)} />
-        </Show>
-        <Show when={showDocModal()}>
-          <CreateDocModal onClose={() => setShowDocModal(false)} />
-        </Show>
       </Show>
 
       <Show when={showShortcuts()}>

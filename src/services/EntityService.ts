@@ -92,9 +92,11 @@ export const EntityService = {
     if (!rootPath) return null;
 
     const notesDir = `${rootPath}/notes`;
-    const slug = await generateUniqueSlug(params.title, notesDir);
-    const filename = `${params.date}-${slug}`;
-    const path = `${notesDir}/${filename}.md`;
+    const slug = await generateUniqueSlug(
+      `${params.date}-${params.title}`,
+      notesDir
+    );
+    const path = `${notesDir}/${slug}.md`;
 
     const frontmatter: Record<string, unknown> = {
       type: "note",

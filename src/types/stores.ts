@@ -25,6 +25,14 @@ export interface IndexState {
 export type ViewType = "journal" | "task" | "doc" | "topic";
 
 /**
+ * Draft state for inline entity creation
+ */
+export interface DraftState {
+  type: "doc" | "task" | "note";
+  date?: string;
+}
+
+/**
  * Context store state
  */
 export interface ContextState {
@@ -40,6 +48,8 @@ export interface ContextState {
   isHomeState: boolean;
   /** Journal scroll anchor date */
   journalAnchorDate: string | null;
+  /** Active draft for inline creation (null = no draft) */
+  draft: DraftState | null;
 }
 
 /**

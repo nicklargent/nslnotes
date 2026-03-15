@@ -67,11 +67,13 @@ export async function generateUniqueSlug(
     }
   }
 
-  // Build a set of existing slugs (filenames without .md)
+  // Build a set of existing slugs (basenames without .md extension)
   const existingSlugs = new Set<string>();
   for (const file of files) {
-    if (file.endsWith(".md")) {
-      existingSlugs.add(file.slice(0, -3));
+    // Extract basename in case full paths are returned
+    const basename = file.split("/").pop() ?? file;
+    if (basename.endsWith(".md")) {
+      existingSlugs.add(basename.slice(0, -3));
     }
   }
 
@@ -107,11 +109,12 @@ export function generateUniqueSlugSync(
     return generateUniqueSlugSync("untitled", existingFiles);
   }
 
-  // Build a set of existing slugs (filenames without .md)
+  // Build a set of existing slugs (basenames without .md extension)
   const existingSlugs = new Set<string>();
   for (const file of existingFiles) {
-    if (file.endsWith(".md")) {
-      existingSlugs.add(file.slice(0, -3));
+    const basename = file.split("/").pop() ?? file;
+    if (basename.endsWith(".md")) {
+      existingSlugs.add(basename.slice(0, -3));
     }
   }
 

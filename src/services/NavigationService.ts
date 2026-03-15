@@ -19,6 +19,7 @@ export const NavigationService = {
       relevanceWeights: new Map(),
       isHomeState: true,
       journalAnchorDate: null,
+      draft: null,
     });
   },
 
@@ -35,6 +36,7 @@ export const NavigationService = {
       activeEntity: entity,
       activeTopic: null,
       isHomeState: false,
+      draft: null,
     });
 
     NavigationService.updateRelevance();

@@ -9,6 +9,7 @@ import { InlineDecorations } from "./InlineDecorations";
 interface ProseEditorProps {
   content: string;
   placeholder?: string | undefined;
+  autofocus?: boolean | undefined;
   onUpdate: (markdown: string) => void;
   onSlashKey?:
     | ((pos: { top: number; left: number }, cursorPos: number) => void)
@@ -55,6 +56,7 @@ export function ProseEditor(props: ProseEditorProps) {
         InlineDecorations,
       ],
       content: htmlFromMarkdown(props.content),
+      autofocus: false,
       onUpdate: ({ editor: e }) => {
         if (skipNextUpdate) {
           skipNextUpdate = false;
@@ -206,6 +208,13 @@ export function ProseEditor(props: ProseEditorProps) {
     });
 
     props.ref?.(editor);
+  });
+
+  // Reactively focus when autofocus becomes true (may happen after mount)
+  createEffect(() => {
+    if (props.autofocus && editor && !editor.isDestroyed) {
+      setTimeout(() => editor!.commands.focus("end"), 0);
+    }
   });
 
   createEffect(() => {
