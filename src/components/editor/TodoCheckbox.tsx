@@ -15,7 +15,7 @@ export function TodoCheckbox(props: TodoCheckboxProps) {
       case "TODO":
         return "\u2610"; // Empty checkbox
       case "DOING":
-        return "\u270e"; // Pencil
+        return "\u25a3"; // Square with inner square
       case "DONE":
         return "\u2611"; // Checked checkbox
     }

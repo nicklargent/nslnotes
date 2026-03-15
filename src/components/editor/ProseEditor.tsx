@@ -73,14 +73,14 @@ export function ProseEditor(props: ProseEditorProps) {
           const clickOffset = pos - $pos.start();
 
           // Check for TODO marker click (Unicode chars ☐✎☑)
-          const todoMatch = /^([\u2610\u270e\u2611])\s/.exec(nodeText);
+          const todoMatch = /^([\u2610\u25a3\u2611])\s/.exec(nodeText);
           if (todoMatch && clickOffset <= 1) {
             event.preventDefault();
             const markerChar = todoMatch[1]!;
             const nextChar =
               markerChar === "\u2610"
-                ? "\u270e"
-                : markerChar === "\u270e"
+                ? "\u25a3"
+                : markerChar === "\u25a3"
                   ? "\u2611"
                   : "\u2610";
             // Replace just the marker character at the exact position
@@ -274,7 +274,7 @@ function htmlFromMarkdown(md: string): string {
     )
     .replace(
       /^(\s*[-*] )DOING /gm,
-      '$1<span class="todo-marker todo-doing" data-todo="DOING">&#9998;</span> '
+      '$1<span class="todo-marker todo-doing" data-todo="DOING">&#9635;</span> '
     )
     .replace(
       /^(\s*[-*] )DONE /gm,
@@ -368,7 +368,7 @@ function nodeToMarkdown(node: Node, listDepth: number): string {
       // Restore TODO markers from Unicode back to text
       text = text
         .replace(/^\u2610\s*/, "TODO ")
-        .replace(/^\u270e\s*/, "DOING ")
+        .replace(/^\u25a3\s*/, "DOING ")
         .replace(/^\u2611\s*/, "DONE ");
       result += text;
     } else if (child.nodeType === Node.ELEMENT_NODE) {
