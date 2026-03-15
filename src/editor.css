@@ -40,13 +40,17 @@
   line-height: 1.6;
 }
 
-.prose-editor .tiptap > p:last-child:not(:first-child):has(> br:only-child) {
+.prose-editor
+  .tiptap:not(.ProseMirror-focused)
+  > p:last-child:not(:first-child):has(> br:only-child) {
   margin: 0;
   height: 0;
   overflow: hidden;
 }
 
-.prose-editor .tiptap > p:last-child:not(:first-child):empty {
+.prose-editor
+  .tiptap:not(.ProseMirror-focused)
+  > p:last-child:not(:first-child):empty {
   margin: 0;
   height: 0;
   overflow: hidden;
