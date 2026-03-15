@@ -16,7 +16,8 @@ const WIKILINK_PATTERN = /\[\[(task|doc|note):([^\]]+)\]\]/g;
  * Regex for topic references: #topic-name or @person-name
  * Must be preceded by whitespace or start of line, followed by non-alphanumeric or end.
  */
-const TOPIC_REF_PATTERN = /(?:^|(?<=\s))[#@][a-z0-9][a-z0-9-]*/gi;
+const TOPIC_REF_PATTERN =
+  /(?:^|(?<=\s))[#@][a-z0-9][a-z0-9-]*(?=[\s.,;:!?)\]|}]|$)/gi;
 
 /**
  * Check if a line is inside a fenced code block.

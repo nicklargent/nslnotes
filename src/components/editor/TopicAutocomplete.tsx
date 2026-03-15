@@ -26,6 +26,9 @@ export function TopicAutocomplete(props: TopicAutocompleteProps) {
         // Match prefix type: # for topics, @ for people
         if (props.prefix === "#" && t.kind !== "topic") return false;
         if (props.prefix === "@" && t.kind !== "person") return false;
+        // Exclude exact match of in-progress text (partially typed topic shouldn't suggest itself)
+        // props.filter includes the prefix char, e.g. "@al" when typing @alice
+        if (f && t.ref.toLowerCase() === f) return false;
         // Filter by typed text
         if (
           f &&

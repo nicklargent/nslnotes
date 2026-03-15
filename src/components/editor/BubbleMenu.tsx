@@ -49,10 +49,18 @@ export function BubbleMenu(props: BubbleMenuProps) {
         props.onClose();
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && !linkMode()) {
+        e.preventDefault();
+        props.onClose();
+      }
+    }
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown, true);
 
     onCleanup(() => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown, true);
     });
   });
 

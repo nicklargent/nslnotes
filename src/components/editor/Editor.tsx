@@ -1,6 +1,6 @@
 import { createSignal, Show, onCleanup } from "solid-js";
 import { ProseEditor } from "./ProseEditor";
-import { CommandMenu } from "./CommandMenu";
+import { CommandMenu, filterCommands } from "./CommandMenu";
 import { BubbleMenu } from "./BubbleMenu";
 import { TopicAutocomplete } from "./TopicAutocomplete";
 import { EntityService } from "../../services/EntityService";
@@ -37,6 +37,7 @@ export function Editor(props: EditorProps) {
     startPos: number;
   } | null>(null);
   const [slashPos, setSlashPos] = createSignal<number | null>(null);
+  const [commandFilter, setCommandFilter] = createSignal("");
   const [showBubbleMenu, setShowBubbleMenu] = createSignal(false);
   let editorRef: TiptapEditor | undefined;
   let blurTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -45,6 +46,12 @@ export function Editor(props: EditorProps) {
   onCleanup(() => {
     if (blurTimeout) clearTimeout(blurTimeout);
   });
+
+  function closeCommandMenu() {
+    setCommandMenuPos(null);
+    setCommandFilter("");
+    setSlashPos(null);
+  }
 
   function handleSlashKey(
     pos: { top: number; left: number },
@@ -73,21 +80,61 @@ export function Editor(props: EditorProps) {
   }
 
   function handleContentUpdate(content: string) {
+    let inProgressToken: string | undefined;
+
     // Update autocomplete filter if active
     const ac = autocomplete();
     if (ac && editorRef) {
       const { state } = editorRef;
       const cursorPos = state.selection.from;
-      // Extract text between start position and cursor
-      const textBetween = state.doc.textBetween(ac.startPos, cursorPos, "");
-      if (textBetween.includes(" ") || textBetween.includes("\n")) {
+      if (cursorPos <= ac.startPos) {
+        // Cursor moved before the trigger character — close autocomplete
         setAutocomplete(null);
       } else {
-        handleAutocompleteFilter(textBetween);
+        // Extract text between start position and cursor
+        const textBetween = state.doc.textBetween(ac.startPos, cursorPos, "");
+        if (textBetween.includes(" ") || textBetween.includes("\n")) {
+          setAutocomplete(null);
+        } else {
+          handleAutocompleteFilter(textBetween);
+          inProgressToken = textBetween;
+        }
       }
     }
 
-    props.onUpdate(content);
+    // Update command menu filter if active
+    const sp = slashPos();
+    if (sp !== null && commandMenuPos() && editorRef) {
+      const { state } = editorRef;
+      const cursorPos = state.selection.from;
+      if (cursorPos <= sp) {
+        closeCommandMenu();
+      } else {
+        const filterText = state.doc.textBetween(sp + 1, cursorPos, "");
+        if (
+          filterText.includes(" ") ||
+          filterText.includes("\n") ||
+          filterCommands(filterText).length === 0
+        ) {
+          closeCommandMenu();
+        } else {
+          setCommandFilter(filterText);
+        }
+      }
+    }
+
+    // Strip in-progress autocomplete token so partial topics don't get indexed
+    let updatedContent = content;
+    if (inProgressToken) {
+      const idx = updatedContent.lastIndexOf(inProgressToken);
+      if (idx !== -1) {
+        updatedContent =
+          updatedContent.slice(0, idx) +
+          updatedContent.slice(idx + inProgressToken.length);
+      }
+    }
+
+    props.onUpdate(updatedContent);
   }
 
   function handleAutocompleteSelect(ref: TopicRef) {
@@ -222,22 +269,24 @@ export function Editor(props: EditorProps) {
   }
 
   function handleCommandSelect(action: string) {
-    setCommandMenuPos(null);
+    if (!editorRef) {
+      closeCommandMenu();
+      return;
+    }
 
-    if (!editorRef) return;
-
-    // Delete the slash character that triggered the menu
+    // Delete the slash character and any filter text that was typed
     const sp = slashPos();
+    closeCommandMenu();
     if (sp !== null) {
+      const cursorPos = editorRef.state.selection.from;
       editorRef
         .chain()
         .focus()
         .command(({ tr }) => {
-          tr.delete(sp, sp + 1);
+          tr.delete(sp, cursorPos);
           return true;
         })
         .run();
-      setSlashPos(null);
     }
 
     switch (action) {
@@ -317,8 +366,9 @@ export function Editor(props: EditorProps) {
       <Show when={commandMenuPos() !== null}>
         <CommandMenu
           position={commandMenuPos()!}
+          filter={commandFilter()}
           onSelect={handleCommandSelect}
-          onClose={() => setCommandMenuPos(null)}
+          onClose={closeCommandMenu}
         />
       </Show>
 

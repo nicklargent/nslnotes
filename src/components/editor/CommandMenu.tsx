@@ -1,4 +1,4 @@
-import { createSignal, For, onMount, onCleanup } from "solid-js";
+import { createSignal, createEffect, For, onMount, onCleanup } from "solid-js";
 
 interface CommandMenuItem {
   id: string;
@@ -6,7 +6,7 @@ interface CommandMenuItem {
   description: string;
 }
 
-const COMMANDS: CommandMenuItem[] = [
+export const COMMANDS: CommandMenuItem[] = [
   {
     id: "promote-to-task",
     label: "Promote to Task",
@@ -64,8 +64,18 @@ const COMMANDS: CommandMenuItem[] = [
   },
 ];
 
+export function filterCommands(filter: string): CommandMenuItem[] {
+  const f = filter.toLowerCase();
+  return COMMANDS.filter(
+    (cmd) =>
+      cmd.label.toLowerCase().includes(f) ||
+      cmd.description.toLowerCase().includes(f)
+  );
+}
+
 interface CommandMenuProps {
   position: { top: number; left: number };
+  filter: string;
   onSelect: (action: string) => void;
   onClose: () => void;
 }
@@ -76,18 +86,16 @@ interface CommandMenuProps {
  * Includes promote-to-task and promote-to-doc actions.
  */
 export function CommandMenu(props: CommandMenuProps) {
-  const [filter, setFilter] = createSignal("");
   const [selectedIndex, setSelectedIndex] = createSignal(0);
   let menuRef: HTMLDivElement | undefined;
 
-  const filteredCommands = () => {
-    const f = filter().toLowerCase();
-    return COMMANDS.filter(
-      (cmd) =>
-        cmd.label.toLowerCase().includes(f) ||
-        cmd.description.toLowerCase().includes(f)
-    );
-  };
+  const filteredCommands = () => filterCommands(props.filter);
+
+  // Reset selection when filter changes
+  createEffect(() => {
+    void props.filter;
+    setSelectedIndex(0);
+  });
 
   function handleKeyDown(e: KeyboardEvent) {
     const cmds = filteredCommands();
@@ -103,11 +111,12 @@ export function CommandMenu(props: CommandMenuProps) {
         e.stopPropagation();
         setSelectedIndex((i) => Math.max(i - 1, 0));
         break;
-      case "Enter": {
-        e.preventDefault();
-        e.stopPropagation();
+      case "Enter":
+      case "Tab": {
         const selected = cmds[selectedIndex()];
         if (selected) {
+          e.preventDefault();
+          e.stopPropagation();
           props.onSelect(selected.id);
         }
         break;
@@ -145,19 +154,6 @@ export function CommandMenu(props: CommandMenuProps) {
         left: `${props.position.left}px`,
       }}
     >
-      <div class="border-b border-gray-100 px-2 py-1">
-        <input
-          type="text"
-          class="w-full border-0 bg-transparent text-sm outline-none"
-          placeholder="Type to filter..."
-          value={filter()}
-          onInput={(e) => {
-            setFilter(e.currentTarget.value);
-            setSelectedIndex(0);
-          }}
-          autofocus
-        />
-      </div>
       <div class="max-h-48 overflow-y-auto">
         <For each={filteredCommands()}>
           {(cmd, index) => (
