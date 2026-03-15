@@ -1,4 +1,4 @@
-import { createSignal, createEffect, createMemo } from "solid-js";
+import { createSignal, createEffect, createMemo, Show } from "solid-js";
 import { Editor } from "../editor/Editor";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
@@ -8,6 +8,7 @@ import { parse, serialize } from "../../lib/frontmatter";
 import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
+import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
 import type { Note } from "../../types/entities";
 
 interface NamedNoteCardProps {
@@ -23,6 +24,7 @@ interface NamedNoteCardProps {
  */
 export function NamedNoteCard(props: NamedNoteCardProps) {
   const [content, setContent] = createSignal("");
+  const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   let saveTimeout: number | undefined;
   let lastLocalContent: string | undefined;
 
@@ -64,7 +66,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
       }}
     >
       <div
-        class="mb-1"
+        class="mb-1 flex items-start justify-between"
         onClick={(e) => {
           if (props.isFocused) e.stopPropagation();
         }}
@@ -76,6 +78,30 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
           }
           class="text-sm font-medium text-gray-800"
         />
+        <Show when={props.isFocused}>
+          <button
+            class="ml-2 shrink-0 rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600"
+            title="Delete note"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDeleteModal(true);
+            }}
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+        </Show>
       </div>
 
       <div
@@ -105,6 +131,17 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
           }
         />
       </div>
+
+      <Show when={showDeleteModal()}>
+        <ConfirmDeleteModal
+          title={liveNote().title ?? liveNote().slug}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={() => {
+            setShowDeleteModal(false);
+            void EntityService.deleteEntity(props.note.path);
+          }}
+        />
+      </Show>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { FileService } from "./FileService";
 import { IndexService } from "./IndexService";
+import { NavigationService } from "./NavigationService";
 import { SettingsService } from "./SettingsService";
 import { serialize, parse } from "../lib/frontmatter";
 import { generateUniqueSlug } from "../lib/slug";
@@ -14,6 +15,21 @@ import type { TopicRef } from "../types/topics";
  * EntityService handles CRUD operations for all entity types (Design §6.3).
  */
 export const EntityService = {
+  /**
+   * Delete an entity file and remove it from the index.
+   */
+  deleteEntity: async (path: string): Promise<void> => {
+    const rootPath = await SettingsService.getRootPath();
+    if (!rootPath) return;
+
+    await FileService.delete(path);
+    await IndexService.invalidate(path, rootPath);
+
+    if (contextStore.activeEntity?.path === path) {
+      NavigationService.goHome();
+    }
+  },
+
   /**
    * Generic frontmatter updater — reads file, merges updates, writes back, invalidates index.
    */

@@ -11,6 +11,7 @@ import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import { EditableDate } from "../metadata/EditableDate";
 import { consumeAutofocus } from "../draft/DraftView";
+import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
 import type { Task } from "../../types/entities";
 
 interface TaskDetailProps {
@@ -23,6 +24,7 @@ interface TaskDetailProps {
  */
 export function TaskDetail(props: TaskDetailProps) {
   const [content, setContent] = createSignal("");
+  const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
 
@@ -117,8 +119,8 @@ export function TaskDetail(props: TaskDetailProps) {
         </div>
 
         {/* Status actions */}
-        <Show when={liveTask().status === "open"}>
-          <div class="mb-4 flex gap-2">
+        <div class="mb-4 flex gap-2">
+          <Show when={liveTask().status === "open"}>
             <button
               class="rounded bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
               onClick={() => void handleStatusChange("done")}
@@ -131,8 +133,14 @@ export function TaskDetail(props: TaskDetailProps) {
             >
               Cancel
             </button>
-          </div>
-        </Show>
+          </Show>
+          <button
+            class="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            Delete
+          </button>
+        </div>
 
         {/* Editor */}
         <div class="border-t border-gray-100 pt-4">
@@ -149,6 +157,17 @@ export function TaskDetail(props: TaskDetailProps) {
           <div class="mt-2 text-right text-xs text-gray-300">Saving...</div>
         </Show>
       </div>
+
+      <Show when={showDeleteModal()}>
+        <ConfirmDeleteModal
+          title={liveTask().title}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={() => {
+            setShowDeleteModal(false);
+            void EntityService.deleteEntity(props.task.path);
+          }}
+        />
+      </Show>
     </div>
   );
 }

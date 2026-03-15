@@ -10,6 +10,7 @@ import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import { consumeAutofocus } from "../draft/DraftView";
+import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
 import type { Doc } from "../../types/entities";
 
 interface DocViewProps {
@@ -22,6 +23,7 @@ interface DocViewProps {
  */
 export function DocView(props: DocViewProps) {
   const [content, setContent] = createSignal("");
+  const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; body: string } | null = null;
@@ -91,9 +93,17 @@ export function DocView(props: DocViewProps) {
               }
             />
           </div>
-          <span class="mt-1 block text-xs text-gray-400">
-            Created: {liveDoc().created}
-          </span>
+          <div class="mt-2 flex items-center gap-3">
+            <span class="text-xs text-gray-400">
+              Created: {liveDoc().created}
+            </span>
+            <button
+              class="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100"
+              onClick={() => setShowDeleteModal(true)}
+            >
+              Delete
+            </button>
+          </div>
         </div>
 
         {/* Editor */}
@@ -110,6 +120,17 @@ export function DocView(props: DocViewProps) {
           <div class="mt-2 text-right text-xs text-gray-300">Saving...</div>
         </Show>
       </div>
+
+      <Show when={showDeleteModal()}>
+        <ConfirmDeleteModal
+          title={liveDoc().title}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={() => {
+            setShowDeleteModal(false);
+            void EntityService.deleteEntity(props.doc.path);
+          }}
+        />
+      </Show>
     </div>
   );
 }
