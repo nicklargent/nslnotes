@@ -52,18 +52,8 @@ export function TaskDetail(props: TaskDetailProps) {
     }, 300);
   }
 
-  async function handleStatusChange(status: "done" | "cancelled") {
-    const rootPath = await SettingsService.getRootPath();
-    if (!rootPath) return;
-
-    const fileContent = await FileService.read(props.task.path);
-    const parsed = parse(fileContent);
-    if (!parsed) return;
-
-    parsed.frontmatter["status"] = status;
-    const newContent = serialize(parsed.frontmatter, parsed.body);
-    await FileService.write(props.task.path, newContent);
-    await IndexService.invalidate(props.task.path, rootPath);
+  async function handleStatusChange(status: "open" | "done" | "cancelled") {
+    await EntityService.updateTaskStatus(props.task.path, status);
   }
 
   const statusColor = () => {
@@ -132,6 +122,14 @@ export function TaskDetail(props: TaskDetailProps) {
               onClick={() => void handleStatusChange("cancelled")}
             >
               Cancel
+            </button>
+          </Show>
+          <Show when={liveTask().status !== "open"}>
+            <button
+              class="rounded bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+              onClick={() => void handleStatusChange("open")}
+            >
+              Reopen
             </button>
           </Show>
           <button

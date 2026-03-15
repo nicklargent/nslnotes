@@ -208,6 +208,10 @@ function App() {
     return IndexService.getGroupedTasks(contextStore);
   });
 
+  const groupedClosedTasks = createMemo(() => {
+    return IndexService.getGroupedClosedTasks();
+  });
+
   const highlightedTaskPath = createMemo(() => {
     const entity = contextStore.activeEntity;
     if (entity && entity.type === "task") return entity.path;
@@ -257,6 +261,7 @@ function App() {
           right={
             <RightPanel
               groupedTasks={groupedTasks()}
+              groupedClosedTasks={groupedClosedTasks()}
               isHomeState={contextStore.isHomeState}
               highlightedTaskPath={highlightedTaskPath()}
               onTaskClick={(task) => NavigationService.navigateTo(task)}

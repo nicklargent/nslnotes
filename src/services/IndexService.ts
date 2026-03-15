@@ -4,12 +4,12 @@ import { indexStore, setIndexStore } from "../stores/indexStore";
 import { parseNote, parseTask, parseDoc } from "../lib/entityParser";
 import { parseTopicRefs } from "../lib/markdown";
 import { computeRelevance } from "../lib/relevance";
-import { isOverdue, isWithinDays } from "../lib/dates";
+import { isOverdue, isWithinDays, getToday, addDays } from "../lib/dates";
 import { saveIndexCache, loadIndexCache } from "../lib/indexCache";
 import type { Note, Task, Doc, Entity } from "../types/entities";
 import type { TopicRef, Topic, EntityReference } from "../types/topics";
 import type { ContextState } from "../types/stores";
-import type { GroupedTasks } from "../types/task-groups";
+import type { GroupedTasks, GroupedClosedTasks } from "../types/task-groups";
 import type { WikiLink } from "../types/inline";
 
 /**
@@ -323,6 +323,39 @@ export const IndexService = {
     return Array.from(indexStore.tasks.values()).filter(
       (t) => t.status === "open"
     );
+  },
+
+  /**
+   * Get closed (done/cancelled) tasks grouped by recency.
+   */
+  getGroupedClosedTasks: (): GroupedClosedTasks => {
+    const today = getToday();
+    const weekAgo = addDays(today, -7).getTime();
+    const monthAgo = addDays(today, -30).getTime();
+
+    const thisWeek: Task[] = [];
+    const lastMonth: Task[] = [];
+    const older: Task[] = [];
+
+    for (const task of indexStore.tasks.values()) {
+      if (task.status !== "done" && task.status !== "cancelled") continue;
+      const t = task.modifiedAt.getTime();
+      if (t >= weekAgo) {
+        thisWeek.push(task);
+      } else if (t >= monthAgo) {
+        lastMonth.push(task);
+      } else {
+        older.push(task);
+      }
+    }
+
+    const byModifiedDesc = (a: Task, b: Task) =>
+      b.modifiedAt.getTime() - a.modifiedAt.getTime();
+    thisWeek.sort(byModifiedDesc);
+    lastMonth.sort(byModifiedDesc);
+    older.sort(byModifiedDesc);
+
+    return { thisWeek, lastMonth, older };
   },
 
   /**

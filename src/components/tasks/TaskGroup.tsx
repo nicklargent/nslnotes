@@ -1,16 +1,18 @@
-import { For, Show } from "solid-js";
+import { For, type JSX, Show } from "solid-js";
 import { TaskItem } from "./TaskItem";
 import type { Task } from "../../types/entities";
 
 interface TaskGroupProps {
   label: string;
   tasks: Task[];
-  highlightedPath: string | null;
+  highlightedPath?: string | null;
   onTaskClick: (task: Task) => void;
+  /** Optional custom item renderer. Defaults to TaskItem. */
+  renderItem?: (task: Task) => JSX.Element;
 }
 
 /**
- * A group of tasks with a section header (RELATED, OVERDUE, THIS WEEK, LATER).
+ * A group of tasks with a section header.
  */
 export function TaskGroup(props: TaskGroupProps) {
   return (
@@ -21,13 +23,17 @@ export function TaskGroup(props: TaskGroupProps) {
         </h3>
         <div class="flex flex-col gap-0.5">
           <For each={props.tasks}>
-            {(task) => (
-              <TaskItem
-                task={task}
-                isHighlighted={task.path === props.highlightedPath}
-                onClick={(t) => props.onTaskClick(t)}
-              />
-            )}
+            {(task) =>
+              props.renderItem ? (
+                props.renderItem(task)
+              ) : (
+                <TaskItem
+                  task={task}
+                  isHighlighted={task.path === (props.highlightedPath ?? null)}
+                  onClick={(t) => props.onTaskClick(t)}
+                />
+              )
+            }
           </For>
         </div>
       </div>

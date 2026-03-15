@@ -17,6 +17,15 @@ export interface GroupedTasks {
 }
 
 /**
+ * Grouped closed tasks by recency for right panel display
+ */
+export interface GroupedClosedTasks {
+  thisWeek: Task[];
+  lastMonth: Task[];
+  older: Task[];
+}
+
+/**
  * Task display item with computed properties
  */
 export interface TaskDisplay extends Task {
