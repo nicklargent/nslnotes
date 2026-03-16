@@ -8,7 +8,6 @@ import { isOverdue, isWithinDays, getToday, addDays } from "../lib/dates";
 import { saveIndexCache, loadIndexCache } from "../lib/indexCache";
 import type { Note, Task, Doc, Entity } from "../types/entities";
 import type { TopicRef, Topic, EntityReference } from "../types/topics";
-import type { ContextState } from "../types/stores";
 import type { GroupedTasks, GroupedClosedTasks } from "../types/task-groups";
 import type { WikiLink } from "../types/inline";
 
@@ -364,21 +363,13 @@ export const IndexService = {
    * @param context - Current context state
    * @returns Grouped tasks
    */
-  getGroupedTasks: (context: ContextState): GroupedTasks => {
+  getGroupedTasks: (): GroupedTasks => {
     const openTasks = IndexService.getOpenTasks();
-    const related: Task[] = [];
     const overdue: Task[] = [];
     const thisWeek: Task[] = [];
     const later: Task[] = [];
 
     for (const task of openTasks) {
-      // Check if related (only when not home state)
-      if (!context.isHomeState && context.relevanceWeights.has(task.path)) {
-        related.push(task);
-        continue; // A task goes in only one group
-      }
-
-      // Check due date groups
       if (task.due) {
         if (isOverdue(task.due)) {
           overdue.push(task);
@@ -392,20 +383,13 @@ export const IndexService = {
       }
     }
 
-    // Sort related by relevance score (descending)
-    related.sort((a, b) => {
-      const scoreA = context.relevanceWeights.get(a.path) ?? 0;
-      const scoreB = context.relevanceWeights.get(b.path) ?? 0;
-      return scoreB - scoreA;
-    });
-
     // Sort overdue by due date (most overdue first)
     overdue.sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
 
     // Sort this week by due date
     thisWeek.sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
 
-    return { related, overdue, thisWeek, later };
+    return { overdue, thisWeek, later };
   },
 
   /**
@@ -614,7 +598,7 @@ function buildTopics(
 /**
  * Collect all topic references from an entity (frontmatter + body).
  */
-function collectAllTopics(entity: Entity): TopicRef[] {
+export function collectAllTopics(entity: Entity): TopicRef[] {
   const topics = new Set<TopicRef>(entity.topics);
   const inlineTopics = parseTopicRefs(entity.content);
   for (const t of inlineTopics) {

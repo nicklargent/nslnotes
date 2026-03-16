@@ -30,8 +30,10 @@ import { indexStore } from "./stores/indexStore";
 import { contextStore, setContextStore } from "./stores/contextStore";
 import { uiStore, setUIStore } from "./stores/uiStore";
 import { debouncedSave } from "./components/layout/Layout";
-import type { Topic } from "./types/topics";
-import type { Doc } from "./types/entities";
+import { parseWikilinks } from "./lib/markdown";
+import { collectAllTopics } from "./services/IndexService";
+import type { Topic, TopicRef } from "./types/topics";
+import type { Doc, Note } from "./types/entities";
 
 /**
  * Application state
@@ -163,24 +165,9 @@ function App() {
     const topics = Array.from(indexStore.topics.values()).filter(
       (t) => t.isActive
     );
-
-    if (contextStore.isHomeState) {
-      return topics.sort((a, b) => {
-        const aTime = a.lastUsed?.getTime() ?? 0;
-        const bTime = b.lastUsed?.getTime() ?? 0;
-        return bTime - aTime;
-      });
-    }
-
-    const weights = contextStore.relevanceWeights;
-    return topics.sort((a, b) => {
-      const aWeight = getTopicWeight(a, weights);
-      const bWeight = getTopicWeight(b, weights);
-      if (aWeight !== bWeight) return bWeight - aWeight;
-      const aTime = a.lastUsed?.getTime() ?? 0;
-      const bTime = b.lastUsed?.getTime() ?? 0;
-      return bTime - aTime;
-    });
+    return topics.sort((a, b) =>
+      a.label.toLowerCase().localeCompare(b.label.toLowerCase())
+    );
   });
 
   /**
@@ -188,24 +175,13 @@ function App() {
    */
   const sortedDocs = createMemo((): Doc[] => {
     const docs = Array.from(indexStore.docs.values());
-
-    if (contextStore.isHomeState) {
-      return docs.sort((a, b) =>
-        a.title.toLowerCase().localeCompare(b.title.toLowerCase())
-      );
-    }
-
-    const weights = contextStore.relevanceWeights;
-    return docs.sort((a, b) => {
-      const aWeight = weights.get(a.path) ?? 0;
-      const bWeight = weights.get(b.path) ?? 0;
-      if (aWeight !== bWeight) return bWeight - aWeight;
-      return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
-    });
+    return docs.sort((a, b) =>
+      a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+    );
   });
 
   const groupedTasks = createMemo(() => {
-    return IndexService.getGroupedTasks(contextStore);
+    return IndexService.getGroupedTasks();
   });
 
   const groupedClosedTasks = createMemo(() => {
@@ -216,6 +192,43 @@ function App() {
     const entity = contextStore.activeEntity;
     if (entity && entity.type === "task") return entity.path;
     return null;
+  });
+
+  /** Notes on currently visible journal dates (shared by activeTopics + linkedPaths). */
+  const visibleNotes = createMemo((): Note[] => {
+    const visible = contextStore.visibleDates;
+    if (visible.size === 0) return [];
+    const notes: Note[] = [];
+    for (const note of indexStore.notes.values()) {
+      if (note.date && visible.has(note.date)) notes.push(note);
+    }
+    return notes;
+  });
+
+  const activeTopics = createMemo((): Set<TopicRef> => {
+    const entity = contextStore.activeEntity;
+    if (entity) return new Set(collectAllTopics(entity));
+    if (contextStore.activeTopic) return new Set([contextStore.activeTopic]);
+    const topics = new Set<TopicRef>();
+    for (const note of visibleNotes()) {
+      for (const t of collectAllTopics(note)) topics.add(t);
+    }
+    return topics;
+  });
+
+  /** Paths of entities directly wikilinked from the active context. */
+  const linkedPaths = createMemo((): Set<string> => {
+    const entities = contextStore.activeEntity
+      ? [contextStore.activeEntity]
+      : visibleNotes();
+    const paths = new Set<string>();
+    for (const entity of entities) {
+      for (const link of parseWikilinks(entity.content)) {
+        const resolved = IndexService.resolveWikilink(link);
+        if (resolved) paths.add(resolved.path);
+      }
+    }
+    return paths;
   });
 
   const [noteDraftDate, setNoteDraftDate] = createSignal<string | null>(null);
@@ -244,6 +257,8 @@ function App() {
             <LeftSidebar
               topics={sortedTopics()}
               docs={sortedDocs()}
+              activeTopics={activeTopics()}
+              linkedPaths={linkedPaths()}
               onTodayClick={() => NavigationService.goHome()}
               onTopicClick={(ref) => NavigationService.navigateToTopic(ref)}
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
@@ -262,8 +277,8 @@ function App() {
             <RightPanel
               groupedTasks={groupedTasks()}
               groupedClosedTasks={groupedClosedTasks()}
-              isHomeState={contextStore.isHomeState}
               highlightedTaskPath={highlightedTaskPath()}
+              linkedPaths={linkedPaths()}
               onTaskClick={(task) => NavigationService.navigateTo(task)}
               onCreateTask={() => setContextStore("draft", { type: "task" })}
             />
@@ -278,17 +293,6 @@ function App() {
       <ToastContainer />
     </AppErrorBoundary>
   );
-}
-
-/**
- * Get the relevance weight for a topic based on its references.
- */
-function getTopicWeight(topic: Topic, weights: Map<string, number>): number {
-  let total = 0;
-  for (const ref of topic.references) {
-    total += weights.get(ref.path) ?? 0;
-  }
-  return total;
 }
 
 export default App;

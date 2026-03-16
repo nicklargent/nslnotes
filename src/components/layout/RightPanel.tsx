@@ -7,8 +7,8 @@ import type { GroupedTasks, GroupedClosedTasks } from "../../types/task-groups";
 interface RightPanelProps {
   groupedTasks: GroupedTasks;
   groupedClosedTasks: GroupedClosedTasks;
-  isHomeState: boolean;
   highlightedTaskPath: string | null;
+  linkedPaths: Set<string>;
   onTaskClick: (task: Task) => void;
   onCreateTask: () => void;
 }
@@ -91,30 +91,25 @@ export function RightPanel(props: RightPanelProps) {
             </Show>
           }
         >
-          <Show when={!props.isHomeState}>
-            <TaskGroup
-              label="Related"
-              tasks={props.groupedTasks.related}
-              highlightedPath={props.highlightedTaskPath}
-              onTaskClick={(t) => props.onTaskClick(t)}
-            />
-          </Show>
           <TaskGroup
             label="Overdue"
             tasks={props.groupedTasks.overdue}
             highlightedPath={props.highlightedTaskPath}
+            linkedPaths={props.linkedPaths}
             onTaskClick={(t) => props.onTaskClick(t)}
           />
           <TaskGroup
             label="This Week"
             tasks={props.groupedTasks.thisWeek}
             highlightedPath={props.highlightedTaskPath}
+            linkedPaths={props.linkedPaths}
             onTaskClick={(t) => props.onTaskClick(t)}
           />
           <TaskGroup
             label="Later"
             tasks={props.groupedTasks.later}
             highlightedPath={props.highlightedTaskPath}
+            linkedPaths={props.linkedPaths}
             onTaskClick={(t) => props.onTaskClick(t)}
           />
         </Show>

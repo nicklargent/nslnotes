@@ -151,41 +151,55 @@ export function JournalView(props: JournalViewProps) {
     onCleanup(() => ro.disconnect());
   }
 
-  /** Set up IntersectionObserver to track most visible date header (T4.6). */
+  /** Track which dates are currently visible in the viewport. */
+  const visibleDateSet = new Set<string>();
+  const pendingHeaders: HTMLDivElement[] = [];
+
+  /** Set up IntersectionObserver to track visible date headers (T4.6). */
   onMount(() => {
     if (!scrollRef) return;
 
     observer = new IntersectionObserver(
       (entries) => {
-        let topEntry: IntersectionObserverEntry | null = null;
+        const prevSize = visibleDateSet.size;
+        let topDate: string | null = null;
+        let topY = Infinity;
+
         for (const entry of entries) {
+          const date = (entry.target as HTMLElement).dataset["date"];
+          if (!date) continue;
           if (entry.isIntersecting) {
-            if (
-              !topEntry ||
-              entry.boundingClientRect.top < topEntry.boundingClientRect.top
-            ) {
-              topEntry = entry;
+            visibleDateSet.add(date);
+            if (entry.boundingClientRect.top < topY) {
+              topY = entry.boundingClientRect.top;
+              topDate = date;
             }
+          } else {
+            visibleDateSet.delete(date);
           }
         }
 
-        if (topEntry?.target) {
-          const date = (topEntry.target as HTMLElement).dataset["date"];
-          if (date) {
-            const todayISO = getTodayISO();
-            if (date === todayISO && focusedNoteSlug() === null) {
-              if (!contextStore.isHomeState) {
-                NavigationService.goHome();
-              }
-            } else if (date !== contextStore.journalAnchorDate) {
-              setContextStore("journalAnchorDate", date);
-              updateDateRelevance(date);
-            }
-          }
+        // Only update store if the set of visible dates actually changed
+        if (visibleDateSet.size !== prevSize || entries.length > 0) {
+          setContextStore("visibleDates", new Set(visibleDateSet));
+        }
+
+        if (focusedNoteSlug() === null && visibleDateSet.size > 0) {
+          updateVisibleContext();
+        }
+
+        if (topDate && topDate !== contextStore.journalAnchorDate) {
+          setContextStore("journalAnchorDate", topDate);
         }
       },
-      { root: scrollRef, threshold: 0.5 }
+      { root: scrollRef, threshold: 0 }
     );
+
+    // Observe any headers that rendered before the observer was ready
+    for (const el of pendingHeaders) {
+      observer.observe(el);
+    }
+    pendingHeaders.length = 0;
   });
 
   onCleanup(() => {
@@ -193,29 +207,19 @@ export function JournalView(props: JournalViewProps) {
   });
 
   function observeHeader(el: HTMLDivElement) {
-    observer?.observe(el);
+    if (observer) {
+      observer.observe(el);
+    } else {
+      pendingHeaders.push(el);
+    }
   }
 
-  function updateDateRelevance(date: string) {
+  function updateVisibleContext() {
     if (focusedNoteSlug() !== null) return;
-
-    const todayISO = getTodayISO();
-    if (date === todayISO) {
-      NavigationService.goHome();
-      return;
-    }
-
-    const daily = getDailyNote(date);
-    if (daily) {
-      setContextStore({
-        activeEntity: daily,
-        isHomeState: false,
-      });
-      NavigationService.updateRelevance();
-    } else {
-      setContextStore({ isHomeState: false });
-      NavigationService.clearRelevance();
-    }
+    setContextStore({
+      activeEntity: null,
+      isHomeState: false,
+    });
   }
 
   function handleNamedNoteFocus(note: Note) {
@@ -228,12 +232,7 @@ export function JournalView(props: JournalViewProps) {
     if (!target.closest("[data-note-card]")) {
       if (focusedNoteSlug() !== null) {
         setFocusedNoteSlug(null);
-        const anchor = contextStore.journalAnchorDate;
-        if (anchor) {
-          updateDateRelevance(anchor);
-        } else {
-          NavigationService.goHome();
-        }
+        updateVisibleContext();
       }
     }
   }

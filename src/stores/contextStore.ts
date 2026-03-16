@@ -8,6 +8,7 @@ const [contextStore, setContextStore] = createStore<ContextState>({
   relevanceWeights: new Map<string, number>(),
   isHomeState: true,
   journalAnchorDate: null,
+  visibleDates: new Set<string>(),
   draft: null,
 });
 

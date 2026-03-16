@@ -6,12 +6,13 @@ interface TopicsListProps {
   title?: string;
   fallbackText?: string;
   topics: Topic[];
+  activeTopics: Set<TopicRef>;
   onTopicClick: (ref: TopicRef) => void;
 }
 
 /**
  * Topics section in the left sidebar.
- * Renders active topics sorted by most recently used (FR-UI-011).
+ * Renders active topics sorted alphabetically (FR-UI-011).
  */
 export function TopicsList(props: TopicsListProps) {
   return (
@@ -32,6 +33,7 @@ export function TopicsList(props: TopicsListProps) {
             {(topic) => (
               <TopicItem
                 topic={topic}
+                isRelevant={props.activeTopics.has(topic.ref)}
                 onClick={(t) => props.onTopicClick(t.ref)}
               />
             )}

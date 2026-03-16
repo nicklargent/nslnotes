@@ -48,6 +48,8 @@ export interface ContextState {
   isHomeState: boolean;
   /** Journal scroll anchor date */
   journalAnchorDate: string | null;
+  /** Dates currently visible in the journal viewport */
+  visibleDates: Set<string>;
   /** Active draft for inline creation (null = no draft) */
   draft: DraftState | null;
 }

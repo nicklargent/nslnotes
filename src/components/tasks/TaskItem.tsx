@@ -6,6 +6,7 @@ import type { Task } from "../../types/entities";
 interface TaskItemProps {
   task: Task;
   isHighlighted: boolean;
+  isRelevant: boolean;
   onClick: (task: Task) => void;
 }
 
@@ -32,14 +33,16 @@ export function TaskItem(props: TaskItemProps) {
 
   return (
     <div
-      class={`group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm transition-all ${
+      class={`group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm transition-all duration-200 ${
         completing() === "done"
           ? "bg-green-50 opacity-60"
           : completing() === "cancelled"
             ? "bg-gray-50 opacity-60"
             : props.isHighlighted
               ? "bg-blue-50 ring-1 ring-blue-200"
-              : "hover:bg-gray-100"
+              : props.isRelevant
+                ? "border-l-2 border-blue-300 bg-blue-50"
+                : "hover:bg-gray-100"
       }`}
     >
       {/* Checkbox button for quick done */}

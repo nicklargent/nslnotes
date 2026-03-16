@@ -6,6 +6,7 @@ interface TaskGroupProps {
   label: string;
   tasks: Task[];
   highlightedPath?: string | null;
+  linkedPaths?: Set<string>;
   onTaskClick: (task: Task) => void;
   /** Optional custom item renderer. Defaults to TaskItem. */
   renderItem?: (task: Task) => JSX.Element;
@@ -30,6 +31,7 @@ export function TaskGroup(props: TaskGroupProps) {
                 <TaskItem
                   task={task}
                   isHighlighted={task.path === (props.highlightedPath ?? null)}
+                  isRelevant={props.linkedPaths?.has(task.path) ?? false}
                   onClick={(t) => props.onTaskClick(t)}
                 />
               )
