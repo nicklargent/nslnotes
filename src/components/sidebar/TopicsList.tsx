@@ -3,6 +3,8 @@ import { TopicItem } from "./TopicItem";
 import type { Topic, TopicRef } from "../../types/topics";
 
 interface TopicsListProps {
+  title?: string;
+  fallbackText?: string;
   topics: Topic[];
   onTopicClick: (ref: TopicRef) => void;
 }
@@ -15,11 +17,15 @@ export function TopicsList(props: TopicsListProps) {
   return (
     <div class="border-b border-gray-100 px-3 py-2">
       <h2 class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
-        Topics
+        {props.title ?? "Topics"}
       </h2>
       <Show
         when={props.topics.length > 0}
-        fallback={<p class="py-2 text-xs text-gray-300">No topics yet</p>}
+        fallback={
+          <p class="py-2 text-xs text-gray-300">
+            {props.fallbackText ?? "No topics yet"}
+          </p>
+        }
       >
         <div class="flex flex-col gap-0.5">
           <For each={props.topics}>
