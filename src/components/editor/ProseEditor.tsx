@@ -225,8 +225,23 @@ export function ProseEditor(props: ProseEditorProps) {
           // # or @ triggers topic autocomplete (T6.10)
           if ((event.key === "#" || event.key === "@") && props.onHashOrAt) {
             const { view } = editor!;
-            const coords = view.coordsAtPos(view.state.selection.from);
             const prefix = event.key as "#" | "@";
+
+            // For #, don't trigger autocomplete at start of text block
+            // where it's heading syntax (e.g. #, ##, ###)
+            if (prefix === "#") {
+              const { $from } = view.state.selection;
+              const textBefore = $from.parent.textBetween(
+                0,
+                $from.parentOffset,
+                ""
+              );
+              if (/^#*$/.test(textBefore)) {
+                return false;
+              }
+            }
+
+            const coords = view.coordsAtPos(view.state.selection.from);
             setTimeout(() => {
               props.onHashOrAt!(
                 prefix,
