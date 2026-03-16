@@ -8,14 +8,9 @@ interface CommandMenuItem {
 
 export const COMMANDS: CommandMenuItem[] = [
   {
-    id: "promote-to-task",
-    label: "Promote to Task",
-    description: "Create a task from this line",
-  },
-  {
-    id: "promote-to-doc",
-    label: "Promote to Doc",
-    description: "Create a document from this section",
+    id: "extract",
+    label: "Extract",
+    description: "Extract to task or document",
   },
   {
     id: "heading1",
@@ -83,7 +78,7 @@ interface CommandMenuProps {
 /**
  * Command menu triggered by / key (T5.8, T6.8, T6.9).
  * Shows available actions for the editor.
- * Includes promote-to-task and promote-to-doc actions.
+ * Includes extract action for promoting content.
  */
 export function CommandMenu(props: CommandMenuProps) {
   const [selectedIndex, setSelectedIndex] = createSignal(0);

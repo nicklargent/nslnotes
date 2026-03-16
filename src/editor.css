@@ -211,3 +211,10 @@
 .animate-bubble-up {
   animation: bubble-up 0.15s ease-out;
 }
+
+/* Promote highlight */
+.promote-highlight {
+  background-color: #dbeafe;
+  border-radius: 2px;
+  transition: background-color 0.15s ease;
+}

@@ -5,6 +5,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import { TextSelection } from "@tiptap/pm/state";
 import { InlineDecorations } from "./InlineDecorations";
+import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
 
 interface ProseEditorProps {
   content: string;
@@ -84,6 +85,7 @@ export function ProseEditor(props: ProseEditorProps) {
           linkOnPaste: true,
         }),
         InlineDecorations,
+        PromoteHighlightPlugin,
       ],
       content: htmlFromMarkdown(props.content),
       autofocus: false,
@@ -491,7 +493,7 @@ function htmlFromMarkdown(md: string): string {
 /**
  * Convert TipTap HTML back to markdown.
  */
-function markdownFromHtml(html: string): string {
+export function markdownFromHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   return nodeToMarkdown(doc.body, 0).trim();
 }

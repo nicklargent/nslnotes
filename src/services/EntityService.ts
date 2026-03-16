@@ -229,14 +229,19 @@ export const EntityService = {
    */
   promoteToTask: async (params: {
     todoText: string;
+    slug?: string;
     sourceTopics: TopicRef[];
+    body?: string;
   }): Promise<{ task: Task; slug: string } | null> => {
     const rootPath = await SettingsService.getRootPath();
     if (!rootPath) return null;
 
     const tasksDir = `${rootPath}/tasks`;
     await runtime.ensureDirectory(tasksDir);
-    const slug = await generateUniqueSlug(params.todoText, tasksDir);
+    const slug = await generateUniqueSlug(
+      params.slug ?? params.todoText,
+      tasksDir
+    );
     const path = `${tasksDir}/${slug}.md`;
 
     const frontmatter: Record<string, unknown> = {
@@ -249,7 +254,7 @@ export const EntityService = {
       frontmatter["topics"] = params.sourceTopics;
     }
 
-    const fileContent = serialize(frontmatter, "");
+    const fileContent = serialize(frontmatter, params.body ?? "");
     await FileService.write(path, fileContent);
     await IndexService.invalidate(path, rootPath);
 
@@ -264,6 +269,7 @@ export const EntityService = {
    */
   promoteToDoc: async (params: {
     title: string;
+    slug?: string;
     content: string;
     topics?: TopicRef[] | undefined;
   }): Promise<{ doc: Doc; slug: string } | null> => {
@@ -272,7 +278,7 @@ export const EntityService = {
 
     const docsDir = `${rootPath}/docs`;
     await runtime.ensureDirectory(docsDir);
-    const slug = await generateUniqueSlug(params.title, docsDir);
+    const slug = await generateUniqueSlug(params.slug ?? params.title, docsDir);
     const path = `${docsDir}/${slug}.md`;
 
     const frontmatter: Record<string, unknown> = {

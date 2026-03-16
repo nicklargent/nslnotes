@@ -1,14 +1,18 @@
 import { createSignal, Show, onCleanup } from "solid-js";
-import { ProseEditor } from "./ProseEditor";
+import { DOMSerializer } from "@tiptap/pm/model";
+import { ProseEditor, markdownFromHtml } from "./ProseEditor";
 import { CommandMenu, filterCommands } from "./CommandMenu";
 import { BubbleMenu } from "./BubbleMenu";
 import { TopicAutocomplete } from "./TopicAutocomplete";
+import { PromoteConfirmBar } from "./PromoteConfirmBar";
+import { detectPromoteRange } from "./promoteRange";
+import { promoteHighlightKey } from "./PromoteHighlightPlugin";
 import { EntityService } from "../../services/EntityService";
 import { NavigationService } from "../../services/NavigationService";
 import { IndexService } from "../../services/IndexService";
-import { PromoteDocModal } from "../modals/PromoteDocModal";
 import { contextStore } from "../../stores/contextStore";
 import type { Editor as TiptapEditor } from "@tiptap/core";
+import type { PromoteRange } from "./promoteRange";
 import type { TopicRef } from "../../types/topics";
 import type { WikiLink } from "../../types/inline";
 
@@ -21,15 +25,16 @@ interface EditorProps {
 
 /**
  * Editor wrapper (T5.2, T6.8, T6.9).
- * Handles command menu actions including promote-to-task/doc.
+ * Handles command menu actions including extract (promote).
  */
 export function Editor(props: EditorProps) {
   const [commandMenuPos, setCommandMenuPos] = createSignal<{
     top: number;
     left: number;
   } | null>(null);
-  const [showPromoteDocModal, setShowPromoteDocModal] = createSignal(false);
-  const [currentLineText, setCurrentLineText] = createSignal("");
+  const [promoteRange, setPromoteRange] = createSignal<PromoteRange | null>(
+    null
+  );
   const [autocomplete, setAutocomplete] = createSignal<{
     pos: { top: number; left: number };
     prefix: "#" | "@";
@@ -40,8 +45,10 @@ export function Editor(props: EditorProps) {
   const [commandFilter, setCommandFilter] = createSignal("");
   const [showBubbleMenu, setShowBubbleMenu] = createSignal(false);
   let editorRef: TiptapEditor | undefined;
+  const [editorReady, setEditorReady] = createSignal(false);
   let blurTimeout: ReturnType<typeof setTimeout> | undefined;
   let bubbleMenuRef: HTMLDivElement | undefined;
+  let confirmBarRef: HTMLDivElement | undefined;
 
   onCleanup(() => {
     if (blurTimeout) clearTimeout(blurTimeout);
@@ -167,87 +174,132 @@ export function Editor(props: EditorProps) {
     return [];
   }
 
-  function getCurrentLineContent(): string {
+  /**
+   * Serialize a ProseMirror range to markdown.
+   */
+  function rangeToMarkdown(from: number, to: number): string {
     if (!editorRef) return "";
-    const { state } = editorRef;
-    const { $from } = state.selection;
-    // Get the text of the current node
-    const node = $from.parent;
-    return node.textContent;
+    const fragment = editorRef.state.doc.slice(from, to).content;
+    const serializer = DOMSerializer.fromSchema(editorRef.state.schema);
+    const dom = serializer.serializeFragment(fragment);
+    const wrapper = document.createElement("div");
+    wrapper.appendChild(dom);
+    return markdownFromHtml(wrapper.innerHTML);
   }
 
-  async function handlePromoteToTask() {
-    const lineText = getCurrentLineContent().trim();
-    if (!lineText) return;
-
-    // Strip TODO/DOING/DONE prefix if present
-    let taskTitle = lineText;
+  /**
+   * Strip TODO/DOING/DONE prefix and Unicode markers from a title string.
+   */
+  function stripTodoPrefix(title: string): string {
+    let cleaned = title;
+    // Strip text prefixes
     for (const prefix of ["TODO ", "DOING ", "DONE "]) {
-      if (taskTitle.startsWith(prefix)) {
-        taskTitle = taskTitle.slice(prefix.length);
+      if (cleaned.startsWith(prefix)) {
+        cleaned = cleaned.slice(prefix.length);
         break;
       }
     }
+    // Strip Unicode markers
+    cleaned = cleaned
+      .replace(/^\u2610\s*/, "")
+      .replace(/^\u25a3\s*/, "")
+      .replace(/^\u2611\s*/, "");
+    return cleaned;
+  }
 
-    const result = await EntityService.promoteToTask({
-      todoText: taskTitle,
-      sourceTopics: getSourceTopics(),
-    });
+  /**
+   * Activate promote highlight and show confirm bar.
+   */
+  function startPromote() {
+    if (!editorRef) return;
+    const range = detectPromoteRange(editorRef.state);
+    if (!range) return;
 
-    if (result) {
-      // Replace current line with wikilink
-      if (editorRef) {
-        const { state } = editorRef;
-        const { $from } = state.selection;
-        const start = $from.start();
-        const end = $from.end();
-        editorRef
-          .chain()
-          .focus()
-          .command(({ tr }) => {
-            tr.insertText(`[[task:${result.slug}]]`, start, end);
-            return true;
-          })
-          .run();
-      }
-      NavigationService.navigateTo(result.task);
+    // Set highlight decoration
+    editorRef.view.dispatch(
+      editorRef.state.tr.setMeta(promoteHighlightKey, {
+        from: range.from,
+        to: range.to,
+      })
+    );
+
+    setShowBubbleMenu(false);
+    setPromoteRange(range);
+  }
+
+  /**
+   * Clear promote highlight and state.
+   */
+  function cancelPromote() {
+    if (editorRef) {
+      editorRef.view.dispatch(
+        editorRef.state.tr.setMeta(promoteHighlightKey, null)
+      );
     }
+    setPromoteRange(null);
   }
 
-  function handlePromoteToDoc() {
-    setCurrentLineText(getCurrentLineContent());
-    setShowPromoteDocModal(true);
+  /**
+   * Replace a range with a wikilink paragraph node.
+   */
+  function replaceRangeWithWikilink(range: PromoteRange, wikilinkText: string) {
+    if (!editorRef) return;
+    const { state } = editorRef;
+    const paragraph = state.schema.nodes["paragraph"]!.create(
+      null,
+      state.schema.text(wikilinkText)
+    );
+    editorRef
+      .chain()
+      .focus()
+      .command(({ tr }) => {
+        tr.replaceWith(range.from, range.to, paragraph);
+        return true;
+      })
+      .run();
   }
 
-  async function handlePromoteDocConfirm(title: string, topics: TopicRef[]) {
-    setShowPromoteDocModal(false);
+  function extractBody(range: PromoteRange): string {
+    if (!range.hasBody) return "";
+    const fullMd = rangeToMarkdown(range.from, range.to);
+    const lines = fullMd.split("\n");
+    return lines.slice(1).join("\n").trim();
+  }
 
-    // Get current content to promote
-    const contentToPromote = currentLineText();
+  async function handlePromoteConfirm(
+    type: "task" | "doc",
+    topics: TopicRef[],
+    slug: string
+  ) {
+    const range = promoteRange();
+    if (!range || !editorRef) return;
 
-    const result = await EntityService.promoteToDoc({
-      title,
-      content: contentToPromote,
-      topics: topics.length > 0 ? topics : undefined,
-    });
+    const title = stripTodoPrefix(range.title);
+    const body = extractBody(range);
+    cancelPromote();
 
-    if (result) {
-      // Replace current content with wikilink
-      if (editorRef) {
-        const { state } = editorRef;
-        const { $from } = state.selection;
-        const start = $from.start();
-        const end = $from.end();
-        editorRef
-          .chain()
-          .focus()
-          .command(({ tr }) => {
-            tr.insertText(`[[doc:${result.slug}]]`, start, end);
-            return true;
-          })
-          .run();
+    if (type === "task") {
+      const result = await EntityService.promoteToTask({
+        todoText: title,
+        slug,
+        sourceTopics: topics.length > 0 ? topics : getSourceTopics(),
+        ...(body ? { body } : {}),
+      });
+      if (result) {
+        replaceRangeWithWikilink(range, `[[task:${result.slug}]]`);
+        NavigationService.navigateTo(result.task);
       }
-      NavigationService.navigateTo(result.doc);
+    } else {
+      const result = await EntityService.promoteToDoc({
+        title,
+        slug,
+        content: body,
+        topics: topics.length > 0 ? topics : undefined,
+      });
+      if (result) {
+        replaceRangeWithWikilink(range, `[[doc:${result.slug}]]`);
+        NavigationService.navigateTo(result.doc);
+      }
     }
   }
 
@@ -290,11 +342,8 @@ export function Editor(props: EditorProps) {
     }
 
     switch (action) {
-      case "promote-to-task":
-        void handlePromoteToTask();
-        return;
-      case "promote-to-doc":
-        handlePromoteToDoc();
+      case "extract":
+        startPromote();
         return;
       case "heading1":
         editorRef.chain().focus().toggleHeading({ level: 1 }).run();
@@ -335,9 +384,17 @@ export function Editor(props: EditorProps) {
         onUpdate={handleContentUpdate}
         onSlashKey={handleSlashKey}
         onHashOrAt={handleHashOrAt}
-        ref={(e) => (editorRef = e)}
+        ref={(e) => {
+          editorRef = e;
+          setEditorReady(true);
+        }}
         onSelectionChange={(hasSelection) => {
-          if (hasSelection && !commandMenuPos() && !autocomplete()) {
+          if (
+            hasSelection &&
+            !commandMenuPos() &&
+            !autocomplete() &&
+            !promoteRange()
+          ) {
             setShowBubbleMenu(true);
           } else {
             setShowBubbleMenu(false);
@@ -346,6 +403,7 @@ export function Editor(props: EditorProps) {
         onEditorBlur={(event) => {
           const relatedTarget = event?.relatedTarget as HTMLElement | null;
           if (relatedTarget && bubbleMenuRef?.contains(relatedTarget)) return;
+          if (relatedTarget && confirmBarRef?.contains(relatedTarget)) return;
           blurTimeout = setTimeout(() => setShowBubbleMenu(false), 200);
         }}
         onEditorFocus={() => {
@@ -355,11 +413,28 @@ export function Editor(props: EditorProps) {
         onTopicClick={handleTopicClick}
       />
 
-      <Show when={showBubbleMenu() && editorRef}>
+      <Show when={showBubbleMenu() && editorReady() && !promoteRange()}>
         <BubbleMenu
           editor={editorRef!}
           onClose={() => setShowBubbleMenu(false)}
+          onExtract={startPromote}
           ref={(el) => (bubbleMenuRef = el)}
+        />
+      </Show>
+
+      <Show when={promoteRange() !== null && editorReady()}>
+        <PromoteConfirmBar
+          editor={editorRef!}
+          range={promoteRange()!}
+          sourceTopics={getSourceTopics()}
+          onConfirmTask={(topics, slug) =>
+            void handlePromoteConfirm("task", topics, slug)
+          }
+          onConfirmDoc={(topics, slug) =>
+            void handlePromoteConfirm("doc", topics, slug)
+          }
+          onCancel={cancelPromote}
+          ref={(el) => (confirmBarRef = el)}
         />
       </Show>
 
@@ -379,16 +454,6 @@ export function Editor(props: EditorProps) {
           filter={autocomplete()!.filter}
           onSelect={handleAutocompleteSelect}
           onClose={() => setAutocomplete(null)}
-        />
-      </Show>
-
-      <Show when={showPromoteDocModal()}>
-        <PromoteDocModal
-          sourceTopics={getSourceTopics()}
-          onConfirm={(title, topics) =>
-            void handlePromoteDocConfirm(title, topics)
-          }
-          onClose={() => setShowPromoteDocModal(false)}
         />
       </Show>
     </div>

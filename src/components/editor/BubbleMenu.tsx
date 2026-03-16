@@ -4,6 +4,7 @@ import type { Editor as TiptapEditor } from "@tiptap/core";
 interface BubbleMenuProps {
   editor: TiptapEditor;
   onClose: () => void;
+  onExtract?: () => void;
   ref?: ((el: HTMLDivElement) => void) | undefined;
 }
 
@@ -14,7 +15,7 @@ interface MenuPosition {
 
 /**
  * Floating toolbar that appears on text selection.
- * Allows toggling formatting (bold, italic, strike, code, headings, link).
+ * Allows toggling formatting (bold, italic, strike, code, headings, link, extract).
  */
 export function BubbleMenu(props: BubbleMenuProps) {
   const [position, setPosition] = createSignal<MenuPosition>({
@@ -244,6 +245,20 @@ export function BubbleMenu(props: BubbleMenuProps) {
           >
             <span class="text-xs">Link</span>
           </button>
+
+          <Show when={props.onExtract}>
+            <div class="mx-0.5 h-5 w-px bg-gray-200" />
+            <button
+              class={btnClass(false)}
+              onClick={() => {
+                props.onExtract?.();
+                props.onClose();
+              }}
+              title="Extract to task or document"
+            >
+              <span class="text-xs">Extract</span>
+            </button>
+          </Show>
         </div>
       </Show>
     </div>
