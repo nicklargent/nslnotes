@@ -61,6 +61,7 @@ export function TaskItem(props: TaskItemProps) {
         class={`flex-1 truncate text-left ${
           completing() ? "line-through text-gray-400" : "text-gray-700"
         }`}
+        title={`[[task:${props.task.slug}]]`}
         onClick={() => props.onClick(props.task)}
       >
         {props.task.title}

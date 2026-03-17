@@ -32,6 +32,7 @@ export function ClosedTaskItem(props: ClosedTaskItemProps) {
       {/* Title */}
       <button
         class="flex-1 truncate text-left line-through"
+        title={`[[task:${props.task.slug}]]`}
         onClick={() => props.onClick(props.task)}
       >
         {props.task.title}

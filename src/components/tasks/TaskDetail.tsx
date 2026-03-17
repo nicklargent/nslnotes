@@ -79,7 +79,17 @@ export function TaskDetail(props: TaskDetailProps) {
             }
             class="text-xl font-semibold text-gray-900"
           />
-          <div class="mt-2 flex items-center gap-2">
+          <div class="mt-2">
+            <EditableTopics
+              topics={liveTask().topics}
+              onSave={(topics) =>
+                void EntityService.updateFrontmatter(props.task.path, {
+                  topics,
+                })
+              }
+            />
+          </div>
+          <div class="mt-2 flex items-center gap-3">
             <span
               class={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor()}`}
             >
@@ -92,19 +102,12 @@ export function TaskDetail(props: TaskDetailProps) {
               }
               label="Due"
             />
+            <code class="select-all rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+              [[task:{liveTask().slug}]]
+            </code>
             <span class="text-xs text-gray-400">
               Created: {liveTask().created}
             </span>
-          </div>
-          <div class="mt-2">
-            <EditableTopics
-              topics={liveTask().topics}
-              onSave={(topics) =>
-                void EntityService.updateFrontmatter(props.task.path, {
-                  topics,
-                })
-              }
-            />
           </div>
         </div>
 

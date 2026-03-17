@@ -94,6 +94,9 @@ export function DocView(props: DocViewProps) {
             />
           </div>
           <div class="mt-2 flex items-center gap-3">
+            <code class="select-all rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+              [[doc:{liveDoc().slug}]]
+            </code>
             <span class="text-xs text-gray-400">
               Created: {liveDoc().created}
             </span>

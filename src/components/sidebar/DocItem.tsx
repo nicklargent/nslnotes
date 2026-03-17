@@ -18,6 +18,7 @@ export function DocItem(props: DocItemProps) {
           ? "border-l-2 border-blue-300 bg-blue-50"
           : "hover:bg-gray-100"
       }`}
+      title={`[[doc:${props.doc.slug}]]`}
       onClick={() => props.onClick(props.doc)}
     >
       {props.doc.title}
