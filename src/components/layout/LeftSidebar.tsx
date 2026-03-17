@@ -3,6 +3,9 @@ import { TopicsList } from "../sidebar/TopicsList";
 import { DocsList } from "../sidebar/DocsList";
 import { uiStore, setUIStore } from "../../stores/uiStore";
 import { debouncedSave } from "./Layout";
+import { TopicService } from "../../services/TopicService";
+import { IndexService } from "../../services/IndexService";
+import { SettingsService } from "../../services/SettingsService";
 import type { Topic, TopicRef } from "../../types/topics";
 import type { Doc } from "../../types/entities";
 
@@ -31,6 +34,14 @@ export function LeftSidebar(props: LeftSidebarProps) {
     debouncedSave();
   }
 
+  async function handleEditLabel(topic: Topic, newLabel: string) {
+    await TopicService.saveTopicLabel(topic.ref, newLabel);
+    const rootPath = await SettingsService.getRootPath();
+    if (rootPath) {
+      await IndexService.invalidate(rootPath + "/topics.yaml", rootPath);
+    }
+  }
+
   return (
     <div class="flex h-full flex-col">
       {/* Today button - pinned at top */}
@@ -44,6 +55,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
           topics={props.topics.filter((t) => t.kind !== "person")}
           activeTopics={props.activeTopics}
           onTopicClick={(ref) => props.onTopicClick(ref)}
+          onEditLabel={handleEditLabel}
         />
         <TopicsList
           title="People"
@@ -51,6 +63,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
           topics={props.topics.filter((t) => t.kind === "person")}
           activeTopics={props.activeTopics}
           onTopicClick={(ref) => props.onTopicClick(ref)}
+          onEditLabel={handleEditLabel}
         />
         <DocsList
           docs={props.docs}

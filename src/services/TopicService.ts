@@ -1,5 +1,6 @@
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { FileService } from "./FileService";
+import { SettingsService } from "./SettingsService";
 import type { TopicRef, TopicDecoration } from "../types/topics";
 
 /**
@@ -89,5 +90,55 @@ export const TopicService = {
   ): string => {
     const decoration = decorations.get(ref);
     return decoration?.label ?? ref;
+  },
+
+  /**
+   * Save a topic's label to topics.yaml.
+   * Creates the file if it doesn't exist. Clears label if empty or matches raw ref.
+   *
+   * @param ref - Topic reference (e.g. "#my-topic")
+   * @param label - New display label (empty string to clear)
+   */
+  saveTopicLabel: async (ref: TopicRef, label: string): Promise<void> => {
+    const rootPath = await SettingsService.getRootPath();
+    if (!rootPath) return;
+
+    const path = rootPath + "/topics.yaml";
+
+    let entries: Record<string, unknown>[] = [];
+    const exists = await FileService.exists(path);
+    if (exists) {
+      try {
+        const content = await FileService.read(path);
+        const parsed = parseYaml(content);
+        if (Array.isArray(parsed)) {
+          entries = parsed;
+        }
+      } catch {
+        // Start fresh if parse fails
+      }
+    }
+
+    const trimmed = label.trim();
+    const shouldClear = trimmed === "" || trimmed === ref;
+
+    const idx = entries.findIndex(
+      (e) =>
+        typeof e === "object" &&
+        e !== null &&
+        (e as Record<string, unknown>)["id"] === ref
+    );
+
+    if (idx >= 0) {
+      if (shouldClear) {
+        delete (entries[idx] as Record<string, unknown>)["label"];
+      } else {
+        (entries[idx] as Record<string, unknown>)["label"] = trimmed;
+      }
+    } else if (!shouldClear) {
+      entries.push({ id: ref, label: trimmed });
+    }
+
+    await FileService.write(path, stringifyYaml(entries));
   },
 };

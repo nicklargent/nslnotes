@@ -1,9 +1,11 @@
+import { createSignal, Show } from "solid-js";
 import type { Topic } from "../../types/topics";
 
 interface TopicItemProps {
   topic: Topic;
   isRelevant: boolean;
   onClick: (topic: Topic) => void;
+  onEditLabel: (topic: Topic, newLabel: string) => void;
 }
 
 /**
@@ -13,10 +15,29 @@ interface TopicItemProps {
  */
 export function TopicItem(props: TopicItemProps) {
   const isPerson = () => props.topic.kind === "person";
+  const [editing, setEditing] = createSignal(false);
+
+  function startEdit(e: MouseEvent) {
+    e.stopPropagation();
+    setEditing(true);
+  }
+
+  function commitEdit(value: string) {
+    setEditing(false);
+    props.onEditLabel(props.topic, value);
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      commitEdit((e.target as HTMLInputElement).value);
+    } else if (e.key === "Escape") {
+      setEditing(false);
+    }
+  }
 
   return (
     <button
-      class={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors duration-200 ${
+      class={`group flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors duration-200 ${
         props.isRelevant
           ? isPerson()
             ? "border-l-2 border-purple-300 bg-purple-50"
@@ -28,14 +49,55 @@ export function TopicItem(props: TopicItemProps) {
       <span class={isPerson() ? "text-purple-500" : "text-blue-500"}>
         {isPerson() ? "@" : "#"}
       </span>
-      <span class="truncate text-gray-700">
-        {props.topic.label.replace(/^[#@]/, "")}
-      </span>
-      {props.topic.openTaskCount > 0 && (
-        <span class="ml-auto text-xs text-gray-400">
-          {props.topic.openTaskCount}
+      <Show
+        when={editing()}
+        fallback={
+          <span class="truncate text-gray-700">
+            {props.topic.label.replace(/^[#@]/, "")}
+          </span>
+        }
+      >
+        <input
+          type="text"
+          class="min-w-0 flex-1 rounded border border-blue-300 bg-white px-1 py-0 text-sm text-gray-700 outline-none focus:ring-1 focus:ring-blue-400"
+          value={props.topic.label.replace(/^[#@]/, "")}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={handleKeyDown}
+          onBlur={(e) => commitEdit(e.target.value)}
+          ref={(el) =>
+            setTimeout(() => {
+              el.focus();
+              el.select();
+            })
+          }
+        />
+      </Show>
+      <Show when={!editing()}>
+        {props.topic.openTaskCount > 0 && (
+          <span class="ml-auto text-xs text-gray-400">
+            {props.topic.openTaskCount}
+          </span>
+        )}
+        <span
+          class="ml-auto hidden shrink-0 cursor-pointer text-gray-400 hover:text-gray-600 group-hover:inline"
+          onClick={startEdit}
+          title="Edit label"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            <path d="m15 5 4 4" />
+          </svg>
         </span>
-      )}
+      </Show>
     </button>
   );
 }

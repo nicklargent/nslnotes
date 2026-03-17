@@ -8,6 +8,7 @@ interface TopicsListProps {
   topics: Topic[];
   activeTopics: Set<TopicRef>;
   onTopicClick: (ref: TopicRef) => void;
+  onEditLabel: (topic: Topic, newLabel: string) => void;
 }
 
 /**
@@ -35,6 +36,7 @@ export function TopicsList(props: TopicsListProps) {
                 topic={topic}
                 isRelevant={props.activeTopics.has(topic.ref)}
                 onClick={(t) => props.onTopicClick(t.ref)}
+                onEditLabel={props.onEditLabel}
               />
             )}
           </For>
