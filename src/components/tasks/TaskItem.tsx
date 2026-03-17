@@ -1,4 +1,5 @@
 import { createSignal, Show } from "solid-js";
+import { setWikilinkDragData } from "../../lib/drag";
 import { EntityService } from "../../services/EntityService";
 import { formatRelativeDate } from "../../lib/dates";
 import type { Task } from "../../types/entities";
@@ -44,6 +45,10 @@ export function TaskItem(props: TaskItemProps) {
                 ? "border-l-2 border-blue-300 bg-blue-50"
                 : "hover:bg-gray-100"
       }`}
+      draggable={true}
+      onDragStart={(e: DragEvent) =>
+        setWikilinkDragData(e, "task", props.task.slug)
+      }
     >
       {/* Checkbox button for quick done */}
       <button

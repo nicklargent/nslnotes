@@ -1,3 +1,4 @@
+import { setWikilinkDragData } from "../../lib/drag";
 import type { Doc } from "../../types/entities";
 
 interface DocItemProps {
@@ -20,6 +21,10 @@ export function DocItem(props: DocItemProps) {
       }`}
       title={`[[doc:${props.doc.slug}]]`}
       onClick={() => props.onClick(props.doc)}
+      draggable={true}
+      onDragStart={(e: DragEvent) =>
+        setWikilinkDragData(e, "doc", props.doc.slug)
+      }
     >
       {props.doc.title}
     </button>

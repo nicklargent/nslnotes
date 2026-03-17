@@ -4,6 +4,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import { TextSelection } from "@tiptap/pm/state";
+import { WIKILINK_MIME } from "../../lib/drag";
 import { InlineDecorations } from "./InlineDecorations";
 import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
 
@@ -38,7 +39,7 @@ export function ProseEditor(props: ProseEditorProps) {
   let containerRef: HTMLDivElement | undefined;
   let editor: Editor | undefined;
   let skipNextUpdate = false;
-  let lastUserUpdate = 0;
+  let lastUserInteraction = 0;
 
   onMount(() => {
     if (!containerRef) return;
@@ -94,7 +95,7 @@ export function ProseEditor(props: ProseEditorProps) {
           skipNextUpdate = false;
           return;
         }
-        lastUserUpdate = Date.now();
+        lastUserInteraction = Date.now();
         const md = markdownFromHtml(e.getHTML());
         props.onUpdate(md);
       },
@@ -173,6 +174,26 @@ export function ProseEditor(props: ProseEditorProps) {
           }
 
           return false;
+        },
+        handleDrop: (view, event, _slice, moved) => {
+          if (moved) return false;
+          const wikilink = event.dataTransfer?.getData(WIKILINK_MIME);
+          if (!wikilink) return false;
+          event.preventDefault();
+          const coords = view.posAtCoords({
+            left: event.clientX,
+            top: event.clientY,
+          });
+          if (!coords) return false;
+          const insertPos = coords.pos;
+          const tr = view.state.tr.insertText(wikilink + " ", insertPos);
+          const cursorPos = insertPos + wikilink.length + 1;
+          tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+          view.dispatch(tr);
+          // Browser may suppress synchronous focus during drop events;
+          // defer to next tick so the editor regains cursor reliably.
+          setTimeout(() => view.focus(), 0);
+          return true;
         },
         handleKeyDown: (view, event) => {
           // Tab to indent list items, or wrap paragraph in bullet list
@@ -290,6 +311,28 @@ export function ProseEditor(props: ProseEditorProps) {
     }
     containerRef.addEventListener("click", handleLinkClick, true);
 
+    // Visual feedback for wikilink drag-and-drop
+    function handleDragOver(e: DragEvent) {
+      if (e.dataTransfer?.types.includes(WIKILINK_MIME)) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        containerRef!.classList.add("wikilink-drop-target");
+      }
+    }
+    function handleDragEnd() {
+      containerRef!.classList.remove("wikilink-drop-target");
+    }
+    containerRef.addEventListener("dragover", handleDragOver);
+    containerRef.addEventListener("dragleave", handleDragEnd);
+    containerRef.addEventListener("drop", handleDragEnd);
+
+    // Track mousedown as earliest interaction signal — fires before focus,
+    // preventing content sync from resetting cursor mid-click.
+    function handleMouseDown() {
+      lastUserInteraction = Date.now();
+    }
+    containerRef.addEventListener("mousedown", handleMouseDown, true);
+
     // Show pointer cursor on Cmd/Ctrl hold over clickable elements
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Control" || e.key === "Meta") {
@@ -310,6 +353,10 @@ export function ProseEditor(props: ProseEditorProps) {
 
     onCleanup(() => {
       containerRef!.removeEventListener("click", handleLinkClick, true);
+      containerRef!.removeEventListener("mousedown", handleMouseDown, true);
+      containerRef!.removeEventListener("dragover", handleDragOver);
+      containerRef!.removeEventListener("dragleave", handleDragEnd);
+      containerRef!.removeEventListener("drop", handleDragEnd);
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlurWindow);
@@ -331,11 +378,10 @@ export function ProseEditor(props: ProseEditorProps) {
       });
     }
     const onEditorFocus = props.onEditorFocus;
-    if (onEditorFocus) {
-      editor.on("focus", () => {
-        onEditorFocus();
-      });
-    }
+    editor.on("focus", () => {
+      lastUserInteraction = Date.now();
+      onEditorFocus?.();
+    });
 
     props.ref?.(editor);
   });
@@ -350,7 +396,8 @@ export function ProseEditor(props: ProseEditorProps) {
   createEffect(() => {
     const newContent = props.content;
     if (!editor || editor.isDestroyed) return;
-    if (Date.now() - lastUserUpdate < 500) return;
+    if (Date.now() - lastUserInteraction < 500) return;
+    if (editor.isFocused) return;
     const currentMd = markdownFromHtml(editor.getHTML());
     if (currentMd !== newContent) {
       skipNextUpdate = true;

@@ -1,3 +1,4 @@
+import { setWikilinkDragData } from "../../lib/drag";
 import { EntityService } from "../../services/EntityService";
 import type { Task } from "../../types/entities";
 
@@ -18,7 +19,13 @@ export function ClosedTaskItem(props: ClosedTaskItemProps) {
   const isDone = () => props.task.status === "done";
 
   return (
-    <div class="group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm text-gray-400 hover:bg-gray-50">
+    <div
+      class="group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm text-gray-400 hover:bg-gray-50"
+      draggable={true}
+      onDragStart={(e: DragEvent) =>
+        setWikilinkDragData(e, "task", props.task.slug)
+      }
+    >
       {/* Status indicator */}
       <span
         class={`flex h-4 w-4 flex-shrink-0 items-center justify-center text-xs ${

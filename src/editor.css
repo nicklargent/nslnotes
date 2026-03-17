@@ -242,6 +242,12 @@
 }
 
 /* Promote highlight */
+/* Wikilink drag-and-drop target */
+.prose-editor.wikilink-drop-target {
+  outline: 2px dashed #93c5fd;
+  outline-offset: -2px;
+}
+
 .promote-highlight {
   background-color: #dbeafe;
   border-radius: 2px;
