@@ -97,34 +97,36 @@ export function SetupScreen(props: SetupScreenProps) {
   }
 
   return (
-    <div class="flex min-h-screen items-center justify-center bg-gray-50">
-      <div class="w-full max-w-md rounded-lg bg-white p-8 shadow-lg">
-        <h1 class="mb-2 text-2xl font-bold text-gray-900">
+    <div class="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div class="w-full max-w-md rounded-lg bg-white dark:bg-gray-800 p-8 shadow-lg dark:shadow-gray-900/50">
+        <h1 class="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
           Welcome to NslNotes
         </h1>
-        <p class="mb-6 text-gray-600">
+        <p class="mb-6 text-gray-600 dark:text-gray-300">
           Choose a folder where your notes, tasks, and documents will be stored.
           All files are plain markdown, so you always own your data.
         </p>
 
         {selectedPath() && (
-          <div class="mb-4 rounded border border-gray-200 bg-gray-50 p-3">
-            <p class="text-sm text-gray-500">Selected folder:</p>
-            <p class="truncate font-mono text-sm text-gray-800">
+          <div class="mb-4 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Selected folder:
+            </p>
+            <p class="truncate font-mono text-sm text-gray-800 dark:text-gray-100">
               {selectedPath()}
             </p>
           </div>
         )}
 
         {error() && (
-          <div class="mb-4 rounded border border-red-200 bg-red-50 p-3">
+          <div class="mb-4 rounded border border-red-200 bg-red-50 dark:bg-red-900/30 p-3">
             <p class="text-sm text-red-700">{error()}</p>
           </div>
         )}
 
         {isWeb ? (
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">
+            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
               Folder path
             </label>
             <input
@@ -135,7 +137,7 @@ export function SetupScreen(props: SetupScreenProps) {
                 if (e.key === "Enter") void handleManualPath();
               }}
               placeholder="/home/user/notes"
-              class="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              class="mb-3 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <button
               type="button"
@@ -157,7 +159,7 @@ export function SetupScreen(props: SetupScreenProps) {
           </button>
         )}
 
-        <p class="mt-4 text-center text-xs text-gray-400">
+        <p class="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
           NslNotes will create notes/, tasks/, and docs/ subfolders.
         </p>
       </div>

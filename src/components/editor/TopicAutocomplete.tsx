@@ -96,7 +96,7 @@ export function TopicAutocomplete(props: TopicAutocompleteProps) {
     <Show when={suggestions().length > 0}>
       <div
         ref={menuRef}
-        class="fixed z-50 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+        class="fixed z-50 w-48 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 shadow-lg dark:shadow-gray-900/50"
         style={{
           top: `${props.position.top + 24}px`,
           left: `${props.position.left}px`,
@@ -107,8 +107,8 @@ export function TopicAutocomplete(props: TopicAutocompleteProps) {
             <button
               class={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
                 index() === selectedIndex()
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-700 hover:bg-gray-50"
+                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700"
+                  : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
               }`}
               onClick={() => props.onSelect(topic.ref)}
               onMouseEnter={() => setSelectedIndex(index())}

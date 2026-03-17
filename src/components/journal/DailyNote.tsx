@@ -90,7 +90,7 @@ export function DailyNote(props: DailyNoteProps) {
         </div>
         <Show when={created()}>
           <button
-            class="ml-2 shrink-0 self-start rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600"
+            class="ml-2 shrink-0 self-start rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-red-100 hover:text-red-600"
             title="Delete daily note"
             onClick={() => setShowDeleteModal(true)}
           >

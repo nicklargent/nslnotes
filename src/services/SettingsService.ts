@@ -19,6 +19,8 @@ export interface AppSettings {
   windowHeight: number | null;
   /** Whether window is maximized */
   windowMaximized: boolean | null;
+  /** Whether dark mode is enabled */
+  darkMode: boolean | null;
 }
 
 /**
@@ -32,6 +34,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   windowWidth: null,
   windowHeight: null,
   windowMaximized: null,
+  darkMode: null,
 };
 
 /**

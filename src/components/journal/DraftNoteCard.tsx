@@ -77,7 +77,7 @@ export function DraftNoteCard(props: DraftNoteCardProps) {
   }
 
   return (
-    <div class="mt-2 rounded-lg border border-blue-300 bg-blue-50 p-3">
+    <div class="mt-2 rounded-lg border border-blue-300 bg-blue-50 dark:bg-blue-900/30 p-3">
       <div class="mb-1">
         <input
           ref={titleRef}
@@ -87,7 +87,7 @@ export function DraftNoteCard(props: DraftNoteCardProps) {
           onKeyDown={handleTitleKeyDown}
           onBlur={handleTitleBlur}
           placeholder="Note title..."
-          class="w-full border-none bg-transparent text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400"
+          class="w-full border-none bg-transparent text-sm font-medium text-gray-800 dark:text-gray-100 outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
       </div>
 
@@ -100,7 +100,9 @@ export function DraftNoteCard(props: DraftNoteCardProps) {
             onUpdate={setBody}
           />
         ) : (
-          <div class="text-sm text-gray-300">Press Enter to create...</div>
+          <div class="text-sm text-gray-300 dark:text-gray-600">
+            Press Enter to create...
+          </div>
         )}
       </div>
     </div>

@@ -82,21 +82,25 @@ export function PromoteConfirmBar(props: PromoteConfirmBarProps) {
         left: `${position().left}px`,
       }}
     >
-      <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-lg max-w-md">
+      <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 shadow-lg dark:shadow-gray-900/50 max-w-md">
         <div class="flex items-center gap-2 mb-1">
-          <span class="text-sm font-semibold text-gray-800 truncate flex-1">
+          <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate flex-1">
             {displayTitle()}
           </span>
           <Show when={props.range.hasBody}>
-            <span class="text-xs text-gray-400">+ content</span>
+            <span class="text-xs text-gray-400 dark:text-gray-500">
+              + content
+            </span>
           </Show>
         </div>
 
         <div class="flex items-center gap-1 mb-2">
-          <span class="text-xs text-gray-400 shrink-0">slug:</span>
+          <span class="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+            slug:
+          </span>
           <input
             type="text"
-            class="flex-1 min-w-0 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-700 outline-none focus:border-blue-400"
+            class="flex-1 min-w-0 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-xs text-gray-700 dark:text-gray-200 outline-none focus:border-blue-400 dark:bg-gray-800"
             value={slug()}
             onInput={(e) => setSlug(e.currentTarget.value)}
             onKeyDown={(e) => {
@@ -114,8 +118,8 @@ export function PromoteConfirmBar(props: PromoteConfirmBarProps) {
                 <button
                   class={`rounded px-1.5 py-0.5 text-xs transition-colors ${
                     selectedTopics().has(ref)
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                   onClick={() => toggleTopic(ref)}
                 >
@@ -140,7 +144,7 @@ export function PromoteConfirmBar(props: PromoteConfirmBarProps) {
             Doc
           </button>
           <button
-            class="ml-1 rounded px-1.5 py-1 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            class="ml-1 rounded px-1.5 py-1 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             onClick={() => props.onCancel()}
             title="Cancel (Esc)"
           >

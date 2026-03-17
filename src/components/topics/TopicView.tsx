@@ -76,19 +76,27 @@ export function TopicView() {
       <div class="mx-auto max-w-2xl px-6 py-6">
         <Show
           when={topic()}
-          fallback={<p class="text-sm text-gray-400">No topic selected</p>}
+          fallback={
+            <p class="text-sm text-gray-400 dark:text-gray-500">
+              No topic selected
+            </p>
+          }
         >
           {(t) => (
             <>
               {/* Topic header */}
               <div class="mb-6">
-                <h1 class="text-xl font-semibold text-gray-900">{t().label}</h1>
-                <span class="text-xs text-gray-400">
+                <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  {t().label}
+                </h1>
+                <span class="text-xs text-gray-400 dark:text-gray-500">
                   {t().kind === "person" ? "Person" : "Topic"} &middot;{" "}
                   {t().references.length} references
                 </span>
                 <Show when={t().note}>
-                  <p class="mt-2 text-sm text-gray-600">{t().note}</p>
+                  <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                    {t().note}
+                  </p>
                 </Show>
               </div>
 
@@ -97,13 +105,13 @@ export function TopicView() {
                 {(doc) => (
                   <div class="mb-6">
                     <button
-                      class="w-full rounded-lg border border-blue-200 bg-blue-50 p-4 text-left hover:border-blue-300"
+                      class="w-full rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/30 p-4 text-left hover:border-blue-300"
                       onClick={() => NavigationService.navigateTo(doc())}
                     >
-                      <h3 class="text-sm font-medium text-blue-800">
+                      <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300">
                         {doc().title}
                       </h3>
-                      <p class="mt-1 text-xs leading-relaxed text-blue-600">
+                      <p class="mt-1 text-xs leading-relaxed text-blue-600 dark:text-blue-400">
                         {doc()
                           .content.split("\n")
                           .filter((l) => l.trim())
@@ -119,20 +127,20 @@ export function TopicView() {
               {/* Open tasks */}
               <Show when={relatedTasks().length > 0}>
                 <div class="mb-6">
-                  <h2 class="mb-2 text-sm font-semibold text-gray-700">
+                  <h2 class="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
                     Open Tasks ({relatedTasks().length})
                   </h2>
                   <div class="space-y-1">
                     <For each={relatedTasks()}>
                       {(task) => (
                         <button
-                          class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                          class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                           onClick={() => NavigationService.navigateTo(task)}
                         >
                           <span class="mr-1 text-blue-500">&bull;</span>
                           {task.title}
                           <Show when={task.due}>
-                            <span class="ml-2 text-xs text-gray-400">
+                            <span class="ml-2 text-xs text-gray-400 dark:text-gray-500">
                               Due: {task.due}
                             </span>
                           </Show>
@@ -146,22 +154,24 @@ export function TopicView() {
               {/* Notes */}
               <Show when={referencingNotes().length > 0}>
                 <div class="mb-6">
-                  <h2 class="mb-2 text-sm font-semibold text-gray-700">
+                  <h2 class="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
                     Notes ({referencingNotes().length})
                   </h2>
                   <div class="space-y-1">
                     <For each={referencingNotes()}>
                       {(note) => (
                         <button
-                          class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                          class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                           onClick={() => NavigationService.navigateTo(note)}
                         >
-                          <span class="text-xs text-gray-400">{note.date}</span>
+                          <span class="text-xs text-gray-400 dark:text-gray-500">
+                            {note.date}
+                          </span>
                           <Show when={note.title}>
                             <span class="ml-2">{note.title}</span>
                           </Show>
                           <Show when={!note.title}>
-                            <span class="ml-2 italic text-gray-400">
+                            <span class="ml-2 italic text-gray-400 dark:text-gray-500">
                               Daily note
                             </span>
                           </Show>
@@ -175,14 +185,14 @@ export function TopicView() {
               {/* Docs */}
               <Show when={referencingDocs().length > 0}>
                 <div class="mb-6">
-                  <h2 class="mb-2 text-sm font-semibold text-gray-700">
+                  <h2 class="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
                     Documents ({referencingDocs().length})
                   </h2>
                   <div class="space-y-1">
                     <For each={referencingDocs()}>
                       {(doc) => (
                         <button
-                          class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                          class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                           onClick={() => NavigationService.navigateTo(doc)}
                         >
                           {doc.title}
@@ -201,7 +211,7 @@ export function TopicView() {
                   relatedTasks().length === 0
                 }
               >
-                <p class="text-sm text-gray-400">
+                <p class="text-sm text-gray-400 dark:text-gray-500">
                   No references found for this topic.
                 </p>
               </Show>

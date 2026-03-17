@@ -39,7 +39,7 @@ export function EditableDate(props: EditableDateProps) {
       when={editing()}
       fallback={
         <span
-          class="cursor-text text-xs text-gray-500 hover:underline hover:decoration-gray-300"
+          class="cursor-text text-xs text-gray-500 dark:text-gray-400 hover:underline hover:decoration-gray-300 dark:hover:decoration-gray-600"
           onClick={startEdit}
         >
           {props.label ? `${props.label}: ` : ""}
@@ -54,7 +54,7 @@ export function EditableDate(props: EditableDateProps) {
         onBlur={save}
         onChange={save}
         onKeyDown={handleKeyDown}
-        class="rounded border border-blue-300 bg-white px-1 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-400"
+        class="rounded border border-blue-300 bg-white dark:bg-gray-800 px-1 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-400"
         ref={(el) => setTimeout(() => el.focus(), 0)}
       />
     </Show>

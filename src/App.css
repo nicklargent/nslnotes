@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Base styles */
 /* font-size is set dynamically via uiStore */
 
@@ -14,4 +16,60 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+/* Editor color tokens */
+:root {
+  --color-editor-placeholder: #d1d5db;
+  --color-code-bg: #f3f4f6;
+  --color-code-text: #ef4444;
+  --color-pre-bg: #1f2937;
+  --color-pre-text: #e5e7eb;
+  --color-blockquote-border: #d1d5db;
+  --color-blockquote-text: #6b7280;
+  --color-hr: #e5e7eb;
+  --color-todo-open: #9ca3af;
+  --color-todo-doing: #3b82f6;
+  --color-todo-done: #22c55e;
+  --color-link: #2563eb;
+  --color-link-underline: #93c5fd;
+  --color-wikilink: #3b82f6;
+  --color-wikilink-border: #93c5fd;
+  --color-wikilink-hover-bg: #eff6ff;
+  --color-topic-ref: #8b5cf6;
+  --color-topic-ref-hover: #7c3aed;
+  --color-topic-ref-border: #a78bfa;
+  --color-promote-highlight: #dbeafe;
+  --color-drop-target: #93c5fd;
+  --color-editor-text: #1f2937;
+}
+
+.dark {
+  --color-editor-placeholder: #6b7280;
+  --color-code-bg: #374151;
+  --color-code-text: #f87171;
+  --color-pre-bg: #111827;
+  --color-pre-text: #e5e7eb;
+  --color-blockquote-border: #4b5563;
+  --color-blockquote-text: #9ca3af;
+  --color-hr: #374151;
+  --color-todo-open: #6b7280;
+  --color-todo-doing: #60a5fa;
+  --color-todo-done: #4ade80;
+  --color-link: #60a5fa;
+  --color-link-underline: #3b82f6;
+  --color-wikilink: #60a5fa;
+  --color-wikilink-border: #3b82f6;
+  --color-wikilink-hover-bg: #1e3a5f;
+  --color-topic-ref: #a78bfa;
+  --color-topic-ref-hover: #c4b5fd;
+  --color-topic-ref-border: #7c3aed;
+  --color-promote-highlight: #1e3a5f;
+  --color-drop-target: #3b82f6;
+  --color-editor-text: #e5e7eb;
+}
+
+/* Dark mode base styles */
+.dark body {
+  color: #e5e7eb;
 }

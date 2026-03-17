@@ -27,6 +27,8 @@ pub struct AppSettings {
     pub window_height: Option<f64>,
     #[serde(rename = "windowMaximized", default)]
     pub window_maximized: Option<bool>,
+    #[serde(rename = "darkMode", default)]
+    pub dark_mode: Option<bool>,
 }
 
 /// Settings filename

@@ -23,9 +23,9 @@ function ErrorFallback(props: { error: Error; onReset: () => void }) {
   const [showDetails, setShowDetails] = createSignal(false);
 
   return (
-    <div class="flex min-h-screen items-center justify-center bg-gray-50 p-8">
-      <div class="w-full max-w-md rounded-lg border border-red-200 bg-white p-6 shadow-lg">
-        <div class="mb-4 flex items-center gap-2 text-red-600">
+    <div class="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 p-8">
+      <div class="w-full max-w-md rounded-lg border border-red-200 bg-white dark:bg-gray-800 p-6 shadow-lg dark:shadow-gray-900/50">
+        <div class="mb-4 flex items-center gap-2 text-red-600 dark:text-red-400">
           <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
             <path
               fill-rule="evenodd"
@@ -36,7 +36,7 @@ function ErrorFallback(props: { error: Error; onReset: () => void }) {
           <h2 class="text-lg font-semibold">Something went wrong</h2>
         </div>
 
-        <p class="mb-4 text-sm text-gray-600">
+        <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">
           An unexpected error occurred. You can try recovering or reload the
           application.
         </p>
@@ -49,7 +49,7 @@ function ErrorFallback(props: { error: Error; onReset: () => void }) {
             Try Again
           </button>
           <button
-            class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            class="rounded border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
             onClick={() => window.location.reload()}
           >
             Reload App
@@ -57,14 +57,14 @@ function ErrorFallback(props: { error: Error; onReset: () => void }) {
         </div>
 
         <button
-          class="mt-3 text-xs text-gray-400 hover:text-gray-600"
+          class="mt-3 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           onClick={() => setShowDetails(!showDetails())}
         >
           {showDetails() ? "Hide" : "Show"} error details
         </button>
 
         {showDetails() && (
-          <pre class="mt-2 max-h-40 overflow-auto rounded bg-gray-100 p-2 text-xs text-gray-700">
+          <pre class="mt-2 max-h-40 overflow-auto rounded bg-gray-100 dark:bg-gray-700 p-2 text-xs text-gray-700 dark:text-gray-200">
             {props.error?.message ?? "Unknown error"}
             {props.error?.stack ? `\n\n${props.error.stack}` : ""}
           </pre>

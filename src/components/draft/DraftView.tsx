@@ -107,7 +107,9 @@ export function DraftView() {
       <div class="mx-auto max-w-2xl px-6 py-6">
         {/* Header */}
         <div class="mb-4">
-          <span class="mb-2 block text-xs text-gray-400">{typeLabel()}</span>
+          <span class="mb-2 block text-xs text-gray-400 dark:text-gray-500">
+            {typeLabel()}
+          </span>
           <input
             ref={titleRef}
             type="text"
@@ -116,16 +118,16 @@ export function DraftView() {
             onKeyDown={handleTitleKeyDown}
             onBlur={handleTitleBlur}
             placeholder={placeholderText()}
-            class="w-full border-none bg-transparent text-xl font-semibold text-gray-900 outline-none placeholder:text-gray-300"
+            class="w-full border-none bg-transparent text-xl font-semibold text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
           />
-          <p class="mt-2 text-xs text-gray-400">
+          <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
             Press Enter to create, Esc to cancel
           </p>
         </div>
 
         {/* Placeholder editor area */}
-        <div class="border-t border-gray-100 pt-4">
-          <div class="text-sm text-gray-300">
+        <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
+          <div class="text-sm text-gray-300 dark:text-gray-600">
             Editor will be available after creating...
           </div>
         </div>

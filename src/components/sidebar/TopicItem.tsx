@@ -40,9 +40,9 @@ export function TopicItem(props: TopicItemProps) {
       class={`group flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors duration-200 ${
         props.isRelevant
           ? isPerson()
-            ? "border-l-2 border-purple-300 bg-purple-50"
-            : "border-l-2 border-blue-300 bg-blue-50"
-          : "hover:bg-gray-100"
+            ? "border-l-2 border-purple-300 bg-purple-50 dark:bg-purple-900/30"
+            : "border-l-2 border-blue-300 bg-blue-50 dark:bg-blue-900/30"
+          : "hover:bg-gray-100 dark:hover:bg-gray-700"
       }`}
       onClick={() => props.onClick(props.topic)}
     >
@@ -52,14 +52,14 @@ export function TopicItem(props: TopicItemProps) {
       <Show
         when={editing()}
         fallback={
-          <span class="truncate text-gray-700">
+          <span class="truncate text-gray-700 dark:text-gray-200">
             {props.topic.label.replace(/^[#@]/, "")}
           </span>
         }
       >
         <input
           type="text"
-          class="min-w-0 flex-1 rounded border border-blue-300 bg-white px-1 py-0 text-sm text-gray-700 outline-none focus:ring-1 focus:ring-blue-400"
+          class="min-w-0 flex-1 rounded border border-blue-300 bg-white dark:bg-gray-800 px-1 py-0 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-400"
           value={props.topic.label.replace(/^[#@]/, "")}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={handleKeyDown}
@@ -74,12 +74,12 @@ export function TopicItem(props: TopicItemProps) {
       </Show>
       <Show when={!editing()}>
         {props.topic.openTaskCount > 0 && (
-          <span class="ml-auto text-xs text-gray-400">
+          <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
             {props.topic.openTaskCount}
           </span>
         )}
         <span
-          class="ml-auto hidden shrink-0 cursor-pointer text-gray-400 hover:text-gray-600 group-hover:inline"
+          class="ml-auto hidden shrink-0 cursor-pointer text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 group-hover:inline"
           onClick={startEdit}
           title="Edit label"
         >

@@ -43,7 +43,7 @@ export function EditableText(props: EditableTextProps) {
       when={editing()}
       fallback={
         <span
-          class={`cursor-text hover:underline hover:decoration-gray-300 ${props.class ?? ""}`}
+          class={`cursor-text hover:underline hover:decoration-gray-300 dark:hover:decoration-gray-600 ${props.class ?? ""}`}
           onClick={startEdit}
         >
           {props.value || props.placeholder || "Untitled"}
@@ -56,7 +56,7 @@ export function EditableText(props: EditableTextProps) {
         onInput={(e) => setDraft(e.currentTarget.value)}
         onBlur={save}
         onKeyDown={handleKeyDown}
-        class={`w-full rounded border border-blue-300 bg-white px-1 outline-none focus:ring-1 focus:ring-blue-400 ${props.class ?? ""}`}
+        class={`w-full rounded border border-blue-300 bg-white dark:bg-gray-800 px-1 outline-none focus:ring-1 focus:ring-blue-400 ${props.class ?? ""}`}
         ref={(el) => setTimeout(() => el.focus(), 0)}
       />
     </Show>

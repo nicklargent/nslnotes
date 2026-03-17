@@ -150,14 +150,14 @@ export function EditableTopics(props: EditableTopicsProps) {
           <Show
             when={props.topics.length > 0}
             fallback={
-              <span class="text-xs text-gray-400 hover:text-gray-500">
+              <span class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400">
                 + Add topics
               </span>
             }
           >
             <For each={props.topics}>
               {(t) => (
-                <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-200">
+                <span class="rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600">
                   {t}
                 </span>
               )}
@@ -175,7 +175,7 @@ export function EditableTopics(props: EditableTopicsProps) {
           onKeyDown={handleKeyDown}
           onClick={updateAutocomplete}
           placeholder="#topic1, @person"
-          class="w-full rounded border border-blue-300 bg-white px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-400"
+          class="w-full rounded border border-blue-300 bg-white dark:bg-gray-800 px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-400"
           ref={(el) => {
             inputRef = el;
             setTimeout(() => el.focus(), 0);

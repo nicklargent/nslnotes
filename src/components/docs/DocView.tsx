@@ -83,7 +83,7 @@ export function DocView(props: DocViewProps) {
             onSave={(title) =>
               void EntityService.updateFrontmatter(props.doc.path, { title })
             }
-            class="text-xl font-semibold text-gray-900"
+            class="text-xl font-semibold text-gray-900 dark:text-gray-100"
           />
           <div class="mt-2">
             <EditableTopics
@@ -94,14 +94,14 @@ export function DocView(props: DocViewProps) {
             />
           </div>
           <div class="mt-2 flex items-center gap-3">
-            <code class="select-all rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+            <code class="select-all rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">
               [[doc:{liveDoc().slug}]]
             </code>
-            <span class="text-xs text-gray-400">
+            <span class="text-xs text-gray-400 dark:text-gray-500">
               Created: {liveDoc().created}
             </span>
             <button
-              class="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100"
+              class="rounded bg-red-50 dark:bg-red-900/30 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100"
               onClick={() => setShowDeleteModal(true)}
             >
               Delete
@@ -110,7 +110,7 @@ export function DocView(props: DocViewProps) {
         </div>
 
         {/* Editor */}
-        <div class="border-t border-gray-100 pt-4">
+        <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
           <Editor
             content={content()}
             placeholder="Start writing..."
@@ -120,7 +120,9 @@ export function DocView(props: DocViewProps) {
         </div>
 
         <Show when={editorStore.isDirty}>
-          <div class="mt-2 text-right text-xs text-gray-300">Saving...</div>
+          <div class="mt-2 text-right text-xs text-gray-300 dark:text-gray-600">
+            Saving...
+          </div>
         </Show>
       </div>
 

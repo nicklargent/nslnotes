@@ -34,7 +34,7 @@ export function ResizeHandle(props: ResizeHandleProps) {
 
   return (
     <div
-      class="flex w-1 cursor-col-resize items-center justify-center bg-gray-200 transition-colors hover:bg-blue-300 active:bg-blue-400"
+      class="flex w-1 cursor-col-resize items-center justify-center bg-gray-200 dark:bg-gray-600 transition-colors hover:bg-blue-300 active:bg-blue-400"
       onMouseDown={onMouseDown}
     />
   );

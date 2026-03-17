@@ -10,7 +10,7 @@ interface TodayButtonProps {
 export function TodayButton(props: TodayButtonProps) {
   return (
     <button
-      class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800"
+      class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm dark:shadow-gray-900/30 hover:bg-blue-700 active:bg-blue-800"
       onClick={() => props.onClick()}
     >
       Today

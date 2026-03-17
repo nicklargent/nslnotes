@@ -130,7 +130,9 @@ export function BubbleMenu(props: BubbleMenuProps) {
 
   const btnClass = (active: boolean) =>
     `px-2 py-1 text-sm rounded transition-colors ${
-      active ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-100"
+      active
+        ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700"
+        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
     }`;
 
   return (
@@ -149,7 +151,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
       <Show
         when={!linkMode()}
         fallback={
-          <div class="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 shadow-lg">
+          <div class="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 shadow-lg dark:shadow-gray-900/50">
             <input
               ref={linkInputRef}
               type="text"
@@ -160,7 +162,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
               onKeyDown={handleLinkKeyDown}
             />
             <button
-              class="px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded"
+              class="px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
               onClick={applyLink}
             >
               Apply
@@ -174,7 +176,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
               </button>
             </Show>
             <button
-              class="px-1 py-0.5 text-xs text-gray-400 hover:text-gray-600"
+              class="px-1 py-0.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               onClick={() => setLinkMode(false)}
             >
               Esc
@@ -182,7 +184,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
           </div>
         }
       >
-        <div class="flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 py-0.5 shadow-lg">
+        <div class="flex items-center gap-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-1 py-0.5 shadow-lg dark:shadow-gray-900/50">
           <button
             class={btnClass(isActive("bold"))}
             onClick={() => toggle("bold")}
@@ -212,7 +214,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
             <span class="font-mono text-xs">&lt;&gt;</span>
           </button>
 
-          <div class="mx-0.5 h-5 w-px bg-gray-200" />
+          <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-600" />
 
           <button
             class={btnClass(isActive("heading", { level: 1 }))}
@@ -236,7 +238,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
             <span class="text-xs font-bold">H3</span>
           </button>
 
-          <div class="mx-0.5 h-5 w-px bg-gray-200" />
+          <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-600" />
 
           <button
             class={btnClass(isActive("link"))}
@@ -247,7 +249,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
           </button>
 
           <Show when={props.onExtract}>
-            <div class="mx-0.5 h-5 w-px bg-gray-200" />
+            <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-600" />
             <button
               class={btnClass(false)}
               onClick={() => {

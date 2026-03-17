@@ -72,13 +72,13 @@ export function KeyboardShortcutsModal(props: KeyboardShortcutsModalProps) {
         if (e.target === e.currentTarget) props.onClose();
       }}
     >
-      <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+      <div class="w-full max-w-lg rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl">
         <div class="mb-4 flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-gray-800">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
             Keyboard Shortcuts
           </h2>
           <button
-            class="text-gray-400 hover:text-gray-600"
+            class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             onClick={() => props.onClose()}
           >
             Esc
@@ -89,16 +89,16 @@ export function KeyboardShortcutsModal(props: KeyboardShortcutsModalProps) {
           <For each={SHORTCUT_GROUPS}>
             {(group) => (
               <div class="mb-4">
-                <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {group.title}
                 </h3>
                 <For each={group.shortcuts}>
                   {(shortcut) => (
                     <div class="flex items-center justify-between py-1">
-                      <span class="text-sm text-gray-600">
+                      <span class="text-sm text-gray-600 dark:text-gray-300">
                         {shortcut.description}
                       </span>
-                      <kbd class="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-mono text-gray-500">
+                      <kbd class="rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-2 py-0.5 text-xs font-mono text-gray-500 dark:text-gray-400">
                         {shortcut.keys}
                       </kbd>
                     </div>

@@ -59,11 +59,11 @@ export function TaskDetail(props: TaskDetailProps) {
   const statusColor = () => {
     switch (liveTask().status) {
       case "open":
-        return "bg-blue-100 text-blue-700";
+        return "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300";
       case "done":
-        return "bg-green-100 text-green-700";
+        return "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300";
       case "cancelled":
-        return "bg-gray-100 text-gray-500";
+        return "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400";
     }
   };
 
@@ -77,7 +77,7 @@ export function TaskDetail(props: TaskDetailProps) {
             onSave={(title) =>
               void EntityService.updateFrontmatter(props.task.path, { title })
             }
-            class="text-xl font-semibold text-gray-900"
+            class="text-xl font-semibold text-gray-900 dark:text-gray-100"
           />
           <div class="mt-2">
             <EditableTopics
@@ -102,10 +102,10 @@ export function TaskDetail(props: TaskDetailProps) {
               }
               label="Due"
             />
-            <code class="select-all rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+            <code class="select-all rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">
               [[task:{liveTask().slug}]]
             </code>
-            <span class="text-xs text-gray-400">
+            <span class="text-xs text-gray-400 dark:text-gray-500">
               Created: {liveTask().created}
             </span>
           </div>
@@ -115,13 +115,13 @@ export function TaskDetail(props: TaskDetailProps) {
         <div class="mb-4 flex gap-2">
           <Show when={liveTask().status === "open"}>
             <button
-              class="rounded bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
+              class="rounded bg-green-50 dark:bg-green-900/30 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40"
               onClick={() => void handleStatusChange("done")}
             >
               Mark Done
             </button>
             <button
-              class="rounded bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+              class="rounded bg-gray-50 dark:bg-gray-900 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
               onClick={() => void handleStatusChange("cancelled")}
             >
               Cancel
@@ -129,14 +129,14 @@ export function TaskDetail(props: TaskDetailProps) {
           </Show>
           <Show when={liveTask().status !== "open"}>
             <button
-              class="rounded bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+              class="rounded bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
               onClick={() => void handleStatusChange("open")}
             >
               Reopen
             </button>
           </Show>
           <button
-            class="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100"
+            class="rounded bg-red-50 dark:bg-red-900/30 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40"
             onClick={() => setShowDeleteModal(true)}
           >
             Delete
@@ -144,7 +144,7 @@ export function TaskDetail(props: TaskDetailProps) {
         </div>
 
         {/* Editor */}
-        <div class="border-t border-gray-100 pt-4">
+        <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
           <Editor
             content={content()}
             placeholder="Add task details..."
@@ -155,7 +155,9 @@ export function TaskDetail(props: TaskDetailProps) {
 
         {/* Dirty indicator */}
         <Show when={editorStore.isDirty}>
-          <div class="mt-2 text-right text-xs text-gray-300">Saving...</div>
+          <div class="mt-2 text-right text-xs text-gray-300 dark:text-gray-600">
+            Saving...
+          </div>
         </Show>
       </div>
 

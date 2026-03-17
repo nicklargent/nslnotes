@@ -17,11 +17,11 @@ export function DocsList(props: DocsListProps) {
   return (
     <div class="px-3 py-2">
       <div class="mb-1 flex items-center justify-between">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
           Docs
         </h2>
         <button
-          class="rounded px-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          class="rounded px-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
           onClick={() => props.onCreateDoc()}
         >
           +
@@ -29,7 +29,11 @@ export function DocsList(props: DocsListProps) {
       </div>
       <Show
         when={props.docs.length > 0}
-        fallback={<p class="py-2 text-xs text-gray-300">No docs yet</p>}
+        fallback={
+          <p class="py-2 text-xs text-gray-300 dark:text-gray-600">
+            No docs yet
+          </p>
+        }
       >
         <div class="flex flex-col gap-0.5">
           <For each={props.docs}>

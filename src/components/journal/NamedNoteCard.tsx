@@ -55,8 +55,8 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
     <div
       class={`mt-2 rounded-lg border p-3 transition-colors ${
         props.isFocused
-          ? "border-blue-300 bg-blue-50"
-          : "border-gray-200 bg-gray-50 hover:border-gray-300"
+          ? "border-blue-300 bg-blue-50 dark:bg-blue-900/30"
+          : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600"
       }`}
       onClick={(e) => {
         if (!props.isFocused) {
@@ -76,11 +76,11 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
           onSave={(title) =>
             void EntityService.updateFrontmatter(props.note.path, { title })
           }
-          class="text-sm font-medium text-gray-800"
+          class="text-sm font-medium text-gray-800 dark:text-gray-100"
         />
         <Show when={props.isFocused}>
           <button
-            class="ml-2 shrink-0 rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600"
+            class="ml-2 shrink-0 rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-red-100 hover:text-red-600"
             title="Delete note"
             onClick={(e) => {
               e.stopPropagation();

@@ -20,7 +20,7 @@ export function ClosedTaskItem(props: ClosedTaskItemProps) {
 
   return (
     <div
-      class="group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm text-gray-400 hover:bg-gray-50"
+      class="group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
       draggable={true}
       onDragStart={(e: DragEvent) =>
         setWikilinkDragData(e, "task", props.task.slug)
@@ -47,7 +47,7 @@ export function ClosedTaskItem(props: ClosedTaskItemProps) {
 
       {/* Reopen button - shown on hover */}
       <button
-        class="flex-shrink-0 text-xs text-transparent group-hover:text-gray-400 group-hover:hover:text-blue-500"
+        class="flex-shrink-0 text-xs text-transparent group-hover:text-gray-400 dark:group-hover:text-gray-500 group-hover:hover:text-blue-500"
         onClick={(e) => void handleReopen(e)}
         title="Reopen task"
       >

@@ -17,14 +17,14 @@ interface TopicsListProps {
  */
 export function TopicsList(props: TopicsListProps) {
   return (
-    <div class="border-b border-gray-100 px-3 py-2">
-      <h2 class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
+    <div class="border-b border-gray-100 dark:border-gray-700 px-3 py-2">
+      <h2 class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
         {props.title ?? "Topics"}
       </h2>
       <Show
         when={props.topics.length > 0}
         fallback={
-          <p class="py-2 text-xs text-gray-300">
+          <p class="py-2 text-xs text-gray-300 dark:text-gray-600">
             {props.fallbackText ?? "No topics yet"}
           </p>
         }

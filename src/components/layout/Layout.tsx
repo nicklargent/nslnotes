@@ -18,6 +18,7 @@ function debouncedSave() {
     settings.leftColumnWidth = uiStore.leftColumnWidth;
     settings.rightColumnWidth = uiStore.rightColumnWidth;
     settings.fontSize = uiStore.fontSize;
+    settings.darkMode = uiStore.darkMode;
     await SettingsService.saveSettings(settings);
   }, 500);
 }
@@ -34,12 +35,12 @@ function clamp(value: number, min: number, max: number): number {
 export function Layout(props: LayoutProps) {
   return (
     <div
-      class="grid h-screen overflow-hidden bg-gray-50"
+      class="grid h-screen overflow-hidden bg-gray-50 dark:bg-gray-900"
       style={{
         "grid-template-columns": `${uiStore.leftColumnWidth}px 4px 1fr 4px ${uiStore.rightColumnWidth}px`,
       }}
     >
-      <aside class="flex flex-col overflow-y-auto border-r border-gray-200 bg-white">
+      <aside class="flex flex-col overflow-y-auto border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         {props.left}
       </aside>
       <ResizeHandle
@@ -61,7 +62,7 @@ export function Layout(props: LayoutProps) {
         }}
         onResizeEnd={debouncedSave}
       />
-      <aside class="flex flex-col overflow-y-auto border-l border-gray-200 bg-white">
+      <aside class="flex flex-col overflow-y-auto border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         {props.right}
       </aside>
     </div>

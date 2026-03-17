@@ -21,7 +21,7 @@ interface CenterPanelProps {
  */
 export function CenterPanel(props: CenterPanelProps) {
   return (
-    <div class="h-full bg-white">
+    <div class="h-full bg-white dark:bg-gray-800">
       <Show
         when={contextStore.draft}
         fallback={
@@ -41,7 +41,9 @@ export function CenterPanel(props: CenterPanelProps) {
                     : null
                 }
                 fallback={
-                  <div class="p-6 text-sm text-gray-400">No task selected</div>
+                  <div class="p-6 text-sm text-gray-400 dark:text-gray-500">
+                    No task selected
+                  </div>
                 }
               >
                 {(task) => <TaskDetail task={task()} />}
@@ -55,7 +57,7 @@ export function CenterPanel(props: CenterPanelProps) {
                     : null
                 }
                 fallback={
-                  <div class="p-6 text-sm text-gray-400">
+                  <div class="p-6 text-sm text-gray-400 dark:text-gray-500">
                     No document selected
                   </div>
                 }

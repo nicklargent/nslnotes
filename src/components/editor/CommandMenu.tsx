@@ -143,7 +143,7 @@ export function CommandMenu(props: CommandMenuProps) {
   return (
     <div
       ref={menuRef}
-      class="fixed z-50 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+      class="fixed z-50 w-56 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 shadow-lg dark:shadow-gray-900/50"
       style={{
         top: `${props.position.top + 24}px`,
         left: `${props.position.left}px`,
@@ -155,14 +155,16 @@ export function CommandMenu(props: CommandMenuProps) {
             <button
               class={`flex w-full flex-col px-3 py-1.5 text-left ${
                 index() === selectedIndex()
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-700 hover:bg-gray-50"
+                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700"
+                  : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
               }`}
               onClick={() => props.onSelect(cmd.id)}
               onMouseEnter={() => setSelectedIndex(index())}
             >
               <span class="text-sm font-medium">{cmd.label}</span>
-              <span class="text-xs text-gray-400">{cmd.description}</span>
+              <span class="text-xs text-gray-400 dark:text-gray-500">
+                {cmd.description}
+              </span>
             </button>
           )}
         </For>

@@ -14,10 +14,10 @@ interface DocItemProps {
 export function DocItem(props: DocItemProps) {
   return (
     <button
-      class={`w-full truncate rounded px-2 py-1 text-left text-sm text-gray-700 transition-colors duration-200 ${
+      class={`w-full truncate rounded px-2 py-1 text-left text-sm text-gray-700 dark:text-gray-200 transition-colors duration-200 ${
         props.isRelevant
-          ? "border-l-2 border-blue-300 bg-blue-50"
-          : "hover:bg-gray-100"
+          ? "border-l-2 border-blue-300 bg-blue-50 dark:bg-blue-900/30"
+          : "hover:bg-gray-100 dark:hover:bg-gray-700"
       }`}
       title={`[[doc:${props.doc.slug}]]`}
       onClick={() => props.onClick(props.doc)}

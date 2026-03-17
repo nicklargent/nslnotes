@@ -33,7 +33,7 @@ export function ToastContainer() {
       <For each={toasts()}>
         {(toast) => (
           <div
-            class={`animate-slide-up rounded-lg px-4 py-2.5 text-sm shadow-lg ${
+            class={`animate-slide-up rounded-lg px-4 py-2.5 text-sm shadow-lg dark:shadow-gray-900/50 ${
               toast.type === "success"
                 ? "bg-green-600 text-white"
                 : toast.type === "error"

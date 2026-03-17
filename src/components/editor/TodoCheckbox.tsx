@@ -24,7 +24,7 @@ export function TodoCheckbox(props: TodoCheckboxProps) {
   const colorClass = () => {
     switch (props.state) {
       case "TODO":
-        return "text-gray-400";
+        return "text-gray-400 dark:text-gray-500";
       case "DOING":
         return "text-blue-500";
       case "DONE":

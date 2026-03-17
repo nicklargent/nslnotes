@@ -52,6 +52,11 @@ function App() {
     document.documentElement.style.fontSize = `${uiStore.fontSize}px`;
   });
 
+  // Apply dark mode class reactively
+  createEffect(() => {
+    document.documentElement.classList.toggle("dark", uiStore.darkMode);
+  });
+
   onMount(async () => {
     try {
       // Hydrate UI store from persisted settings
@@ -64,6 +69,9 @@ function App() {
       }
       if (settings.fontSize != null) {
         setUIStore("fontSize", settings.fontSize);
+      }
+      if (settings.darkMode != null) {
+        setUIStore("darkMode", settings.darkMode);
       }
 
       const configured = await SettingsService.isConfigured();

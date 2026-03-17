@@ -36,14 +36,14 @@ export function TaskItem(props: TaskItemProps) {
     <div
       class={`group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm transition-all duration-200 ${
         completing() === "done"
-          ? "bg-green-50 opacity-60"
+          ? "bg-green-50 dark:bg-green-900/30 opacity-60"
           : completing() === "cancelled"
-            ? "bg-gray-50 opacity-60"
+            ? "bg-gray-50 dark:bg-gray-900 opacity-60"
             : props.isHighlighted
-              ? "bg-blue-50 ring-1 ring-blue-200"
+              ? "bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200"
               : props.isRelevant
-                ? "border-l-2 border-blue-300 bg-blue-50"
-                : "hover:bg-gray-100"
+                ? "border-l-2 border-blue-300 bg-blue-50 dark:bg-blue-900/30"
+                : "hover:bg-gray-100 dark:hover:bg-gray-700"
       }`}
       draggable={true}
       onDragStart={(e: DragEvent) =>
@@ -52,7 +52,7 @@ export function TaskItem(props: TaskItemProps) {
     >
       {/* Checkbox button for quick done */}
       <button
-        class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-gray-300 text-xs text-transparent hover:border-green-400 hover:text-green-500"
+        class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-gray-300 dark:border-gray-600 text-xs text-transparent hover:border-green-400 hover:text-green-500"
         onClick={(e) => void handleStatusChange(e, "done")}
         title="Mark done"
       >
@@ -64,7 +64,9 @@ export function TaskItem(props: TaskItemProps) {
       {/* Title */}
       <button
         class={`flex-1 truncate text-left ${
-          completing() ? "line-through text-gray-400" : "text-gray-700"
+          completing()
+            ? "line-through text-gray-400 dark:text-gray-500"
+            : "text-gray-700 dark:text-gray-200"
         }`}
         title={`[[task:${props.task.slug}]]`}
         onClick={() => props.onClick(props.task)}
@@ -74,14 +76,14 @@ export function TaskItem(props: TaskItemProps) {
 
       {/* Due date */}
       {props.task.due && (
-        <span class="flex-shrink-0 text-xs text-gray-400">
+        <span class="flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">
           {formatRelativeDate(props.task.due)}
         </span>
       )}
 
       {/* Cancel button - shown on hover */}
       <button
-        class="flex-shrink-0 text-xs text-transparent group-hover:text-gray-300 group-hover:hover:text-red-400"
+        class="flex-shrink-0 text-xs text-transparent group-hover:text-gray-300 dark:group-hover:text-gray-600 group-hover:hover:text-red-400"
         onClick={(e) => void handleStatusChange(e, "cancelled")}
         title="Cancel task"
       >

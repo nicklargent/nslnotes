@@ -34,13 +34,13 @@ export function RightPanel(props: RightPanelProps) {
   return (
     <div class="flex h-full flex-col">
       {/* Header */}
-      <div class="flex items-center justify-between border-b border-gray-200 px-3 py-3">
+      <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-3 py-3">
         <div class="flex items-center gap-2">
-          <h2 class="text-sm font-semibold text-gray-700">
+          <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
             {showClosed() ? "Closed Tasks" : "Open Tasks"}
           </h2>
           <button
-            class="rounded px-1.5 py-0.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            class="rounded px-1.5 py-0.5 text-xs text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
             onClick={() => setShowClosed((s) => !s)}
             title={showClosed() ? "Show open tasks" : "Show closed tasks"}
           >
@@ -49,7 +49,7 @@ export function RightPanel(props: RightPanelProps) {
         </div>
         <Show when={!showClosed()}>
           <button
-            class="rounded px-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            class="rounded px-1.5 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
             onClick={() => props.onCreateTask()}
           >
             +
@@ -65,7 +65,7 @@ export function RightPanel(props: RightPanelProps) {
             <Show
               when={hasClosedTasks()}
               fallback={
-                <p class="px-2 py-4 text-center text-xs text-gray-400">
+                <p class="px-2 py-4 text-center text-xs text-gray-400 dark:text-gray-500">
                   No closed tasks
                 </p>
               }
