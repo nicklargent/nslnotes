@@ -326,12 +326,47 @@ export function ProseEditor(props: ProseEditorProps) {
     containerRef.addEventListener("dragleave", handleDragEnd);
     containerRef.addEventListener("drop", handleDragEnd);
 
-    // Track mousedown as earliest interaction signal — fires before focus,
-    // preventing content sync from resetting cursor mid-click.
-    function handleMouseDown() {
+    // Fix: when clicking into an unfocused editor whose selection was reset
+    // (e.g. by setContent), ProseMirror sometimes fails to resolve the click
+    // position. We capture mousedown coords and, after ProseMirror finishes
+    // processing the click, correct the selection if it wasn't updated.
+    let clickCoords: { x: number; y: number } | null = null;
+    let selBeforeClick = -1;
+    function handleMouseDown(e: MouseEvent) {
       lastUserInteraction = Date.now();
+      if (!editor?.isFocused) {
+        clickCoords = { x: e.clientX, y: e.clientY };
+        selBeforeClick = editor?.state.selection.from ?? -1;
+      }
+    }
+    function correctClickSelection(
+      coords: { x: number; y: number },
+      selBefore: number
+    ) {
+      if (!editor || editor.isDestroyed) return;
+      const { from } = editor.state.selection;
+      if (from !== selBefore) return; // ProseMirror handled it
+      const pos = editor.view.posAtCoords({ left: coords.x, top: coords.y });
+      if (pos && pos.pos !== from) {
+        const tr = editor.state.tr.setSelection(
+          TextSelection.create(editor.state.doc, pos.pos)
+        );
+        editor.view.dispatch(tr);
+      }
+    }
+    function handleMouseUp() {
+      const coords = clickCoords;
+      const selBefore = selBeforeClick;
+      clickCoords = null;
+      selBeforeClick = -1;
+      if (!coords || !editor || editor.isDestroyed) return;
+      // Try synchronously first (avoids visible flash)
+      correctClickSelection(coords, selBefore);
+      // Fallback: ProseMirror may process asynchronously
+      setTimeout(() => correctClickSelection(coords, selBefore), 0);
     }
     containerRef.addEventListener("mousedown", handleMouseDown, true);
+    document.addEventListener("mouseup", handleMouseUp);
 
     // Show pointer cursor on Cmd/Ctrl hold over clickable elements
     function handleKeyDown(e: KeyboardEvent) {
@@ -354,6 +389,7 @@ export function ProseEditor(props: ProseEditorProps) {
     onCleanup(() => {
       containerRef!.removeEventListener("click", handleLinkClick, true);
       containerRef!.removeEventListener("mousedown", handleMouseDown, true);
+      document.removeEventListener("mouseup", handleMouseUp);
       containerRef!.removeEventListener("dragover", handleDragOver);
       containerRef!.removeEventListener("dragleave", handleDragEnd);
       containerRef!.removeEventListener("drop", handleDragEnd);
