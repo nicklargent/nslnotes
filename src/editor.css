@@ -148,7 +148,9 @@
 /* Pointer cursor on Cmd/Ctrl hold for clickable elements */
 .prose-editor.ctrl-held .tiptap a,
 .prose-editor.ctrl-held .tiptap .wikilink,
-.prose-editor.ctrl-held .tiptap .topic-ref {
+.prose-editor.ctrl-held .tiptap .topic-ref,
+.prose-editor.ctrl-held .tiptap .wikilink-resolved,
+.prose-editor.ctrl-held .tiptap .topic-resolved {
   cursor: pointer;
 }
 
@@ -167,6 +169,19 @@
   border-bottom-color: #3b82f6;
 }
 
+/* Resolved wikilinks (title shown instead of raw syntax) */
+.wikilink-resolved {
+  color: #3b82f6;
+  cursor: text;
+  border-bottom: 1px dashed #93c5fd;
+  transition: background-color 0.1s;
+}
+
+.wikilink-resolved:hover {
+  background-color: #eff6ff;
+  border-bottom-color: #3b82f6;
+}
+
 /* Topic/person refs */
 .topic-ref {
   color: #8b5cf6;
@@ -178,6 +193,20 @@
 .topic-ref:hover {
   color: #7c3aed;
   text-decoration: underline;
+}
+
+/* Resolved topic refs (label shown instead of raw ref) */
+.topic-resolved {
+  color: #8b5cf6;
+  cursor: text;
+  font-weight: 500;
+  border-bottom: 1px dashed #a78bfa;
+  transition: color 0.1s;
+}
+
+.topic-resolved:hover {
+  color: #7c3aed;
+  border-bottom-color: #7c3aed;
 }
 
 /* Toast animation */

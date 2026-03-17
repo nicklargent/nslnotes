@@ -2,6 +2,46 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { Transaction } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { IndexService } from "../../services/IndexService";
+import { indexStore } from "../../stores/indexStore";
+import type { TopicRef } from "../../types/topics";
+import type { EntityType } from "../../types/entities";
+
+const WIKILINK_RE = /\[\[(task|doc|note):([^\]]+)\]\]/g;
+const TOPIC_RE = /(?:^|(?<=\s))([#@][a-z0-9-]+)/gi;
+const HIDDEN_STYLE = "font-size:0;letter-spacing:-1ch;color:transparent;";
+
+function resolveWikilinkTitle(type: EntityType, target: string): string | null {
+  const entity = IndexService.resolveWikilink({
+    raw: "",
+    type,
+    target,
+    isValid: true,
+  });
+  if (!entity) return null;
+  if (entity.type === "note") return entity.title ?? entity.date;
+  return entity.title;
+}
+
+function resolveTopicLabel(ref: string): string | null {
+  const topic = indexStore.topics.get(ref as TopicRef);
+  if (topic && topic.label !== topic.ref) return topic.label;
+  return null;
+}
+
+function createResolvedSpan(
+  className: string,
+  text: string,
+  attrs: Record<string, string>
+): HTMLElement {
+  const span = document.createElement("span");
+  span.className = className;
+  span.textContent = text;
+  for (const [k, v] of Object.entries(attrs)) {
+    span.setAttribute(k, v);
+  }
+  return span;
+}
 
 /**
  * ProseMirror decoration plugin that scans document text for inline patterns
@@ -178,6 +218,7 @@ export const InlineDecorations = Extension.create({
         props: {
           decorations(state) {
             const decorations: Decoration[] = [];
+            const { from: selFrom, to: selTo } = state.selection;
 
             state.doc.descendants((node, pos) => {
               if (!node.isText) return;
@@ -199,29 +240,75 @@ export const InlineDecorations = Extension.create({
               }
 
               // Wikilinks [[type:target]]
-              const wlRegex = /\[\[(task|doc|note):[^\]]+\]\]/g;
+              WIKILINK_RE.lastIndex = 0;
               let wlMatch;
-              while ((wlMatch = wlRegex.exec(text)) !== null) {
-                decorations.push(
-                  Decoration.inline(
-                    pos + wlMatch.index,
-                    pos + wlMatch.index + wlMatch[0].length,
-                    { class: "wikilink" }
-                  )
-                );
+              while ((wlMatch = WIKILINK_RE.exec(text)) !== null) {
+                const wlFrom = pos + wlMatch.index;
+                const wlTo = wlFrom + wlMatch[0].length;
+                const cursorInside = selFrom <= wlTo && selTo >= wlFrom;
+                const type = wlMatch[1] as EntityType;
+                const target = wlMatch[2]!;
+                const title = resolveWikilinkTitle(type, target);
+
+                if (cursorInside || !title) {
+                  decorations.push(
+                    Decoration.inline(wlFrom, wlTo, { class: "wikilink" })
+                  );
+                } else {
+                  decorations.push(
+                    Decoration.inline(wlFrom, wlTo, {
+                      class: "wikilink-hidden",
+                      style: HIDDEN_STYLE,
+                    })
+                  );
+                  decorations.push(
+                    Decoration.widget(
+                      wlFrom,
+                      () =>
+                        createResolvedSpan("wikilink-resolved", title, {
+                          "data-wikilink-type": type,
+                          "data-wikilink-target": target,
+                        }),
+                      { side: -1, key: `wl:${type}:${target}` }
+                    )
+                  );
+                }
               }
 
               // Topic/person refs (#topic, @person)
-              const topicRegex = /(?:^|(?<=\s))([#@][a-z0-9-]+)/gi;
-              let topicMatch;
-              while ((topicMatch = topicRegex.exec(text)) !== null) {
-                decorations.push(
-                  Decoration.inline(
-                    pos + topicMatch.index,
-                    pos + topicMatch.index + topicMatch[0].length,
-                    { class: "topic-ref" }
-                  )
-                );
+              TOPIC_RE.lastIndex = 0;
+              let topicMatch: RegExpExecArray | null;
+              while ((topicMatch = TOPIC_RE.exec(text)) !== null) {
+                const rawRef = topicMatch[0];
+                const topicFrom = pos + topicMatch.index;
+                const topicTo = topicFrom + rawRef.length;
+                const cursorInside = selFrom <= topicTo && selTo >= topicFrom;
+                const label = resolveTopicLabel(rawRef);
+
+                if (cursorInside || !label) {
+                  decorations.push(
+                    Decoration.inline(topicFrom, topicTo, {
+                      class: "topic-ref",
+                    })
+                  );
+                } else {
+                  decorations.push(
+                    Decoration.inline(topicFrom, topicTo, {
+                      class: "topic-hidden",
+                      style: HIDDEN_STYLE,
+                    })
+                  );
+                  decorations.push(
+                    Decoration.widget(
+                      topicFrom,
+                      () =>
+                        createResolvedSpan("topic-resolved", label, {
+                          "data-topic-ref": rawRef,
+                        }),
+                      { side: -1, key: `topic:${rawRef}` }
+                    )
+                  );
+                }
               }
             });
 

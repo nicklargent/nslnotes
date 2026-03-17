@@ -238,7 +238,7 @@ export function ProseEditor(props: ProseEditorProps) {
                 $from.parentOffset,
                 ""
               );
-              if (/^#*$/.test(textBefore)) {
+              if (/^#+$/.test(textBefore)) {
                 return false;
               }
             }
