@@ -1,6 +1,7 @@
 import {
   createSignal,
   createMemo,
+  createEffect,
   For,
   Show,
   onMount,
@@ -40,6 +41,9 @@ export function JournalView(props: JournalViewProps) {
     null
   );
   const [autofocusNotePath, setAutofocusNotePath] = createSignal<string | null>(
+    null
+  );
+  const [pendingScrollDate, setPendingScrollDate] = createSignal<string | null>(
     null
   );
   let scrollRef: HTMLDivElement | undefined;
@@ -154,6 +158,49 @@ export function JournalView(props: JournalViewProps) {
   /** Track which dates are currently visible in the viewport. */
   const visibleDateSet = new Set<string>();
   const pendingHeaders: HTMLDivElement[] = [];
+
+  /** Capture navigation intent on mount — set pending scroll target. */
+  onMount(() => {
+    if (contextStore.isHomeState) return; // home state starts at top, nothing to do
+    const anchorDate = contextStore.journalAnchorDate;
+    if (anchorDate) {
+      setPendingScrollDate(anchorDate);
+    }
+  });
+
+  /** React to home state changes (Today button while already on journal). */
+  createEffect(() => {
+    if (contextStore.isHomeState) {
+      setStartIndex(0);
+      setPendingScrollDate(null);
+      requestAnimationFrame(() => {
+        if (scrollRef) scrollRef.scrollTop = 0;
+      });
+    }
+  });
+
+  /** Scroll to pending date after render. */
+  createEffect(() => {
+    const target = pendingScrollDate();
+    if (!target || !scrollRef) return;
+
+    const all = allDatesWithContent();
+    const dateIndex = all.indexOf(target);
+    if (dateIndex > 0) {
+      const newStart = Math.max(0, dateIndex - BUFFER_SIZE);
+      setStartIndex(newStart);
+      requestAnimationFrame(() => {
+        if (!scrollRef) return;
+        const el = scrollRef.querySelector(`[data-date="${target}"]`);
+        if (el) {
+          el.scrollIntoView({ block: "start" });
+        }
+        setPendingScrollDate(null);
+      });
+    } else {
+      setPendingScrollDate(null);
+    }
+  });
 
   /** Set up IntersectionObserver to track visible date headers (T4.6). */
   onMount(() => {

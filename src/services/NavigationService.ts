@@ -37,6 +37,9 @@ export const NavigationService = {
       activeTopic: null,
       isHomeState: false,
       draft: null,
+      ...(entity.type === "note" && entity.date
+        ? { journalAnchorDate: entity.date }
+        : {}),
     });
 
     NavigationService.updateRelevance();
