@@ -1,5 +1,7 @@
 import { createSignal, createEffect, onCleanup, Show } from "solid-js";
 import { Editor } from "../editor/Editor";
+import { RawEditor } from "../editor/RawEditor";
+import { RawModeToggle } from "../editor/RawModeToggle";
 import { serialize } from "../../lib/frontmatter";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
@@ -23,8 +25,10 @@ interface DailyNoteProps {
 export function DailyNote(props: DailyNoteProps) {
   const [content, setContent] = createSignal("");
   const [created, setCreated] = createSignal(false);
+  const [rawMode, setRawMode] = createSignal(false);
   const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   let saveTimeout: number | undefined;
+  let rawFlush: (() => Promise<void>) | null = null;
 
   // Track props reactively
   createEffect(() => {
@@ -78,36 +82,80 @@ export function DailyNote(props: DailyNoteProps) {
     setContent("");
   }
 
+  async function toggleRawMode() {
+    const rootPath = await SettingsService.getRootPath();
+    if (!rootPath) return;
+    const path = `${rootPath}/notes/${props.date}.md`;
+
+    if (rawMode()) {
+      // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
+      if (rawFlush) await rawFlush();
+      const fileContent = await FileService.read(path);
+      const parsed = parse(fileContent);
+      if (parsed) {
+        setContent(parsed.body);
+      }
+      rawFlush = null;
+      setRawMode(false);
+    } else {
+      // Rendered → Raw: flush pending TipTap save first
+      if (pendingSave) {
+        window.clearTimeout(saveTimeout);
+        await saveDailyNote(pendingSave.date, pendingSave.body);
+        pendingSave = null;
+      }
+      setRawMode(true);
+    }
+  }
+
   return (
     <div class="min-h-[60px] py-1">
       <div class="flex items-center justify-between">
         <div class="flex-1">
-          <Editor
-            content={content()}
-            placeholder="Start writing..."
-            onUpdate={handleUpdate}
-          />
+          <Show
+            when={rawMode() && props.note}
+            fallback={
+              <Editor
+                content={content()}
+                placeholder="Start writing..."
+                onUpdate={handleUpdate}
+              />
+            }
+          >
+            <RawEditor
+              filePath={props.note!.path}
+              onFlushRef={(fn) => {
+                rawFlush = fn;
+              }}
+            />
+          </Show>
         </div>
         <Show when={created()}>
-          <button
-            class="ml-2 shrink-0 self-start rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-red-100 hover:text-red-600"
-            title="Delete daily note"
-            onClick={() => setShowDeleteModal(true)}
-          >
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div class="ml-2 flex shrink-0 flex-col gap-1 self-start">
+            <RawModeToggle
+              active={rawMode()}
+              onClick={() => void toggleRawMode()}
+            />
+            <button
+              class="rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-red-100 hover:text-red-600"
+              title="Delete daily note"
+              onClick={() => setShowDeleteModal(true)}
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          </div>
         </Show>
       </div>
 

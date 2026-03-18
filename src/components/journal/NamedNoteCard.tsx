@@ -1,5 +1,13 @@
-import { createSignal, createEffect, createMemo, Show } from "solid-js";
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  onCleanup,
+  Show,
+} from "solid-js";
 import { Editor } from "../editor/Editor";
+import { RawEditor } from "../editor/RawEditor";
+import { RawModeToggle } from "../editor/RawModeToggle";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
 import { SettingsService } from "../../services/SettingsService";
@@ -24,9 +32,11 @@ interface NamedNoteCardProps {
  */
 export function NamedNoteCard(props: NamedNoteCardProps) {
   const [content, setContent] = createSignal("");
+  const [rawMode, setRawMode] = createSignal(false);
   const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   let saveTimeout: number | undefined;
   let lastLocalContent: string | undefined;
+  let rawFlush: (() => Promise<void>) | null = null;
 
   // Reactively look up the latest note from the index store so edits are reflected
   const liveNote = createMemo(() => {
@@ -41,6 +51,10 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
     }
   });
 
+  onCleanup(() => {
+    if (saveTimeout) window.clearTimeout(saveTimeout);
+  });
+
   function handleUpdate(newContent: string) {
     lastLocalContent = newContent;
     setContent(newContent);
@@ -49,6 +63,28 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
     saveTimeout = window.setTimeout(() => {
       void saveNamedNote(props.note.path, newContent);
     }, 300);
+  }
+
+  async function toggleRawMode() {
+    if (rawMode()) {
+      // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
+      if (rawFlush) await rawFlush();
+      const fileContent = await FileService.read(props.note.path);
+      const parsed = parse(fileContent);
+      if (parsed) {
+        lastLocalContent = parsed.body;
+        setContent(parsed.body);
+      }
+      rawFlush = null;
+      setRawMode(false);
+    } else {
+      // Rendered → Raw: flush pending TipTap save first
+      if (saveTimeout) {
+        window.clearTimeout(saveTimeout);
+        await saveNamedNote(props.note.path, content());
+      }
+      setRawMode(true);
+    }
   }
 
   return (
@@ -79,28 +115,36 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
           class="text-sm font-medium text-gray-800 dark:text-gray-100"
         />
         <Show when={props.isFocused}>
-          <button
-            class="ml-2 shrink-0 rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-red-100 hover:text-red-600"
-            title="Delete note"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDeleteModal(true);
-            }}
-          >
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+          <div class="ml-2 flex shrink-0 items-center gap-1">
+            <span onClick={(e) => e.stopPropagation()}>
+              <RawModeToggle
+                active={rawMode()}
+                onClick={() => void toggleRawMode()}
               />
-            </svg>
-          </button>
+            </span>
+            <button
+              class="rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-red-100 hover:text-red-600"
+              title="Delete note"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteModal(true);
+              }}
+            >
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          </div>
         </Show>
       </div>
 
@@ -110,12 +154,24 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
           if (props.isFocused) e.stopPropagation();
         }}
       >
-        <Editor
-          content={content()}
-          placeholder="Start writing..."
-          autofocus={props.autofocus}
-          onUpdate={handleUpdate}
-        />
+        <Show
+          when={rawMode()}
+          fallback={
+            <Editor
+              content={content()}
+              placeholder="Start writing..."
+              autofocus={props.autofocus}
+              onUpdate={handleUpdate}
+            />
+          }
+        >
+          <RawEditor
+            filePath={props.note.path}
+            onFlushRef={(fn) => {
+              rawFlush = fn;
+            }}
+          />
+        </Show>
       </div>
 
       <div

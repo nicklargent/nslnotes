@@ -1,5 +1,7 @@
-import { createSignal, createEffect, Show } from "solid-js";
+import { createSignal, createEffect, onCleanup, Show } from "solid-js";
 import { Editor } from "../editor/Editor";
+import { RawEditor } from "../editor/RawEditor";
+import { RawModeToggle } from "../editor/RawModeToggle";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
 import { SettingsService } from "../../services/SettingsService";
@@ -24,9 +26,11 @@ interface TaskDetailProps {
  */
 export function TaskDetail(props: TaskDetailProps) {
   const [content, setContent] = createSignal("");
+  const [rawMode, setRawMode] = createSignal(false);
   const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
+  let rawFlush: (() => Promise<void>) | null = null;
 
   // Reactively look up the latest task from index store so metadata edits are reflected
   const liveTask = () =>
@@ -52,8 +56,33 @@ export function TaskDetail(props: TaskDetailProps) {
     }, 300);
   }
 
+  onCleanup(() => {
+    if (saveTimeout) window.clearTimeout(saveTimeout);
+  });
+
   async function handleStatusChange(status: "open" | "done" | "cancelled") {
     await EntityService.updateTaskStatus(props.task.path, status);
+  }
+
+  async function toggleRawMode() {
+    if (rawMode()) {
+      // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
+      if (rawFlush) await rawFlush();
+      const fileContent = await FileService.read(props.task.path);
+      const parsed = parse(fileContent);
+      if (parsed) {
+        setContent(parsed.body);
+      }
+      rawFlush = null;
+      setRawMode(false);
+    } else {
+      // Rendered → Raw: flush pending TipTap save first
+      if (saveTimeout) {
+        window.clearTimeout(saveTimeout);
+        await saveTask(props.task.path, content());
+      }
+      setRawMode(true);
+    }
   }
 
   const statusColor = () => {
@@ -108,6 +137,10 @@ export function TaskDetail(props: TaskDetailProps) {
             <span class="text-xs text-gray-400 dark:text-gray-500">
               Created: {liveTask().created}
             </span>
+            <RawModeToggle
+              active={rawMode()}
+              onClick={() => void toggleRawMode()}
+            />
           </div>
         </div>
 
@@ -145,12 +178,24 @@ export function TaskDetail(props: TaskDetailProps) {
 
         {/* Editor */}
         <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
-          <Editor
-            content={content()}
-            placeholder="Add task details..."
-            autofocus={shouldAutofocus}
-            onUpdate={handleUpdate}
-          />
+          <Show
+            when={rawMode()}
+            fallback={
+              <Editor
+                content={content()}
+                placeholder="Add task details..."
+                autofocus={shouldAutofocus}
+                onUpdate={handleUpdate}
+              />
+            }
+          >
+            <RawEditor
+              filePath={props.task.path}
+              onFlushRef={(fn) => {
+                rawFlush = fn;
+              }}
+            />
+          </Show>
         </div>
 
         {/* Dirty indicator */}

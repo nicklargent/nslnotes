@@ -1,5 +1,7 @@
 import { createSignal, createEffect, onCleanup, Show } from "solid-js";
 import { Editor } from "../editor/Editor";
+import { RawEditor } from "../editor/RawEditor";
+import { RawModeToggle } from "../editor/RawModeToggle";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
 import { SettingsService } from "../../services/SettingsService";
@@ -23,10 +25,12 @@ interface DocViewProps {
  */
 export function DocView(props: DocViewProps) {
   const [content, setContent] = createSignal("");
+  const [rawMode, setRawMode] = createSignal(false);
   const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; body: string } | null = null;
+  let rawFlush: (() => Promise<void>) | null = null;
 
   // Reactively look up the latest doc from index store so metadata edits are reflected
   const liveDoc = () =>
@@ -60,6 +64,28 @@ export function DocView(props: DocViewProps) {
         pendingSave = null;
       }
     }, 300);
+  }
+
+  async function toggleRawMode() {
+    if (rawMode()) {
+      // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
+      if (rawFlush) await rawFlush();
+      const fileContent = await FileService.read(props.doc.path);
+      const parsed = parse(fileContent);
+      if (parsed) {
+        setContent(parsed.body);
+      }
+      rawFlush = null;
+      setRawMode(false);
+    } else {
+      // Rendered → Raw: flush pending TipTap save first
+      if (pendingSave) {
+        window.clearTimeout(saveTimeout);
+        await saveDoc(pendingSave.path, pendingSave.body);
+        pendingSave = null;
+      }
+      setRawMode(true);
+    }
   }
 
   // Flush pending saves on cleanup (component unmount / doc switch)
@@ -100,6 +126,10 @@ export function DocView(props: DocViewProps) {
             <span class="text-xs text-gray-400 dark:text-gray-500">
               Created: {liveDoc().created}
             </span>
+            <RawModeToggle
+              active={rawMode()}
+              onClick={() => void toggleRawMode()}
+            />
             <button
               class="rounded bg-red-50 dark:bg-red-900/30 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100"
               onClick={() => setShowDeleteModal(true)}
@@ -111,12 +141,24 @@ export function DocView(props: DocViewProps) {
 
         {/* Editor */}
         <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
-          <Editor
-            content={content()}
-            placeholder="Start writing..."
-            autofocus={shouldAutofocus}
-            onUpdate={handleUpdate}
-          />
+          <Show
+            when={rawMode()}
+            fallback={
+              <Editor
+                content={content()}
+                placeholder="Start writing..."
+                autofocus={shouldAutofocus}
+                onUpdate={handleUpdate}
+              />
+            }
+          >
+            <RawEditor
+              filePath={props.doc.path}
+              onFlushRef={(fn) => {
+                rawFlush = fn;
+              }}
+            />
+          </Show>
         </div>
 
         <Show when={editorStore.isDirty}>
