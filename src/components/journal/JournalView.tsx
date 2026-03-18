@@ -46,6 +46,7 @@ export function JournalView(props: JournalViewProps) {
   const [pendingScrollDate, setPendingScrollDate] = createSignal<string | null>(
     null
   );
+  const [hoveredDate, setHoveredDate] = createSignal<string | null>(null);
   let scrollRef: HTMLDivElement | undefined;
   let observer: IntersectionObserver | undefined;
   const heightCache = new Map<string, number>();
@@ -297,17 +298,31 @@ export function JournalView(props: JournalViewProps) {
 
         <For each={visibleDates()}>
           {(date) => (
-            <div ref={(el) => cacheDateHeight(date, el)}>
+            <div
+              ref={(el) => cacheDateHeight(date, el)}
+              onMouseEnter={() => setHoveredDate(date)}
+              onMouseLeave={() => {
+                if (hoveredDate() === date) setHoveredDate(null);
+              }}
+            >
               <div
                 ref={observeHeader}
                 data-date={date}
                 class="sticky top-0 z-10"
               >
-                <DateHeader date={date} onNewNote={(d) => props.onNewNote(d)} />
+                <DateHeader
+                  date={date}
+                  hovered={hoveredDate() === date}
+                  onNewNote={(d) => props.onNewNote(d)}
+                />
               </div>
 
               <div class="mb-6">
-                <DailyNote date={date} note={getDailyNote(date)} />
+                <DailyNote
+                  date={date}
+                  note={getDailyNote(date)}
+                  hovered={hoveredDate() === date}
+                />
 
                 <For each={getNamedNotePaths(date)}>
                   {(path) => {
@@ -319,6 +334,7 @@ export function JournalView(props: JournalViewProps) {
                             <NamedNoteCard
                               note={n()}
                               isFocused={focusedNoteSlug() === n().slug}
+                              hovered={hoveredDate() === date}
                               autofocus={autofocusNotePath() === n().path}
                               onClick={(nn) => handleNamedNoteFocus(nn)}
                             />

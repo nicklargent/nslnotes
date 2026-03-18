@@ -268,3 +268,25 @@ export function addDays(date: Date, days: number): Date {
 export function isValidISODate(str: string): boolean {
   return parseISODate(str) !== null;
 }
+
+/**
+ * Get the full weekday name for a date (e.g., "Wednesday").
+ *
+ * @param date - The date (Date object or ISO string)
+ * @returns Full weekday name
+ */
+export function getWeekdayName(date: Date | string): string {
+  const targetDate = typeof date === "string" ? parseISODate(date) : date;
+  if (!targetDate) return "";
+
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  return dayNames[targetDate.getDay()] ?? "";
+}

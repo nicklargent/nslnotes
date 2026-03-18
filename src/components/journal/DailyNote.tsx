@@ -14,6 +14,7 @@ import type { Note } from "../../types/entities";
 interface DailyNoteProps {
   date: string;
   note: Note | undefined;
+  hovered: boolean;
 }
 
 /**
@@ -131,7 +132,9 @@ export function DailyNote(props: DailyNoteProps) {
           </Show>
         </div>
         <Show when={created()}>
-          <div class="ml-2 flex shrink-0 flex-col gap-1 self-start">
+          <div
+            class={`ml-2 flex shrink-0 flex-col gap-1 self-start transition-opacity duration-300 ${props.hovered ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          >
             <RawModeToggle
               active={rawMode()}
               onClick={() => void toggleRawMode()}
