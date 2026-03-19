@@ -4,6 +4,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import { DOMSerializer } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { WIKILINK_MIME } from "../../lib/drag";
 import { InlineDecorations } from "./InlineDecorations";
@@ -147,6 +148,16 @@ export function ProseEditor(props: ProseEditorProps) {
         props.onUpdate(md);
       },
       editorProps: {
+        clipboardTextSerializer: (slice) => {
+          const serializer = DOMSerializer.fromSchema(editor!.schema);
+          const wrapper = document.createElement("div");
+          wrapper.appendChild(serializer.serializeFragment(slice.content));
+          return markdownFromHtml(
+            wrapper.innerHTML,
+            props.entityPath,
+            rootPath()
+          );
+        },
         handlePaste: (_view, event) => {
           const items = event.clipboardData?.items;
           if (!items || !props.entityPath) return false;
