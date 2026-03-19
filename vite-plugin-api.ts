@@ -98,6 +98,16 @@ async function handleApi(
       }
     }
 
+    // DELETE /api/files/rmdir — recursively delete a directory
+    if (pathname === "/api/files/rmdir" && req.method === "DELETE") {
+      const dirPath = getQueryParam(url, "path");
+      if (!dirPath) return sendError(res, "Missing path param", 400);
+      if (fs.existsSync(dirPath)) {
+        fs.rmSync(dirPath, { recursive: true, force: true });
+      }
+      return sendJson(res, { ok: true });
+    }
+
     // GET /api/files/exists
     if (pathname === "/api/files/exists" && req.method === "GET") {
       const filePath = getQueryParam(url, "path");

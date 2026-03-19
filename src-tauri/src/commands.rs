@@ -63,6 +63,17 @@ pub async fn delete_file(path: String) -> Result<(), String> {
     fs::remove_file(&path).map_err(|e| format!("Failed to delete file '{}': {}", path, e))
 }
 
+/// Delete a directory and all its contents
+#[tauri::command]
+pub async fn delete_directory(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    if p.exists() {
+        fs::remove_dir_all(&path).map_err(|e| format!("Failed to delete directory '{}': {}", path, e))
+    } else {
+        Ok(())
+    }
+}
+
 /// Check if file exists
 #[tauri::command]
 pub async fn file_exists(path: String) -> Result<bool, String> {

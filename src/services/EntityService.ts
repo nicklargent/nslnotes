@@ -26,6 +26,22 @@ export const EntityService = {
     await FileService.delete(path);
     await IndexService.invalidate(path, rootPath);
 
+    // Delete the associated .assets/ directory if it exists
+    const assetsDir = ImageService.getAssetsDir(path);
+    if (await runtime.exists(assetsDir)) {
+      // Remove image index entries for images in this assets dir
+      const imageEntries = [...indexStore.imageFiles.keys()].filter((imgPath) =>
+        imgPath.startsWith(assetsDir + "/")
+      );
+      for (const imgPath of imageEntries) {
+        indexStore.imageFiles.delete(imgPath);
+        indexStore.imageToEntities.delete(imgPath);
+      }
+      indexStore.entityToImages.delete(path);
+
+      await runtime.deleteDirectory(assetsDir);
+    }
+
     if (contextStore.activeEntity?.path === path) {
       NavigationService.goHome();
     }

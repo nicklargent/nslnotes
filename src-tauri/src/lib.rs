@@ -2,9 +2,9 @@ mod commands;
 mod watcher;
 
 use commands::{
-    copy_file, delete_file, ensure_directory, file_exists, get_file_size, get_settings_path,
-    list_directory, load_settings, read_file, save_settings, verify_directory, write_binary,
-    write_file, AppSettings,
+    copy_file, delete_directory, delete_file, ensure_directory, file_exists, get_file_size,
+    get_settings_path, list_directory, load_settings, read_file, save_settings, verify_directory,
+    write_binary, write_file, AppSettings,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -46,6 +46,7 @@ pub fn run() {
             read_file,
             write_file,
             delete_file,
+            delete_directory,
             file_exists,
             list_directory,
             verify_directory,

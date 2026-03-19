@@ -110,6 +110,22 @@ export const runtime = {
   },
 
   /**
+   * Delete a directory and all its contents
+   */
+  deleteDirectory: async (path: string): Promise<void> => {
+    if (runtime.isNative()) {
+      return invoke("delete_directory", { path });
+    }
+    const res = await fetch(
+      `/api/files/rmdir?path=${encodeURIComponent(path)}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) {
+      throw new Error(`Failed to delete directory: ${path}`);
+    }
+  },
+
+  /**
    * Check if file exists
    */
   exists: async (path: string): Promise<boolean> => {
