@@ -1,5 +1,6 @@
 import { FileService } from "./FileService";
 import { IndexService } from "./IndexService";
+import { ImageService } from "./ImageService";
 import { NavigationService } from "./NavigationService";
 import { SettingsService } from "./SettingsService";
 import { serialize, parse } from "../lib/frontmatter";
@@ -232,6 +233,7 @@ export const EntityService = {
     slug?: string;
     sourceTopics: TopicRef[];
     body?: string;
+    sourceEntityPath?: string;
   }): Promise<{ task: Task; slug: string } | null> => {
     const rootPath = await SettingsService.getRootPath();
     if (!rootPath) return null;
@@ -254,7 +256,17 @@ export const EntityService = {
       frontmatter["topics"] = params.sourceTopics;
     }
 
-    const fileContent = serialize(frontmatter, params.body ?? "");
+    // Copy images if body contains image references
+    let body = params.body ?? "";
+    if (body && params.sourceEntityPath && /!\[/.test(body)) {
+      body = await ImageService.copyImagesForPromotion(
+        params.sourceEntityPath,
+        path,
+        body
+      );
+    }
+
+    const fileContent = serialize(frontmatter, body);
     await FileService.write(path, fileContent);
     await IndexService.invalidate(path, rootPath);
 
@@ -272,6 +284,7 @@ export const EntityService = {
     slug?: string;
     content: string;
     topics?: TopicRef[] | undefined;
+    sourceEntityPath?: string;
   }): Promise<{ doc: Doc; slug: string } | null> => {
     const rootPath = await SettingsService.getRootPath();
     if (!rootPath) return null;
@@ -290,7 +303,17 @@ export const EntityService = {
       frontmatter["topics"] = params.topics;
     }
 
-    const fileContent = serialize(frontmatter, params.content);
+    // Copy images if content contains image references
+    let content = params.content;
+    if (content && params.sourceEntityPath && /!\[/.test(content)) {
+      content = await ImageService.copyImagesForPromotion(
+        params.sourceEntityPath,
+        path,
+        content
+      );
+    }
+
+    const fileContent = serialize(frontmatter, content);
     await FileService.write(path, fileContent);
     await IndexService.invalidate(path, rootPath);
 

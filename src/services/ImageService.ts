@@ -2,6 +2,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { runtime } from "../lib/runtime";
 import { IMAGE_MIME_TYPES, MIME_TO_EXT } from "../types/images";
 import type { ImageMimeType } from "../types/images";
+import { indexStore, setIndexStore } from "../stores/indexStore";
 
 /**
  * Derive the root path from an entity path.
@@ -171,6 +172,97 @@ export const ImageService = {
       .replace(/\.md$/, "");
     const alt = stripExtension(filename);
     return `![${alt}](./${entitySlug}.assets/${storedFilename})`;
+  },
+  /**
+   * Copy images referenced in markdown from source entity's .assets/ to target entity's .assets/.
+   * Rewrites relative paths in the markdown to point to the new location.
+   * Source images are left in place.
+   */
+  async copyImagesForPromotion(
+    sourceEntityPath: string,
+    targetEntityPath: string,
+    markdown: string
+  ): Promise<string> {
+    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)(?:\{width=(\d+)\})?/g;
+    let match: RegExpExecArray | null;
+    const replacements: { original: string; replacement: string }[] = [];
+
+    const sourceDir = sourceEntityPath.substring(
+      0,
+      sourceEntityPath.lastIndexOf("/")
+    );
+    const targetAssetsDir = ImageService.getAssetsDir(targetEntityPath);
+    const targetSlug = targetEntityPath
+      .substring(targetEntityPath.lastIndexOf("/") + 1)
+      .replace(/\.md$/, "");
+
+    let needsTargetDir = false;
+
+    while ((match = imageRegex.exec(markdown)) !== null) {
+      const fullMatch = match[0];
+      const alt = match[1] ?? "";
+      const relativePath = match[2] ?? "";
+      const width = match[3];
+
+      // Resolve source absolute path
+      const sourcePath = relativePath.startsWith("./")
+        ? `${sourceDir}/${relativePath.slice(2)}`
+        : `${sourceDir}/${relativePath}`;
+
+      // Extract filename from the source path
+      const filename = sourcePath.substring(sourcePath.lastIndexOf("/") + 1);
+      const targetPath = `${targetAssetsDir}/${filename}`;
+      const newRelativePath = `./${targetSlug}.assets/${filename}`;
+
+      needsTargetDir = true;
+      replacements.push({
+        original: fullMatch,
+        replacement: `![${alt}](${newRelativePath})${width ? `{width=${width}}` : ""}`,
+      });
+
+      // Copy the file
+      try {
+        await runtime.ensureDirectory(targetAssetsDir);
+        await runtime.copyFile(sourcePath, targetPath);
+      } catch {
+        // If copy fails (e.g., source doesn't exist), skip silently
+      }
+    }
+
+    if (replacements.length === 0) return markdown;
+
+    // Ensure target assets dir exists
+    if (needsTargetDir) {
+      await runtime.ensureDirectory(targetAssetsDir);
+    }
+
+    // Apply replacements
+    let result = markdown;
+    for (const { original, replacement } of replacements) {
+      result = result.replace(original, replacement);
+    }
+    return result;
+  },
+
+  /**
+   * Delete an orphaned image from disk and update the index.
+   * Only callable on orphaned images (guard check).
+   */
+  async deleteImage(imagePath: string): Promise<void> {
+    const imageFile = indexStore.imageFiles.get(imagePath);
+    if (!imageFile || !imageFile.isOrphan) return;
+
+    await runtime.deleteFile(imagePath);
+
+    // Update index
+    const newImageFiles = new Map(indexStore.imageFiles);
+    newImageFiles.delete(imagePath);
+    setIndexStore("imageFiles", newImageFiles);
+
+    // Remove from reverse map
+    const newImageToEntities = new Map(indexStore.imageToEntities);
+    newImageToEntities.delete(imagePath);
+    setIndexStore("imageToEntities", newImageToEntities);
   },
 };
 

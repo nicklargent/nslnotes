@@ -9,7 +9,9 @@ import { WIKILINK_MIME } from "../../lib/drag";
 import { InlineDecorations } from "./InlineDecorations";
 import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
 import { ImageResizePlugin } from "./ImageResizePlugin";
+import { ImageMagnifyPlugin } from "./ImageMagnifyPlugin";
 import { ImageService, rootPathFromEntity } from "../../services/ImageService";
+import { showToast } from "../Toast";
 import { IMAGE_MIME_TYPES } from "../../types/images";
 
 /** Read a File as base64, stripping the data URL prefix. */
@@ -131,6 +133,7 @@ export function ProseEditor(props: ProseEditorProps) {
         InlineDecorations,
         PromoteHighlightPlugin,
         ImageResizePlugin,
+        ImageMagnifyPlugin,
       ],
       content: htmlFromMarkdown(props.content, props.entityPath, rootPath()),
       autofocus: false,
@@ -174,6 +177,9 @@ export function ProseEditor(props: ProseEditorProps) {
                     .focus()
                     .setImage({ src: resolved.src, alt: resolved.alt })
                     .run();
+                })
+                .catch(() => {
+                  showToast("Failed to paste image", "error");
                 });
               return true;
             }
@@ -323,6 +329,9 @@ export function ProseEditor(props: ProseEditorProps) {
                     .setImage({ src: resolved.src, alt: resolved.alt })
                     .run();
                 }
+              })
+              .catch(() => {
+                showToast("Failed to insert dropped image", "error");
               });
             return true;
           }

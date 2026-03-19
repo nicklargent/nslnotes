@@ -9,6 +9,7 @@ import {
 import { IndexService } from "../../services/IndexService";
 import { NavigationService } from "../../services/NavigationService";
 import { contextStore, setContextStore } from "../../stores/contextStore";
+import { ImageGrid } from "./ImageGrid";
 import type { SearchFilter, SearchResult } from "../../types/search";
 
 const FILTERS: { label: string; value: SearchFilter }[] = [
@@ -54,8 +55,9 @@ export function SearchView() {
     clearTimeout(debounceTimer);
     debounceTimer = window.setTimeout(() => {
       if (f === "images") {
-        // Images tab handled separately in Phase 6
+        // Images tab uses ImageGrid component directly
         setResults([]);
+        setContextStore("searchState", { query: q, filter: f, results: [] });
         return;
       }
       const searchResults = q.length >= 2 ? IndexService.search(q, f) : [];
@@ -128,54 +130,58 @@ export function SearchView() {
       {/* Results */}
       <div class="flex-1 overflow-y-auto">
         <Show
-          when={results().length > 0}
+          when={filter() === "images"}
           fallback={
-            <div class="p-6 text-center text-sm text-gray-400 dark:text-gray-500">
-              <Show
-                when={query().length >= 2}
-                fallback="Type at least 2 characters to search"
-              >
-                <Show
-                  when={filter() !== "images"}
-                  fallback="Images tab coming soon"
-                >
-                  No results found
-                </Show>
-              </Show>
-            </div>
+            <Show
+              when={results().length > 0}
+              fallback={
+                <div class="p-6 text-center text-sm text-gray-400 dark:text-gray-500">
+                  <Show
+                    when={query().length >= 2}
+                    fallback="Type at least 2 characters to search"
+                  >
+                    No results found
+                  </Show>
+                </div>
+              }
+            >
+              <div class="divide-y divide-gray-100 dark:divide-gray-700">
+                <For each={results()}>
+                  {(result) => (
+                    <button
+                      type="button"
+                      class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      onClick={() =>
+                        NavigationService.navigateTo(result.entity)
+                      }
+                    >
+                      <div class="flex items-center gap-2">
+                        <span
+                          class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${TYPE_BADGES[result.entity.type]?.class ?? ""}`}
+                        >
+                          {TYPE_BADGES[result.entity.type]?.label ??
+                            result.entity.type}
+                        </span>
+                        <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {getEntityTitle(result)}
+                        </span>
+                        <span class="ml-auto shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                          {getEntityDate(result)}
+                        </span>
+                      </div>
+                      <Show when={result.matchedLines.length > 0}>
+                        <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                          {result.matchedLines[0]}
+                        </p>
+                      </Show>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
           }
         >
-          <div class="divide-y divide-gray-100 dark:divide-gray-700">
-            <For each={results()}>
-              {(result) => (
-                <button
-                  type="button"
-                  class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                  onClick={() => NavigationService.navigateTo(result.entity)}
-                >
-                  <div class="flex items-center gap-2">
-                    <span
-                      class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${TYPE_BADGES[result.entity.type]?.class ?? ""}`}
-                    >
-                      {TYPE_BADGES[result.entity.type]?.label ??
-                        result.entity.type}
-                    </span>
-                    <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {getEntityTitle(result)}
-                    </span>
-                    <span class="ml-auto shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                      {getEntityDate(result)}
-                    </span>
-                  </div>
-                  <Show when={result.matchedLines.length > 0}>
-                    <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
-                      {result.matchedLines[0]}
-                    </p>
-                  </Show>
-                </button>
-              )}
-            </For>
-          </div>
+          <ImageGrid query={query()} />
         </Show>
       </div>
     </div>

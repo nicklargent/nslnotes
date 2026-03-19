@@ -1,6 +1,7 @@
 import type { Note, Task, Doc, Entity } from "./entities";
 import type { TopicRef, Topic, TopicDecoration } from "./topics";
 import type { SearchState } from "./search";
+import type { ImageFile } from "./images";
 
 /**
  * Index store state
@@ -18,6 +19,12 @@ export interface IndexState {
   topicsYaml: Map<TopicRef, TopicDecoration>;
   /** Last full index timestamp */
   lastIndexed: Date | null;
+  /** All discovered image files indexed by absolute path */
+  imageFiles: Map<string, ImageFile>;
+  /** Entity path → image absolute paths referenced in its markdown */
+  entityToImages: Map<string, string[]>;
+  /** Image absolute path → entity paths that reference it */
+  imageToEntities: Map<string, string[]>;
 }
 
 /**

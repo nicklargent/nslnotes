@@ -285,6 +285,7 @@ export function Editor(props: EditorProps) {
         slug,
         sourceTopics: topics.length > 0 ? topics : getSourceTopics(),
         ...(body ? { body } : {}),
+        ...(props.entityPath ? { sourceEntityPath: props.entityPath } : {}),
       });
       if (result) {
         replaceRangeWithWikilink(range, `[[task:${result.slug}]]`);
@@ -296,6 +297,7 @@ export function Editor(props: EditorProps) {
         slug,
         content: body,
         topics: topics.length > 0 ? topics : undefined,
+        ...(props.entityPath ? { sourceEntityPath: props.entityPath } : {}),
       });
       if (result) {
         replaceRangeWithWikilink(range, `[[doc:${result.slug}]]`);

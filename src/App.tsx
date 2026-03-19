@@ -15,6 +15,7 @@ import {
   TaskListSkeleton,
 } from "./components/LoadingSkeleton";
 import { KeyboardShortcutsModal } from "./components/modals/KeyboardShortcutsModal";
+import { ImagePreview } from "./components/shared/ImagePreview";
 import { Layout } from "./components/layout/Layout";
 import { LeftSidebar } from "./components/layout/LeftSidebar";
 import { CenterPanel } from "./components/layout/CenterPanel";
@@ -306,6 +307,7 @@ function App() {
         <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
       </Show>
 
+      <ImagePreview />
       <ToastContainer />
     </AppErrorBoundary>
   );

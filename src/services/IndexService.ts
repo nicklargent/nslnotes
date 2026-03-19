@@ -11,6 +11,7 @@ import type { TopicRef, Topic, EntityReference } from "../types/topics";
 import type { GroupedTasks, GroupedClosedTasks } from "../types/task-groups";
 import type { WikiLink } from "../types/inline";
 import type { SearchFilter, SearchResult } from "../types/search";
+import type { ImageRef, ImageFile } from "../types/images";
 
 /**
  * Join path segments (simple implementation).
@@ -144,6 +145,9 @@ export const IndexService = {
     // Save to cache (T7.2)
     saveIndexCache(notes, tasks, docs, topicsYaml);
 
+    // Build image index (T6.4)
+    void IndexService.buildImageIndex(rootPath);
+
     const durationMs = performance.now() - startTime;
     return {
       durationMs,
@@ -212,6 +216,9 @@ export const IndexService = {
     });
 
     saveIndexCache(notes, tasks, docs, topicsYaml);
+
+    // Build image index (T6.4)
+    void IndexService.buildImageIndex(rootPath);
   },
 
   /**
@@ -532,6 +539,201 @@ export const IndexService = {
     });
 
     return results;
+  },
+
+  /**
+   * Parse image references from markdown content.
+   * Matches `![alt](path)` and `![alt](path){width=N}` syntax.
+   */
+  parseImageRefs: (_entityPath: string, content: string): ImageRef[] => {
+    const regex = /!\[([^\]]*)\]\(([^)]+)\)(?:\{width=(\d+)\})?/g;
+    const refs: ImageRef[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(content)) !== null) {
+      const ref: ImageRef = {
+        alt: match[1] ?? "",
+        relativePath: match[2] ?? "",
+      };
+      if (match[3]) {
+        ref.width = parseInt(match[3], 10);
+      }
+      refs.push(ref);
+    }
+    return refs;
+  },
+
+  /**
+   * Resolve a relative image path to an absolute path.
+   */
+  resolveImagePath: (relativePath: string, entityPath: string): string => {
+    const entityDir = entityPath.substring(0, entityPath.lastIndexOf("/"));
+    if (relativePath.startsWith("./")) {
+      return `${entityDir}/${relativePath.slice(2)}`;
+    }
+    return `${entityDir}/${relativePath}`;
+  },
+
+  /**
+   * Scan all .assets/ directories to discover image files on disk.
+   */
+  scanAssetDirectories: async (
+    rootPath: string
+  ): Promise<Map<string, ImageFile>> => {
+    const imageFiles = new Map<string, ImageFile>();
+    const imageExtensions = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
+
+    for (const subdir of ["notes", "tasks", "docs"]) {
+      const dirPath = joinPath(rootPath, subdir);
+      let entries: { name: string; path: string }[];
+      try {
+        entries = await FileService.list(dirPath);
+      } catch {
+        continue;
+      }
+
+      // Find .assets directories
+      const assetDirs = entries.filter((e) => e.name.endsWith(".assets"));
+
+      for (const assetDir of assetDirs) {
+        // Derive parent entity path
+        const entitySlug = assetDir.name.replace(/\.assets$/, "");
+        const entityPath = joinPath(dirPath, `${entitySlug}.md`);
+
+        let imageEntries: { name: string; path: string }[];
+        try {
+          imageEntries = await FileService.list(assetDir.path);
+        } catch {
+          continue;
+        }
+
+        for (const img of imageEntries) {
+          const ext = img.name.split(".").pop()?.toLowerCase() ?? "";
+          if (!imageExtensions.has(ext)) continue;
+
+          imageFiles.set(img.path, {
+            path: img.path,
+            filename: img.name,
+            entityPath,
+            size: 0, // Size populated lazily if needed
+            isOrphan: false, // Set during buildImageIndex
+          });
+        }
+      }
+    }
+
+    return imageFiles;
+  },
+
+  /**
+   * Build bidirectional image index from parsed entities and disk scan.
+   * Called during buildIndex after entities are loaded.
+   */
+  buildImageIndex: async (rootPath: string): Promise<void> => {
+    // 1. Scan disk for image files
+    const imageFiles = await IndexService.scanAssetDirectories(rootPath);
+
+    // 2. Build entity → images map from markdown references
+    const entityToImages = new Map<string, string[]>();
+    const imageToEntities = new Map<string, string[]>();
+    const allReferencedImages = new Set<string>();
+
+    const allEntities: Entity[] = [
+      ...indexStore.notes.values(),
+      ...indexStore.tasks.values(),
+      ...indexStore.docs.values(),
+    ];
+
+    for (const entity of allEntities) {
+      const refs = IndexService.parseImageRefs(entity.path, entity.content);
+      if (refs.length === 0) continue;
+
+      const imagePaths: string[] = [];
+      for (const ref of refs) {
+        const absPath = IndexService.resolveImagePath(
+          ref.relativePath,
+          entity.path
+        );
+        imagePaths.push(absPath);
+        allReferencedImages.add(absPath);
+
+        // Build reverse map
+        const existing = imageToEntities.get(absPath);
+        if (existing) {
+          existing.push(entity.path);
+        } else {
+          imageToEntities.set(absPath, [entity.path]);
+        }
+      }
+      entityToImages.set(entity.path, imagePaths);
+    }
+
+    // 3. Mark orphans: images on disk not referenced by their parent entity
+    for (const [path, imageFile] of imageFiles) {
+      if (!allReferencedImages.has(path)) {
+        imageFile.isOrphan = true;
+      }
+    }
+
+    // 4. Update store
+    setIndexStore("imageFiles", imageFiles);
+    setIndexStore("entityToImages", entityToImages);
+    setIndexStore("imageToEntities", imageToEntities);
+  },
+
+  /**
+   * Search images by filename, alt text, or parent entity name.
+   * With empty query, returns all images.
+   */
+  searchImages: (query: string): ImageFile[] => {
+    const images = Array.from(indexStore.imageFiles.values());
+
+    if (!query || query.length === 0) {
+      return images;
+    }
+
+    const lowerQuery = query.toLowerCase();
+
+    return images.filter((img) => {
+      // Match filename
+      if (img.filename.toLowerCase().includes(lowerQuery)) return true;
+
+      // Match parent entity name
+      const entityName = img.entityPath
+        .substring(img.entityPath.lastIndexOf("/") + 1)
+        .replace(/\.md$/, "");
+      if (entityName.toLowerCase().includes(lowerQuery)) return true;
+
+      // Match alt text from references
+      const refs = indexStore.imageToEntities.get(img.path);
+      if (refs) {
+        for (const entityPath of refs) {
+          const entity =
+            indexStore.notes.get(entityPath) ??
+            indexStore.tasks.get(entityPath) ??
+            indexStore.docs.get(entityPath);
+          if (entity) {
+            const imageRefs = IndexService.parseImageRefs(
+              entityPath,
+              entity.content
+            );
+            for (const ref of imageRefs) {
+              const absPath = IndexService.resolveImagePath(
+                ref.relativePath,
+                entityPath
+              );
+              if (
+                absPath === img.path &&
+                ref.alt.toLowerCase().includes(lowerQuery)
+              ) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+
+      return false;
+    });
   },
 
   /**

@@ -335,10 +335,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.4, Design §4.1
 **Dependencies**: T4.1
 **Acceptance**:
-- [ ] `imageFiles: Map<string, ImageFile>` added to `IndexState`
-- [ ] `entityToImages: Map<string, string[]>` added (entity path → image paths)
-- [ ] `imageToEntities: Map<string, string[]>` added (image path → entity paths)
-- [ ] `indexStore` initialized with empty Maps
+- [x] `imageFiles: Map<string, ImageFile>` added to `IndexState`
+- [x] `entityToImages: Map<string, string[]>` added (entity path → image paths)
+- [x] `imageToEntities: Map<string, string[]>` added (image path → entity paths)
+- [x] `indexStore` initialized with empty Maps
 
 **Verify**: Store fields accessible, type-check passes
 
@@ -348,10 +348,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.4, Design §3.1
 **Dependencies**: T6.1
 **Acceptance**:
-- [ ] `IndexService.parseImageRefs(entityPath, content)` extracts `![alt](path)` references
-- [ ] Uses canonical regex: `/!\[([^\]]*)\]\(([^)]+)\)(?:\{width=(\d+)\})?/g`
-- [ ] Returns array of `ImageRef` with alt, relativePath, optional width
-- [ ] Resolves relative paths to absolute paths for index
+- [x] `IndexService.parseImageRefs(entityPath, content)` extracts `![alt](path)` references
+- [x] Uses canonical regex: `/!\[([^\]]*)\]\(([^)]+)\)(?:\{width=(\d+)\})?/g`
+- [x] Returns array of `ImageRef` with alt, relativePath, optional width
+- [x] Resolves relative paths to absolute paths for index
 
 **Verify**: Parse markdown with image refs, correct paths extracted
 
@@ -361,9 +361,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.4, Design §3.1
 **Dependencies**: T6.1
 **Acceptance**:
-- [ ] `IndexService.scanAssetDirectories(rootPath)` enumerates all `.assets/` dirs in notes/, tasks/, docs/
-- [ ] Lists all image files (PNG, JPEG, GIF, WebP) in each `.assets/` dir
-- [ ] Returns `ImageFile[]` with path, filename, parent entity path, size
+- [x] `IndexService.scanAssetDirectories(rootPath)` enumerates all `.assets/` dirs in notes/, tasks/, docs/
+- [x] Lists all image files (PNG, JPEG, GIF, WebP) in each `.assets/` dir
+- [x] Returns `ImageFile[]` with path, filename, parent entity path, size
 
 **Verify**: Create `.assets/` dirs with images, scan finds them all
 
@@ -373,11 +373,11 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.4, Design §3.1
 **Dependencies**: T6.2, T6.3
 **Acceptance**:
-- [ ] `IndexService.buildImageIndex(rootPath)` called at end of `buildIndex`
-- [ ] Populates `imageFiles`, `entityToImages`, `imageToEntities` Maps
-- [ ] Detects orphans: files in `.assets/` not referenced by parent entity markdown
-- [ ] Sets `isOrphan` flag on `ImageFile` entries
-- [ ] Also called from `_rebuildFresh`
+- [x] `IndexService.buildImageIndex(rootPath)` called at end of `buildIndex`
+- [x] Populates `imageFiles`, `entityToImages`, `imageToEntities` Maps
+- [x] Detects orphans: files in `.assets/` not referenced by parent entity markdown
+- [x] Sets `isOrphan` flag on `ImageFile` entries
+- [x] Also called from `_rebuildFresh`
 
 **Verify**: Add images to entities, some referenced, some not — orphans correctly detected
 
@@ -387,10 +387,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.3, Design §3.1
 **Dependencies**: T6.4
 **Acceptance**:
-- [ ] `IndexService.searchImages(query)` filters image files
-- [ ] Matches against filename, alt text, and parent entity name
-- [ ] Empty query returns all images
-- [ ] Results grouped chronologically
+- [x] `IndexService.searchImages(query)` filters image files
+- [x] Matches against filename, alt text, and parent entity name
+- [x] Empty query returns all images
+- [x] Results grouped chronologically
 
 **Verify**: Search for image filename, correct results returned; empty query returns all
 
@@ -400,9 +400,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.3
 **Dependencies**: T6.4
 **Acceptance**:
-- [ ] `ImageService.deleteImage(imagePath, rootPath)` deletes file from disk
-- [ ] Updates image index (removes from maps)
-- [ ] Only callable on orphaned images (guard check)
+- [x] `ImageService.deleteImage(imagePath, rootPath)` deletes file from disk
+- [x] Updates image index (removes from maps)
+- [x] Only callable on orphaned images (guard check)
 
 **Verify**: Delete orphaned image, file removed, index updated
 
@@ -412,12 +412,12 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.3, Design §5.3
 **Dependencies**: T6.5
 **Acceptance**:
-- [ ] `src/components/search/ImageGrid.tsx` — CSS grid of thumbnail cards
-- [ ] Each card shows: thumbnail (CSS-scaled), filename, parent entity link
-- [ ] Orphan badge on unreferenced images
-- [ ] Delete button shown only on orphaned images
-- [ ] Cards grouped by date
-- [ ] Clicking parent entity link navigates to that entity
+- [x] `src/components/search/ImageGrid.tsx` — CSS grid of thumbnail cards
+- [x] Each card shows: thumbnail (CSS-scaled), filename, parent entity link
+- [x] Orphan badge on unreferenced images
+- [x] Delete button shown only on orphaned images
+- [x] Cards grouped by date
+- [x] Clicking parent entity link navigates to that entity
 
 **Verify**: Images tab shows grid of images; orphans badged; delete button on orphans only
 
@@ -427,9 +427,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.3, Design §5.2
 **Dependencies**: T6.7, T3.1
 **Acceptance**:
-- [ ] When Images filter tab is active, SearchView renders ImageGrid instead of result list
-- [ ] Search input filters images by filename, alt text, parent entity name
-- [ ] Empty query shows all images in grid
+- [x] When Images filter tab is active, SearchView renders ImageGrid instead of result list
+- [x] Search input filters images by filename, alt text, parent entity name
+- [x] Empty query shows all images in grid
 
 **Verify**: Click Images tab, grid appears; type query, images filter; clear query, all images shown
 
@@ -441,10 +441,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.5, Design §5.4
 **Dependencies**: None
 **Acceptance**:
-- [ ] `src/components/shared/ImagePreview.tsx` — modal overlay
-- [ ] Shows image at native resolution (no scaling)
-- [ ] Dismissed by clicking outside, pressing Escape, or clicking close button
-- [ ] No gallery navigation (single image only)
+- [x] `src/components/shared/ImagePreview.tsx` — modal overlay
+- [x] Shows image at native resolution (no scaling)
+- [x] Dismissed by clicking outside, pressing Escape, or clicking close button
+- [x] No gallery navigation (single image only)
 
 **Verify**: Open preview, image at full resolution; Escape/click-outside closes
 
@@ -454,9 +454,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: Design §5.7
 **Dependencies**: T7.1
 **Acceptance**:
-- [ ] Preview signal (reactive) added to App.tsx
-- [ ] `ImagePreview` component mounted at App level
-- [ ] Signal controls which image path (if any) is being previewed
+- [x] Preview signal (reactive) added to App.tsx
+- [x] `ImagePreview` component mounted at App level
+- [x] Signal controls which image path (if any) is being previewed
 
 **Verify**: Set preview signal, modal opens; clear signal, modal closes
 
@@ -466,9 +466,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.5
 **Dependencies**: T7.2, T4.5
 **Acceptance**:
-- [ ] On hover over image in editor, small magnify icon appears in top-right corner
-- [ ] Clicking magnify icon opens ImagePreview modal with that image
-- [ ] Icon does not interfere with image selection or resize
+- [x] On hover over image in editor, small magnify icon appears in top-right corner
+- [x] Clicking magnify icon opens ImagePreview modal with that image
+- [x] Icon does not interfere with image selection or resize
 
 **Verify**: Hover image in editor, magnify icon appears; click it, preview opens at native size
 
@@ -478,9 +478,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.3
 **Dependencies**: T7.2, T6.7
 **Acceptance**:
-- [ ] On hover over ImageGrid card, magnify icon appears
-- [ ] Clicking magnify icon opens ImagePreview for that image
-- [ ] Does not conflict with card click (parent entity navigation)
+- [x] On hover over ImageGrid card, magnify icon appears
+- [x] Clicking magnify icon opens ImagePreview for that image
+- [x] Does not conflict with card click (parent entity navigation)
 
 **Verify**: Hover image card in grid, magnify icon; click it, preview opens
 
@@ -490,11 +490,11 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC Edge Cases, Design §3.3
 **Dependencies**: T4.3
 **Acceptance**:
-- [ ] `ImageService.copyImagesForPromotion(sourceEntityPath, targetEntityPath, markdown)` implemented
-- [ ] Copies all referenced images from source `.assets/` to target `.assets/`
-- [ ] Rewrites relative paths in the promoted markdown to point to new location
-- [ ] Source images left in place (not moved)
-- [ ] Integrated into `EntityService.promoteToTask()` and `EntityService.promoteToDoc()`
+- [x] `ImageService.copyImagesForPromotion(sourceEntityPath, targetEntityPath, markdown)` implemented
+- [x] Copies all referenced images from source `.assets/` to target `.assets/`
+- [x] Rewrites relative paths in the promoted markdown to point to new location
+- [x] Source images left in place (not moved)
+- [x] Integrated into `EntityService.promoteToTask()` and `EntityService.promoteToDoc()`
 
 **Verify**: Promote note with image → new entity has copied image in its `.assets/`; source image unchanged
 
@@ -504,9 +504,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: UX polish
 **Dependencies**: T4.7, T4.8
 **Acceptance**:
-- [ ] Loading indicator shown during image ingestion (paste/drop)
-- [ ] Error toast on failed image write
-- [ ] Graceful handling of broken image paths in editor (placeholder shown)
+- [x] Loading indicator shown during image ingestion (paste/drop)
+- [x] Error toast on failed image write
+- [x] Graceful handling of broken image paths in editor (placeholder shown)
 
 **Verify**: Paste large image, loading indicator appears; simulate write failure, error toast shown
 
