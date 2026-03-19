@@ -119,6 +119,7 @@ export function DailyNote(props: DailyNoteProps) {
               <Editor
                 content={content()}
                 placeholder="Start writing..."
+                entityPath={props.note?.path}
                 onUpdate={handleUpdate}
               />
             }

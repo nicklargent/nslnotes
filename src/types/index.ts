@@ -22,3 +22,6 @@ export type { IndexState, ViewType, ContextState, EditorState } from "./stores";
 export type { TaskGroup, GroupedTasks, TaskDisplay } from "./task-groups";
 
 export type { SearchFilter, SearchResult, SearchState } from "./search";
+
+export type { ImageRef, ImageFile, ImageMimeType } from "./images";
+export { IMAGE_MIME_TYPES, MIME_TO_EXT } from "./images";

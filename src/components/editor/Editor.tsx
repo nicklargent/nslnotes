@@ -20,6 +20,7 @@ interface EditorProps {
   content: string;
   placeholder?: string | undefined;
   autofocus?: boolean | undefined;
+  entityPath?: string | undefined;
   onUpdate: (content: string) => void;
 }
 
@@ -381,6 +382,7 @@ export function Editor(props: EditorProps) {
         content={props.content}
         placeholder={props.placeholder}
         autofocus={props.autofocus}
+        entityPath={props.entityPath}
         onUpdate={handleContentUpdate}
         onSlashKey={handleSlashKey}
         onHashOrAt={handleHashOrAt}

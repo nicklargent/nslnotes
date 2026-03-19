@@ -162,6 +162,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
               content={content()}
               placeholder="Start writing..."
               autofocus={props.autofocus}
+              entityPath={props.note.path}
               onUpdate={handleUpdate}
             />
           }

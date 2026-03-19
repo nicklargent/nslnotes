@@ -148,6 +148,7 @@ export function DocView(props: DocViewProps) {
                 content={content()}
                 placeholder="Start writing..."
                 autofocus={shouldAutofocus}
+                entityPath={props.doc.path}
                 onUpdate={handleUpdate}
               />
             }

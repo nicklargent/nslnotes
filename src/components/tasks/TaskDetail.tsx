@@ -185,6 +185,7 @@ export function TaskDetail(props: TaskDetailProps) {
                 content={content()}
                 placeholder="Add task details..."
                 autofocus={shouldAutofocus}
+                entityPath={props.task.path}
                 onUpdate={handleUpdate}
               />
             }

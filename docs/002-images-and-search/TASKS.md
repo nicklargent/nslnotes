@@ -182,10 +182,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.1, §2.2, Design §2
 **Dependencies**: None
 **Acceptance**:
-- [ ] `src/types/images.ts` with `ImageRef` (alt, relativePath, width?)
-- [ ] `ImageFile` type (path, filename, entityPath, size, isOrphan)
-- [ ] `ImageMimeType` and MIME constants for PNG, JPEG, GIF, WebP
-- [ ] Types exported from `src/types/index.ts`
+- [x] `src/types/images.ts` with `ImageRef` (alt, relativePath, width?)
+- [x] `ImageFile` type (path, filename, entityPath, size, isOrphan)
+- [x] `ImageMimeType` and MIME constants for PNG, JPEG, GIF, WebP
+- [x] Types exported from `src/types/index.ts`
 
 **Verify**: Types import cleanly, TypeScript compiles
 
@@ -195,12 +195,12 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.1, §2.3, Design §3.3
 **Dependencies**: T4.1, T1.4
 **Acceptance**:
-- [ ] `src/services/ImageService.ts` created
-- [ ] `getAssetsDir(entityPath)` returns `{entitySlug}.assets/` path
-- [ ] `generateImageFilename(source, mimeType)` returns `{prefix}-{unix-timestamp}.{ext}`
-- [ ] Prefix is slugified original filename for drag-drop, `clipboard` for paste
-- [ ] `resolveImageUrl(relativePath, entityPath, rootPath)` returns renderable URL
-- [ ] Uses `convertFileSrc` in Tauri mode, `/api/assets?path=` in web mode
+- [x] `src/services/ImageService.ts` created
+- [x] `getAssetsDir(entityPath)` returns `{entitySlug}.assets/` path
+- [x] `generateImageFilename(source, mimeType)` returns `{prefix}-{unix-timestamp}.{ext}`
+- [x] Prefix is slugified original filename for drag-drop, `clipboard` for paste
+- [x] `resolveImageUrl(relativePath, entityPath, rootPath)` returns renderable URL
+- [x] Uses `convertFileSrc` in Tauri mode, `/api/assets?path=` in web mode
 
 **Verify**: Generate filenames for paste and drop; resolve URLs in both modes
 
@@ -210,11 +210,11 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.3, Design §3.3
 **Dependencies**: T4.2
 **Acceptance**:
-- [ ] `ImageService.ingestFromClipboard(entityPath, base64, mimeType)` — writes to `.assets/`, returns markdown string
-- [ ] `ImageService.ingestFromDrop(entityPath, filename, base64, mimeType)` — writes to `.assets/`, returns markdown string
-- [ ] Both create `.assets/` folder on first use
-- [ ] Non-image MIME types silently ignored
-- [ ] Returns relative markdown path: `![alt](./slug.assets/img.png)`
+- [x] `ImageService.ingestFromClipboard(entityPath, base64, mimeType)` — writes to `.assets/`, returns markdown string
+- [x] `ImageService.ingestFromDrop(entityPath, filename, base64, mimeType)` — writes to `.assets/`, returns markdown string
+- [x] Both create `.assets/` folder on first use
+- [x] Non-image MIME types silently ignored
+- [x] Returns relative markdown path: `![alt](./slug.assets/img.png)`
 
 **Verify**: Ingest test image, file appears in correct `.assets/` directory, markdown string is valid
 
@@ -224,10 +224,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.5, Design §6.1
 **Dependencies**: None
 **Acceptance**:
-- [ ] `@tiptap/extension-image` installed
-- [ ] Image extension added to ProseEditor extensions array
-- [ ] Configured with `inline: false`, `allowBase64: false`
-- [ ] `<img>` elements render in editor
+- [x] `@tiptap/extension-image` installed
+- [x] Image extension added to ProseEditor extensions array
+- [x] Configured with `inline: false`, `allowBase64: false`
+- [x] `<img>` elements render in editor
 
 **Verify**: Insert `<img>` HTML into editor, image renders
 
@@ -237,11 +237,11 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.2, Design §6.2
 **Dependencies**: T4.4, T4.2
 **Acceptance**:
-- [ ] `htmlFromMarkdown`: regex converts `![alt](src){width=N}` → `<img src="resolved" alt="alt" width="N">`
-- [ ] Image regex runs before link regex to avoid `![...]()` being consumed as `[...]()` link
-- [ ] `markdownFromHtml`: DOM walker converts `<img>` → `![alt](relativeSrc){width=N}`
-- [ ] Relative paths resolved via `ImageService.resolveImageUrl` for display
-- [ ] Resolved URLs converted back to relative paths on save via `unresolveImageSrc`
+- [x] `htmlFromMarkdown`: regex converts `![alt](src){width=N}` → `<img src="resolved" alt="alt" width="N">`
+- [x] Image regex runs before link regex to avoid `![...]()` being consumed as `[...]()` link
+- [x] `markdownFromHtml`: DOM walker converts `<img>` → `![alt](relativeSrc){width=N}`
+- [x] Relative paths resolved via `ImageService.resolveImageUrl` for display
+- [x] Resolved URLs converted back to relative paths on save via `unresolveImageSrc`
 
 **Verify**: Write markdown with `![alt](path){width=400}`, renders as sized image; save, markdown preserved
 
@@ -251,9 +251,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: Design §6.3
 **Dependencies**: T4.5
 **Acceptance**:
-- [ ] `entityPath` and `rootPath` props added to `ProseEditor` interface
-- [ ] Props threaded from `DailyNote.tsx`, `NamedNoteCard.tsx`, `TaskDetail.tsx`, `DocView.tsx`
-- [ ] Props used by image regex in `htmlFromMarkdown`/`markdownFromHtml`
+- [x] `entityPath` and `rootPath` props added to `ProseEditor` interface
+- [x] Props threaded from `DailyNote.tsx`, `NamedNoteCard.tsx`, `TaskDetail.tsx`, `DocView.tsx`
+- [x] Props used by image regex in `htmlFromMarkdown`/`markdownFromHtml`
 
 **Verify**: Open a note, doc, and task — no prop-related errors in console
 
@@ -263,11 +263,11 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.3, Design §6.4
 **Dependencies**: T4.3, T4.6
 **Acceptance**:
-- [ ] `handlePaste` in ProseEditor detects image MIME types in clipboard
-- [ ] Reads image as base64 via FileReader
-- [ ] Calls `ImageService.ingestFromClipboard` to write file
-- [ ] Inserts image node at cursor position via TipTap chain
-- [ ] Text paste still works normally when no image in clipboard
+- [x] `handlePaste` in ProseEditor detects image MIME types in clipboard
+- [x] Reads image as base64 via FileReader
+- [x] Calls `ImageService.ingestFromClipboard` to write file
+- [x] Inserts image node at cursor position via TipTap chain
+- [x] Text paste still works normally when no image in clipboard
 
 **Verify**: Copy image to clipboard, paste in editor — image file created in `.assets/`, renders inline
 
@@ -277,11 +277,11 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.3, Design §6.5
 **Dependencies**: T4.3, T4.6
 **Acceptance**:
-- [ ] Existing `handleDrop` in ProseEditor extended to detect image files in `dataTransfer`
-- [ ] Reads image as base64, calls `ImageService.ingestFromDrop`
-- [ ] Inserts image at drop coordinates via `view.posAtCoords`
-- [ ] Existing wikilink drop behavior preserved
-- [ ] Non-image files silently ignored
+- [x] Existing `handleDrop` in ProseEditor extended to detect image files in `dataTransfer`
+- [x] Reads image as base64, calls `ImageService.ingestFromDrop`
+- [x] Inserts image at drop coordinates via `view.posAtCoords`
+- [x] Existing wikilink drop behavior preserved
+- [x] Non-image files silently ignored
 
 **Verify**: Drag image file from OS into editor — image file created in `.assets/`, renders at drop position
 
@@ -293,10 +293,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.5, Design §6.6
 **Dependencies**: T4.5
 **Acceptance**:
-- [ ] `src/components/editor/ImageResizePlugin.ts` — ProseMirror plugin
-- [ ] Clicking an image shows blue border (2px solid) and bottom-right drag handle (8x8)
-- [ ] Clicking outside deselects the image
-- [ ] Only one image can be selected at a time
+- [x] `src/components/editor/ImageResizePlugin.ts` — ProseMirror plugin
+- [x] Clicking an image shows blue border (2px solid) and bottom-right drag handle (8x8)
+- [x] Clicking outside deselects the image
+- [x] Only one image can be selected at a time
 
 **Verify**: Click image in editor, blue border and handle appear; click elsewhere, deselects
 
@@ -306,11 +306,11 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.5, Design §6.6
 **Dependencies**: T5.1
 **Acceptance**:
-- [ ] Mousedown on handle starts resize tracking
-- [ ] Mousemove updates image width style in real time
-- [ ] Width constrained: min 50px, max content container width
-- [ ] Height scales proportionally (CSS aspect-ratio preserved)
-- [ ] Mouseup dispatches ProseMirror transaction setting node `width` attribute
+- [x] Mousedown on handle starts resize tracking
+- [x] Mousemove updates image width style in real time
+- [x] Width constrained: min 50px, max content container width
+- [x] Height scales proportionally (CSS aspect-ratio preserved)
+- [x] Mouseup dispatches ProseMirror transaction setting node `width` attribute
 
 **Verify**: Drag handle, image resizes smoothly; release, width persists in node attributes
 
@@ -320,10 +320,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.2, Design §6.6
 **Dependencies**: T5.2
 **Acceptance**:
-- [ ] Width attribute change triggers editor `onUpdate` → auto-save
-- [ ] `markdownFromHtml` serializes `<img width="N">` as `![alt](path){width=N}`
-- [ ] `htmlFromMarkdown` parses `{width=N}` back to `<img width="N">`
-- [ ] Plugin registered in ProseEditor extensions
+- [x] Width attribute change triggers editor `onUpdate` → auto-save
+- [x] `markdownFromHtml` serializes `<img width="N">` as `![alt](path){width=N}`
+- [x] `htmlFromMarkdown` parses `{width=N}` back to `<img width="N">`
+- [x] Plugin registered in ProseEditor extensions
 
 **Verify**: Resize image → save → reload → image retains width; check markdown file has `{width=N}`
 

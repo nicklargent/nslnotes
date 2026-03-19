@@ -16,3 +16,5 @@ export { TopicService } from "./TopicService";
 export { NavigationService } from "./NavigationService";
 
 export { EntityService } from "./EntityService";
+
+export { ImageService } from "./ImageService";

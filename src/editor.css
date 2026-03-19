@@ -1,6 +1,10 @@
 /* TipTap Editor Styles */
 
 /* Prose editor */
+.prose-editor {
+  position: relative;
+}
+
 .prose-editor .tiptap {
   outline: none;
   min-height: 60px;
@@ -253,4 +257,27 @@
   background-color: var(--color-promote-highlight);
   border-radius: 2px;
   transition: background-color 0.15s ease;
+}
+
+/* Image resize */
+.image-resize-selected img {
+  outline: 2px solid var(--color-image-resize-border);
+  outline-offset: 1px;
+}
+
+.image-resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--color-image-resize-handle);
+  border: 1px solid white;
+  border-radius: 1px;
+  cursor: nwse-resize;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.prose-editor .tiptap img {
+  max-width: 100%;
+  height: auto;
 }

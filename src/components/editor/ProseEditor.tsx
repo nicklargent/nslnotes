@@ -3,15 +3,35 @@ import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import { TextSelection } from "@tiptap/pm/state";
 import { WIKILINK_MIME } from "../../lib/drag";
 import { InlineDecorations } from "./InlineDecorations";
 import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
+import { ImageResizePlugin } from "./ImageResizePlugin";
+import { ImageService, rootPathFromEntity } from "../../services/ImageService";
+import { IMAGE_MIME_TYPES } from "../../types/images";
+
+/** Read a File as base64, stripping the data URL prefix. */
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      if (base64) resolve(base64);
+      else reject(new Error("Failed to extract base64 from data URL"));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface ProseEditorProps {
   content: string;
   placeholder?: string | undefined;
   autofocus?: boolean | undefined;
+  entityPath?: string | undefined;
   onUpdate: (markdown: string) => void;
   onSlashKey?:
     | ((pos: { top: number; left: number }, cursorPos: number) => void)
@@ -40,6 +60,8 @@ export function ProseEditor(props: ProseEditorProps) {
   let editor: Editor | undefined;
   let skipNextUpdate = false;
   let lastUserInteraction = 0;
+  const rootPath = () =>
+    props.entityPath ? rootPathFromEntity(props.entityPath) : undefined;
 
   onMount(() => {
     if (!containerRef) return;
@@ -85,10 +107,32 @@ export function ProseEditor(props: ProseEditorProps) {
           autolink: true,
           linkOnPaste: true,
         }),
+        Image.extend({
+          addAttributes() {
+            return {
+              ...this.parent?.(),
+              width: {
+                default: null,
+                parseHTML: (element) => element.getAttribute("width"),
+                renderHTML: (attributes) => {
+                  if (!attributes["width"]) return {};
+                  return {
+                    width: attributes["width"],
+                    style: `width: ${attributes["width"]}px`,
+                  };
+                },
+              },
+            };
+          },
+        }).configure({
+          inline: false,
+          allowBase64: false,
+        }),
         InlineDecorations,
         PromoteHighlightPlugin,
+        ImageResizePlugin,
       ],
-      content: htmlFromMarkdown(props.content),
+      content: htmlFromMarkdown(props.content, props.entityPath, rootPath()),
       autofocus: false,
       onUpdate: ({ editor: e }) => {
         if (skipNextUpdate) {
@@ -96,10 +140,46 @@ export function ProseEditor(props: ProseEditorProps) {
           return;
         }
         lastUserInteraction = Date.now();
-        const md = markdownFromHtml(e.getHTML());
+        const md = markdownFromHtml(e.getHTML(), props.entityPath, rootPath());
         props.onUpdate(md);
       },
       editorProps: {
+        handlePaste: (_view, event) => {
+          const items = event.clipboardData?.items;
+          if (!items || !props.entityPath) return false;
+
+          for (const item of Array.from(items)) {
+            if (IMAGE_MIME_TYPES.has(item.type)) {
+              event.preventDefault();
+              const file = item.getAsFile();
+              if (!file) return true;
+
+              void readFileAsBase64(file)
+                .then((base64) =>
+                  ImageService.ingestFromClipboard(
+                    props.entityPath!,
+                    base64,
+                    item.type
+                  )
+                )
+                .then((md) => {
+                  if (!md || !editor) return;
+                  const resolved = resolveImageMarkdownSrc(
+                    md,
+                    props.entityPath,
+                    rootPath()
+                  );
+                  editor
+                    .chain()
+                    .focus()
+                    .setImage({ src: resolved.src, alt: resolved.alt })
+                    .run();
+                });
+              return true;
+            }
+          }
+          return false;
+        },
         handleClick: (view, pos, event) => {
           const $pos = view.state.doc.resolve(pos);
           const nodeText = $pos.parent.textContent;
@@ -177,23 +257,77 @@ export function ProseEditor(props: ProseEditorProps) {
         },
         handleDrop: (view, event, _slice, moved) => {
           if (moved) return false;
+
+          // Handle wikilink drops
           const wikilink = event.dataTransfer?.getData(WIKILINK_MIME);
-          if (!wikilink) return false;
-          event.preventDefault();
-          const coords = view.posAtCoords({
-            left: event.clientX,
-            top: event.clientY,
-          });
-          if (!coords) return false;
-          const insertPos = coords.pos;
-          const tr = view.state.tr.insertText(wikilink + " ", insertPos);
-          const cursorPos = insertPos + wikilink.length + 1;
-          tr.setSelection(TextSelection.create(tr.doc, cursorPos));
-          view.dispatch(tr);
-          // Browser may suppress synchronous focus during drop events;
-          // defer to next tick so the editor regains cursor reliably.
-          setTimeout(() => view.focus(), 0);
-          return true;
+          if (wikilink) {
+            event.preventDefault();
+            const coords = view.posAtCoords({
+              left: event.clientX,
+              top: event.clientY,
+            });
+            if (!coords) return false;
+            const insertPos = coords.pos;
+            const tr = view.state.tr.insertText(wikilink + " ", insertPos);
+            const cursorPos = insertPos + wikilink.length + 1;
+            tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+            view.dispatch(tr);
+            setTimeout(() => view.focus(), 0);
+            return true;
+          }
+
+          // Handle image file drops
+          const files = event.dataTransfer?.files;
+          if (!files || files.length === 0 || !props.entityPath) return false;
+
+          for (const file of Array.from(files)) {
+            if (!IMAGE_MIME_TYPES.has(file.type)) continue;
+
+            event.preventDefault();
+            const dropCoords = view.posAtCoords({
+              left: event.clientX,
+              top: event.clientY,
+            });
+
+            void readFileAsBase64(file)
+              .then((base64) =>
+                ImageService.ingestFromDrop(
+                  props.entityPath!,
+                  file.name,
+                  base64,
+                  file.type
+                )
+              )
+              .then((md) => {
+                if (!md || !editor) return;
+                const resolved = resolveImageMarkdownSrc(
+                  md,
+                  props.entityPath,
+                  rootPath()
+                );
+                if (dropCoords) {
+                  const pos = dropCoords.pos;
+                  editor
+                    .chain()
+                    .focus()
+                    .command(({ tr }) => {
+                      tr.setSelection(TextSelection.create(tr.doc, pos));
+                      return true;
+                    })
+                    .setImage({ src: resolved.src, alt: resolved.alt })
+                    .run();
+                } else {
+                  editor
+                    .chain()
+                    .focus()
+                    .setImage({ src: resolved.src, alt: resolved.alt })
+                    .run();
+                }
+              });
+            return true;
+          }
+
+          return false;
         },
         handleKeyDown: (view, event) => {
           // Tab to indent list items, or wrap paragraph in bullet list
@@ -434,10 +568,16 @@ export function ProseEditor(props: ProseEditorProps) {
     if (!editor || editor.isDestroyed) return;
     if (Date.now() - lastUserInteraction < 500) return;
     if (editor.isFocused) return;
-    const currentMd = markdownFromHtml(editor.getHTML());
+    const currentMd = markdownFromHtml(
+      editor.getHTML(),
+      props.entityPath,
+      rootPath()
+    );
     if (currentMd !== newContent) {
       skipNextUpdate = true;
-      editor.commands.setContent(htmlFromMarkdown(newContent));
+      editor.commands.setContent(
+        htmlFromMarkdown(newContent, props.entityPath, rootPath())
+      );
     }
   });
 
@@ -453,7 +593,11 @@ export function ProseEditor(props: ProseEditorProps) {
 /**
  * Simple markdown to HTML conversion for TipTap content.
  */
-function htmlFromMarkdown(md: string): string {
+function htmlFromMarkdown(
+  md: string,
+  entityPath?: string,
+  rootPath?: string
+): string {
   if (!md.trim()) return "<p></p>";
 
   let html = md
@@ -465,6 +609,18 @@ function htmlFromMarkdown(md: string): string {
     .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    // Images — must run BEFORE links to avoid ![...]() being consumed as [...]()
+    .replace(
+      /!\[([^\]]*)\]\(([^)]+)\)(?:\{width=(\d+)\})?/g,
+      (_match, alt: string, src: string, width: string) => {
+        const resolvedSrc =
+          entityPath && rootPath
+            ? ImageService.resolveImageUrl(src, entityPath, rootPath)
+            : src;
+        const widthAttr = width ? ` width="${width}"` : "";
+        return `<img src="${resolvedSrc}" alt="${alt}"${widthAttr}>`;
+      }
+    )
     // Markdown links [text](url) — must run before wikilinks and topic refs
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
     // Wikilinks
@@ -532,7 +688,11 @@ function htmlFromMarkdown(md: string): string {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.startsWith("<h") || trimmed.startsWith("<pre>")) {
+    if (trimmed.startsWith("<img ")) {
+      // Block-level image — do not wrap in <p>
+      closeListsTo(-1);
+      result.push(trimmed);
+    } else if (trimmed.startsWith("<h") || trimmed.startsWith("<pre>")) {
       closeListsTo(-1);
       result.push(trimmed);
     } else if (/^(\s*)([-*])\s(.*)$/.test(line)) {
@@ -576,158 +736,190 @@ function htmlFromMarkdown(md: string): string {
 /**
  * Convert TipTap HTML back to markdown.
  */
-export function markdownFromHtml(html: string): string {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  return nodeToMarkdown(doc.body, 0).trim();
-}
+const sharedParser = new DOMParser();
 
-function nodeToMarkdown(node: Node, listDepth: number): string {
-  // Handle case where node itself is a list element (called from liNestedLists)
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    const selfTag = (node as HTMLElement).tagName.toLowerCase();
-    if (selfTag === "ul" || selfTag === "ol") {
-      return processListNode(node as HTMLElement, selfTag, listDepth);
-    }
-  }
+export function markdownFromHtml(
+  html: string,
+  entityPath?: string,
+  rootPath?: string
+): string {
+  const doc = sharedParser.parseFromString(html, "text/html");
 
-  let result = "";
-
-  for (const child of Array.from(node.childNodes)) {
-    if (child.nodeType === Node.TEXT_NODE) {
-      let text = child.textContent ?? "";
-      // Restore TODO markers from Unicode back to text
-      text = text
-        .replace(/^\u2610\s*/, "TODO ")
-        .replace(/^\u25a3\s*/, "DOING ")
-        .replace(/^\u2611\s*/, "DONE ");
-      result += text;
-    } else if (child.nodeType === Node.ELEMENT_NODE) {
-      const el = child as HTMLElement;
-      const tag = el.tagName.toLowerCase();
-
-      switch (tag) {
-        case "h1":
-          result += `# ${el.textContent}\n`;
-          break;
-        case "h2":
-          result += `## ${el.textContent}\n`;
-          break;
-        case "h3":
-          result += `### ${el.textContent}\n`;
-          break;
-        case "p":
-          result += `${nodeToMarkdown(el, listDepth)}\n`;
-          break;
-        case "strong": {
-          const inner = nodeToMarkdown(el, listDepth);
-          if (inner.startsWith("**") && inner.endsWith("**")) {
-            result += inner;
-          } else {
-            result += `**${inner}**`;
-          }
-          break;
-        }
-        case "em": {
-          const inner = nodeToMarkdown(el, listDepth);
-          if (
-            inner.startsWith("*") &&
-            inner.endsWith("*") &&
-            !inner.startsWith("**")
-          ) {
-            result += inner;
-          } else {
-            result += `*${inner}*`;
-          }
-          break;
-        }
-        case "a": {
-          const href =
-            el.getAttribute("href") || el.getAttribute("data-href") || "";
-          const text = nodeToMarkdown(el, listDepth);
-          result += `[${text}](${href})`;
-          break;
-        }
-        case "code":
-          if (el.parentElement?.tagName.toLowerCase() === "pre") {
-            result += el.textContent;
-          } else {
-            result += `\`${el.textContent}\``;
-          }
-          break;
-        case "pre":
-          result += `\`\`\`\n${el.textContent}\n\`\`\`\n`;
-          break;
-        case "ul":
-        case "ol":
-          result += processListNode(el, tag, listDepth);
-          break;
-        case "li":
-          result += nodeToMarkdown(el, listDepth);
-          break;
-        case "br":
-          result += "\n";
-          break;
-        default:
-          result += nodeToMarkdown(el, listDepth);
+  function convert(node: Node, listDepth: number): string {
+    // Handle case where node itself is a list element (called from liNestedLists)
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const selfTag = (node as HTMLElement).tagName.toLowerCase();
+      if (selfTag === "ul" || selfTag === "ol") {
+        return processList(node as HTMLElement, selfTag, listDepth);
       }
     }
-  }
 
-  return result;
-}
+    let result = "";
 
-/** Process a <ul> or <ol> element into markdown list items. */
-function processListNode(
-  el: HTMLElement,
-  tag: string,
-  listDepth: number
-): string {
-  let result = "";
-  if (tag === "ul") {
-    for (const li of Array.from(el.children)) {
-      const indent = "  ".repeat(listDepth);
-      const liContent = liTextContent(li, listDepth);
-      const nestedLists = liNestedLists(li, listDepth + 1);
-      result += `${indent}- ${liContent.trim()}\n${nestedLists}`;
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        let text = child.textContent ?? "";
+        text = text
+          .replace(/^\u2610\s*/, "TODO ")
+          .replace(/^\u25a3\s*/, "DOING ")
+          .replace(/^\u2611\s*/, "DONE ");
+        result += text;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const el = child as HTMLElement;
+        const tag = el.tagName.toLowerCase();
+
+        switch (tag) {
+          case "h1":
+            result += `# ${el.textContent}\n`;
+            break;
+          case "h2":
+            result += `## ${el.textContent}\n`;
+            break;
+          case "h3":
+            result += `### ${el.textContent}\n`;
+            break;
+          case "p":
+            result += `${convert(el, listDepth)}\n`;
+            break;
+          case "strong": {
+            const inner = convert(el, listDepth);
+            if (inner.startsWith("**") && inner.endsWith("**")) {
+              result += inner;
+            } else {
+              result += `**${inner}**`;
+            }
+            break;
+          }
+          case "em": {
+            const inner = convert(el, listDepth);
+            if (
+              inner.startsWith("*") &&
+              inner.endsWith("*") &&
+              !inner.startsWith("**")
+            ) {
+              result += inner;
+            } else {
+              result += `*${inner}*`;
+            }
+            break;
+          }
+          case "a": {
+            const href =
+              el.getAttribute("href") || el.getAttribute("data-href") || "";
+            const text = convert(el, listDepth);
+            result += `[${text}](${href})`;
+            break;
+          }
+          case "img": {
+            const src = el.getAttribute("src") ?? "";
+            const alt = el.getAttribute("alt") ?? "";
+            const width = el.getAttribute("width");
+            const relativeSrc =
+              entityPath && rootPath
+                ? ImageService.unresolveImageSrc(src, entityPath, rootPath)
+                : src;
+            const widthSuffix = width ? `{width=${width}}` : "";
+            result += `![${alt}](${relativeSrc})${widthSuffix}\n`;
+            break;
+          }
+          case "code":
+            if (el.parentElement?.tagName.toLowerCase() === "pre") {
+              result += el.textContent;
+            } else {
+              result += `\`${el.textContent}\``;
+            }
+            break;
+          case "pre":
+            result += `\`\`\`\n${el.textContent}\n\`\`\`\n`;
+            break;
+          case "ul":
+          case "ol":
+            result += processList(el, tag, listDepth);
+            break;
+          case "li":
+            result += convert(el, listDepth);
+            break;
+          case "br":
+            result += "\n";
+            break;
+          default:
+            result += convert(el, listDepth);
+        }
+      }
     }
-  } else {
-    Array.from(el.children).forEach((li, i) => {
-      const indent = "  ".repeat(listDepth);
-      const liContent = liTextContent(li, listDepth);
-      const nestedLists = liNestedLists(li, listDepth + 1);
-      result += `${indent}${i + 1}. ${liContent.trim()}\n${nestedLists}`;
-    });
-  }
-  return result;
-}
 
-/** Extract inline text from a <li>, skipping nested <ul>/<ol>. */
-function liTextContent(li: Element, listDepth: number): string {
-  let result = "";
-  for (const child of Array.from(li.childNodes)) {
-    if (child.nodeType === Node.ELEMENT_NODE) {
-      const tag = (child as HTMLElement).tagName.toLowerCase();
-      if (tag === "ul" || tag === "ol") continue; // handled separately
-    }
-    result += nodeToMarkdown(child as Node, listDepth);
+    return result;
   }
-  return result;
-}
 
-/** Extract nested <ul>/<ol> from a <li>. */
-function liNestedLists(li: Element, listDepth: number): string {
-  let result = "";
-  for (const child of Array.from(li.children)) {
-    const tag = child.tagName.toLowerCase();
-    if (tag === "ul" || tag === "ol") {
-      result += nodeToMarkdown(child, listDepth);
+  function processList(
+    el: HTMLElement,
+    tag: string,
+    listDepth: number
+  ): string {
+    let result = "";
+    if (tag === "ul") {
+      for (const li of Array.from(el.children)) {
+        const indent = "  ".repeat(listDepth);
+        const liContent = liText(li, listDepth);
+        const nested = liNested(li, listDepth + 1);
+        result += `${indent}- ${liContent.trim()}\n${nested}`;
+      }
+    } else {
+      Array.from(el.children).forEach((li, i) => {
+        const indent = "  ".repeat(listDepth);
+        const liContent = liText(li, listDepth);
+        const nested = liNested(li, listDepth + 1);
+        result += `${indent}${i + 1}. ${liContent.trim()}\n${nested}`;
+      });
     }
+    return result;
   }
-  return result;
+
+  function liText(li: Element, listDepth: number): string {
+    let result = "";
+    for (const child of Array.from(li.childNodes)) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = (child as HTMLElement).tagName.toLowerCase();
+        if (tag === "ul" || tag === "ol") continue;
+      }
+      result += convert(child as Node, listDepth);
+    }
+    return result;
+  }
+
+  function liNested(li: Element, listDepth: number): string {
+    let result = "";
+    for (const child of Array.from(li.children)) {
+      const tag = child.tagName.toLowerCase();
+      if (tag === "ul" || tag === "ol") {
+        result += convert(child, listDepth);
+      }
+    }
+    return result;
+  }
+
+  return convert(doc.body, 0).trim();
 }
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Parse a markdown image string and resolve the src URL for display. */
+function resolveImageMarkdownSrc(
+  md: string,
+  entityPath?: string,
+  rootPath?: string
+): { src: string; alt: string } {
+  const match = /!\[([^\]]*)\]\(([^)]+)\)/.exec(md);
+  if (!match) return { src: "", alt: "" };
+  const alt = match[1] ?? "";
+  const rawSrc = match[2] ?? "";
+  const src =
+    entityPath && rootPath
+      ? ImageService.resolveImageUrl(rawSrc, entityPath, rootPath)
+      : rawSrc;
+  return { src, alt };
 }
 
 // List item movement helpers (ported from OutlinerEditor)
