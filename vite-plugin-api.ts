@@ -7,6 +7,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { type IncomingMessage, type ServerResponse } from "node:http";
 
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
 function parseBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -134,6 +142,62 @@ async function handleApi(
       const body = JSON.parse(await parseBody(req)) as { path: string };
       fs.mkdirSync(body.path, { recursive: true });
       return sendJson(res, { ok: true });
+    }
+
+    // GET /api/assets — serve image binary with correct Content-Type
+    if (pathname === "/api/assets" && req.method === "GET") {
+      const relativePath = getQueryParam(url, "path");
+      if (!relativePath) return sendError(res, "Missing path param", 400);
+
+      const filePath = path.resolve(relativePath);
+      let data: Buffer;
+      try {
+        data = fs.readFileSync(filePath);
+      } catch {
+        return sendError(res, "File not found", 404);
+      }
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = IMAGE_MIME_TYPES[ext] ?? "application/octet-stream";
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Content-Length": data.length.toString(),
+      });
+      return res.end(data);
+    }
+
+    // POST /api/files/copy — copy file from src to dst
+    if (pathname === "/api/files/copy" && req.method === "POST") {
+      const body = JSON.parse(await parseBody(req)) as {
+        src: string;
+        dst: string;
+      };
+      fs.mkdirSync(path.dirname(body.dst), { recursive: true });
+      fs.copyFileSync(body.src, body.dst);
+      return sendJson(res, { ok: true });
+    }
+
+    // PUT /api/files/binary — write base64-decoded data to path
+    if (pathname === "/api/files/binary" && req.method === "PUT") {
+      const body = JSON.parse(await parseBody(req)) as {
+        path: string;
+        base64Data: string;
+      };
+      fs.mkdirSync(path.dirname(body.path), { recursive: true });
+      const buffer = Buffer.from(body.base64Data, "base64");
+      fs.writeFileSync(body.path, buffer);
+      return sendJson(res, { ok: true });
+    }
+
+    // GET /api/files/size — return file size in bytes
+    if (pathname === "/api/files/size" && req.method === "GET") {
+      const filePath = getQueryParam(url, "path");
+      if (!filePath) return sendError(res, "Missing path param", 400);
+      try {
+        const stats = fs.statSync(filePath);
+        return sendJson(res, { size: stats.size });
+      } catch {
+        return sendError(res, "File not found", 404);
+      }
     }
 
     sendError(res, "Not found", 404);

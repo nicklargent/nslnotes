@@ -2,8 +2,9 @@ mod commands;
 mod watcher;
 
 use commands::{
-    delete_file, ensure_directory, file_exists, get_settings_path, list_directory, load_settings,
-    read_file, save_settings, verify_directory, write_file, AppSettings,
+    copy_file, delete_file, ensure_directory, file_exists, get_file_size, get_settings_path,
+    list_directory, load_settings, read_file, save_settings, verify_directory, write_binary,
+    write_file, AppSettings,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -53,7 +54,10 @@ pub fn run() {
             stop_watching,
             get_watcher_status,
             load_settings,
-            save_settings
+            save_settings,
+            copy_file,
+            write_binary,
+            get_file_size
         ])
         .setup(|app| {
             // Restore window size/maximized state from settings

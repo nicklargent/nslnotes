@@ -20,3 +20,5 @@ export type { TodoState, TodoItem, WikiLink } from "./inline";
 export type { IndexState, ViewType, ContextState, EditorState } from "./stores";
 
 export type { TaskGroup, GroupedTasks, TaskDisplay } from "./task-groups";
+
+export type { SearchFilter, SearchResult, SearchState } from "./search";

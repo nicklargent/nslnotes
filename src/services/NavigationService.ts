@@ -2,6 +2,7 @@ import { contextStore, setContextStore } from "../stores/contextStore";
 import { IndexService } from "./IndexService";
 import type { Entity } from "../types/entities";
 import type { TopicRef } from "../types/topics";
+import type { SearchFilter } from "../types/search";
 
 /**
  * NavigationService manages view navigation and context state (Design §6.5).
@@ -20,6 +21,7 @@ export const NavigationService = {
       isHomeState: true,
       journalAnchorDate: null,
       draft: null,
+      searchState: null,
     });
   },
 
@@ -37,6 +39,7 @@ export const NavigationService = {
       activeTopic: null,
       isHomeState: false,
       draft: null,
+      searchState: null,
       ...(entity.type === "note" && entity.date
         ? { journalAnchorDate: entity.date }
         : {}),
@@ -84,5 +87,25 @@ export const NavigationService = {
    */
   clearRelevance: (): void => {
     setContextStore("relevanceWeights", new Map());
+  },
+
+  /**
+   * Navigate to the search view.
+   * Optionally pre-populates query and filter.
+   */
+  goToSearch: (query?: string, filter?: SearchFilter): void => {
+    setContextStore({
+      activeView: "search",
+      activeEntity: null,
+      activeTopic: null,
+      relevanceWeights: new Map(),
+      isHomeState: false,
+      draft: null,
+      searchState: {
+        query: query ?? "",
+        filter: filter ?? "all",
+        results: [],
+      },
+    });
   },
 };

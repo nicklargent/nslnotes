@@ -115,6 +115,13 @@ function App() {
   function handleGlobalKeyDown(e: KeyboardEvent) {
     const mod = e.ctrlKey || e.metaKey;
 
+    // Cmd/Ctrl+K: Open search
+    if (mod && e.key === "k") {
+      e.preventDefault();
+      NavigationService.goToSearch();
+      return;
+    }
+
     // Font size: Ctrl/Cmd + = / -
     if (mod && (e.key === "=" || e.key === "+")) {
       e.preventDefault();
@@ -268,6 +275,7 @@ function App() {
               activeTopics={activeTopics()}
               linkedPaths={linkedPaths()}
               onTodayClick={() => NavigationService.goHome()}
+              onSearchClick={() => NavigationService.goToSearch()}
               onTopicClick={(ref) => NavigationService.navigateToTopic(ref)}
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
               onCreateDoc={() => setContextStore("draft", { type: "doc" })}

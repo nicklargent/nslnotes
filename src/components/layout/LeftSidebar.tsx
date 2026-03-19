@@ -15,6 +15,7 @@ interface LeftSidebarProps {
   activeTopics: Set<TopicRef>;
   linkedPaths: Set<string>;
   onTodayClick: () => void;
+  onSearchClick: () => void;
   onTopicClick: (ref: TopicRef) => void;
   onDocClick: (doc: Doc) => void;
   onCreateDoc: () => void;
@@ -44,9 +45,29 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
   return (
     <div class="flex h-full flex-col">
-      {/* Today button - pinned at top */}
+      {/* Today + Search buttons - pinned at top */}
       <div class="border-b border-gray-200 p-3 dark:border-gray-700">
         <TodayButton onClick={() => props.onTodayClick()} />
+        <button
+          type="button"
+          class="mt-2 flex w-full items-center gap-2 rounded-lg border border-gray-300 px-4 py-1.5 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-300"
+          onClick={() => props.onSearchClick()}
+        >
+          <svg
+            class="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          Search
+          <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
+            {navigator.platform.includes("Mac") ? "\u2318K" : "Ctrl+K"}
+          </span>
+        </button>
       </div>
 
       {/* Scrollable sections */}

@@ -3,6 +3,7 @@ import { JournalView } from "../journal/JournalView";
 import { TaskDetail } from "../tasks/TaskDetail";
 import { DocView } from "../docs/DocView";
 import { TopicView } from "../topics/TopicView";
+import { SearchView } from "../search/SearchView";
 import { DraftView } from "../draft/DraftView";
 import { contextStore } from "../../stores/contextStore";
 import type { ViewType } from "../../types/stores";
@@ -67,6 +68,9 @@ export function CenterPanel(props: CenterPanelProps) {
             </Match>
             <Match when={props.activeView === "topic"}>
               <TopicView />
+            </Match>
+            <Match when={props.activeView === "search"}>
+              <SearchView />
             </Match>
           </Switch>
         }

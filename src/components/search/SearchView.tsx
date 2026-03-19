@@ -1,0 +1,183 @@
+import {
+  createSignal,
+  createEffect,
+  onMount,
+  onCleanup,
+  For,
+  Show,
+} from "solid-js";
+import { IndexService } from "../../services/IndexService";
+import { NavigationService } from "../../services/NavigationService";
+import { contextStore, setContextStore } from "../../stores/contextStore";
+import type { SearchFilter, SearchResult } from "../../types/search";
+
+const FILTERS: { label: string; value: SearchFilter }[] = [
+  { label: "All", value: "all" },
+  { label: "Notes", value: "notes" },
+  { label: "Tasks", value: "tasks" },
+  { label: "Docs", value: "docs" },
+  { label: "Images", value: "images" },
+];
+
+const TYPE_BADGES: Record<string, { label: string; class: string }> = {
+  note: {
+    label: "Note",
+    class: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  },
+  task: {
+    label: "Task",
+    class: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  },
+  doc: {
+    label: "Doc",
+    class: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  },
+};
+
+export function SearchView() {
+  let inputRef: HTMLInputElement | undefined;
+  const [query, setQuery] = createSignal(contextStore.searchState?.query ?? "");
+  const [filter, setFilter] = createSignal<SearchFilter>(
+    contextStore.searchState?.filter ?? "all"
+  );
+  const [results, setResults] = createSignal<SearchResult[]>([]);
+  let debounceTimer: number | undefined;
+
+  onMount(() => {
+    inputRef?.focus();
+  });
+
+  // Debounced search
+  createEffect(() => {
+    const q = query();
+    const f = filter();
+    clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(() => {
+      if (f === "images") {
+        // Images tab handled separately in Phase 6
+        setResults([]);
+        return;
+      }
+      const searchResults = q.length >= 2 ? IndexService.search(q, f) : [];
+      setResults(searchResults);
+      // Sync back to store
+      setContextStore("searchState", {
+        query: q,
+        filter: f,
+        results: searchResults,
+      });
+    }, 200);
+  });
+
+  onCleanup(() => clearTimeout(debounceTimer));
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      NavigationService.goHome();
+    }
+  }
+
+  function getEntityTitle(result: SearchResult): string {
+    const entity = result.entity;
+    if (entity.type === "note") return entity.title ?? entity.date;
+    return entity.title;
+  }
+
+  function getEntityDate(result: SearchResult): string {
+    const entity = result.entity;
+    if (entity.type === "note") return entity.date;
+    if (entity.type === "task") return entity.created;
+    if (entity.type === "doc") return entity.created;
+    return "";
+  }
+
+  return (
+    <div class="flex h-full flex-col">
+      {/* Search input */}
+      <div class="border-b border-gray-200 p-4 dark:border-gray-700">
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Search notes, tasks, and docs..."
+          value={query()}
+          onInput={(e) => setQuery(e.currentTarget.value)}
+          onKeyDown={handleKeyDown}
+          class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
+        />
+
+        {/* Filter tabs */}
+        <div class="mt-3 flex gap-1">
+          <For each={FILTERS}>
+            {(f) => (
+              <button
+                type="button"
+                class={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  filter() === f.value
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                    : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                }`}
+                onClick={() => setFilter(f.value)}
+              >
+                {f.label}
+              </button>
+            )}
+          </For>
+        </div>
+      </div>
+
+      {/* Results */}
+      <div class="flex-1 overflow-y-auto">
+        <Show
+          when={results().length > 0}
+          fallback={
+            <div class="p-6 text-center text-sm text-gray-400 dark:text-gray-500">
+              <Show
+                when={query().length >= 2}
+                fallback="Type at least 2 characters to search"
+              >
+                <Show
+                  when={filter() !== "images"}
+                  fallback="Images tab coming soon"
+                >
+                  No results found
+                </Show>
+              </Show>
+            </div>
+          }
+        >
+          <div class="divide-y divide-gray-100 dark:divide-gray-700">
+            <For each={results()}>
+              {(result) => (
+                <button
+                  type="button"
+                  class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  onClick={() => NavigationService.navigateTo(result.entity)}
+                >
+                  <div class="flex items-center gap-2">
+                    <span
+                      class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${TYPE_BADGES[result.entity.type]?.class ?? ""}`}
+                    >
+                      {TYPE_BADGES[result.entity.type]?.label ??
+                        result.entity.type}
+                    </span>
+                    <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {getEntityTitle(result)}
+                    </span>
+                    <span class="ml-auto shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                      {getEntityDate(result)}
+                    </span>
+                  </div>
+                  <Show when={result.matchedLines.length > 0}>
+                    <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                      {result.matchedLines[0]}
+                    </p>
+                  </Show>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+    </div>
+  );
+}

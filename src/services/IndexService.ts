@@ -10,6 +10,7 @@ import type { Note, Task, Doc, Entity } from "../types/entities";
 import type { TopicRef, Topic, EntityReference } from "../types/topics";
 import type { GroupedTasks, GroupedClosedTasks } from "../types/task-groups";
 import type { WikiLink } from "../types/inline";
+import type { SearchFilter, SearchResult } from "../types/search";
 
 /**
  * Join path segments (simple implementation).
@@ -454,6 +455,86 @@ export const IndexService = {
   },
 
   /**
+   * Full-text search across all entities.
+   * Case-insensitive substring match against body content, titles, topics, and dates.
+   * Results ordered by date (reverse chronological).
+   */
+  search: (query: string, filter: SearchFilter): SearchResult[] => {
+    if (query.length < 2) return [];
+
+    const lowerQuery = query.toLowerCase();
+    const results: SearchResult[] = [];
+
+    const entities: Entity[] = [];
+    if (filter === "all" || filter === "notes") {
+      entities.push(...indexStore.notes.values());
+    }
+    if (filter === "all" || filter === "tasks") {
+      entities.push(...indexStore.tasks.values());
+    }
+    if (filter === "all" || filter === "docs") {
+      entities.push(...indexStore.docs.values());
+    }
+
+    for (const entity of entities) {
+      const matchedLines: string[] = [];
+      const highlightRanges: [number, number, number][] = [];
+
+      // Check title
+      const title =
+        entity.type === "note" ? (entity.title ?? entity.date) : entity.title;
+      const titleLower = title.toLowerCase();
+      const titleMatch = titleLower.includes(lowerQuery);
+
+      // Check topics
+      const topicMatch = entity.topics.some((t) =>
+        t.toLowerCase().includes(lowerQuery)
+      );
+
+      // Check date
+      const date =
+        entity.type === "note"
+          ? entity.date
+          : entity.type === "task" || entity.type === "doc"
+            ? entity.created
+            : "";
+      const dateMatch = date.includes(lowerQuery);
+
+      // Check body content line by line
+      const lines = entity.content.split("\n");
+      for (const line of lines) {
+        const lineLower = line.toLowerCase();
+        let idx = lineLower.indexOf(lowerQuery);
+        if (idx !== -1) {
+          const lineIndex = matchedLines.length;
+          matchedLines.push(line.trim());
+          while (idx !== -1) {
+            highlightRanges.push([lineIndex, idx, idx + lowerQuery.length]);
+            idx = lineLower.indexOf(lowerQuery, idx + 1);
+          }
+        }
+      }
+
+      if (titleMatch || topicMatch || dateMatch || matchedLines.length > 0) {
+        // If only metadata matched, add a context line
+        if (matchedLines.length === 0 && lines[0]?.trim()) {
+          matchedLines.push(lines[0].trim());
+        }
+        results.push({ entity, matchedLines, highlightRanges });
+      }
+    }
+
+    // Sort by date, reverse chronological
+    results.sort((a, b) => {
+      const dateA = getEntitySortDate(a.entity);
+      const dateB = getEntitySortDate(b.entity);
+      return dateB.localeCompare(dateA);
+    });
+
+    return results;
+  },
+
+  /**
    * Compute relevance weights for the current context entity.
    *
    * @param entity - The entity to compute relevance from
@@ -593,6 +674,16 @@ function buildTopics(
   }
 
   return result;
+}
+
+/**
+ * Get a sortable date string from an entity.
+ */
+function getEntitySortDate(entity: Entity): string {
+  if (entity.type === "note") return entity.date;
+  if (entity.type === "task") return entity.created;
+  if (entity.type === "doc") return entity.created;
+  return "";
 }
 
 /**

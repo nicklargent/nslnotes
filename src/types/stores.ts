@@ -1,5 +1,6 @@
 import type { Note, Task, Doc, Entity } from "./entities";
 import type { TopicRef, Topic, TopicDecoration } from "./topics";
+import type { SearchState } from "./search";
 
 /**
  * Index store state
@@ -22,7 +23,7 @@ export interface IndexState {
 /**
  * View types for center panel
  */
-export type ViewType = "journal" | "task" | "doc" | "topic";
+export type ViewType = "journal" | "task" | "doc" | "topic" | "search";
 
 /**
  * Draft state for inline entity creation
@@ -52,6 +53,8 @@ export interface ContextState {
   visibleDates: Set<string>;
   /** Active draft for inline creation (null = no draft) */
   draft: DraftState | null;
+  /** Search view state (null when not searching) */
+  searchState: SearchState | null;
 }
 
 /**

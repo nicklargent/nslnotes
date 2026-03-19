@@ -10,6 +10,7 @@ const [contextStore, setContextStore] = createStore<ContextState>({
   journalAnchorDate: null,
   visibleDates: new Set<string>(),
   draft: null,
+  searchState: null,
 });
 
 export { contextStore, setContextStore };

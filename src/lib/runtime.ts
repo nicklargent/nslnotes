@@ -176,6 +176,55 @@ export const runtime = {
   },
 
   /**
+   * Copy a file from src to dst, creating parent directories if needed
+   */
+  copyFile: async (src: string, dst: string): Promise<void> => {
+    if (runtime.isNative()) {
+      return invoke("copy_file", { src, dst });
+    }
+    const res = await fetch("/api/files/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ src, dst }),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to copy file: ${src} -> ${dst}`);
+    }
+  },
+
+  /**
+   * Write base64-encoded binary data to a file
+   */
+  writeBinary: async (path: string, base64Data: string): Promise<void> => {
+    if (runtime.isNative()) {
+      return invoke("write_binary", { path, base64Data });
+    }
+    const res = await fetch("/api/files/binary", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, base64Data }),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to write binary file: ${path}`);
+    }
+  },
+
+  /**
+   * Get the size of a file in bytes
+   */
+  getFileSize: async (path: string): Promise<number> => {
+    if (runtime.isNative()) {
+      return invoke<number>("get_file_size", { path });
+    }
+    const res = await fetch(`/api/files/size?path=${encodeURIComponent(path)}`);
+    if (!res.ok) {
+      throw new Error(`Failed to get file size: ${path}`);
+    }
+    const data = (await res.json()) as { size: number };
+    return data.size;
+  },
+
+  /**
    * Start watching a directory for file changes.
    * In native mode, uses Tauri's file watcher with notify crate.
    * In web mode, falls back to polling.

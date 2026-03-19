@@ -10,8 +10,8 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.6, Design §7.3
 **Dependencies**: None
 **Acceptance**:
-- [ ] `base64 = "0.22"` added to `src-tauri/Cargo.toml` `[dependencies]`
-- [ ] `cargo check` passes
+- [x] `base64 = "0.22"` added to `src-tauri/Cargo.toml` `[dependencies]`
+- [x] `cargo check` passes
 
 **Verify**: `cargo check` in `src-tauri/` succeeds
 
@@ -21,10 +21,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.6, Design §7.1
 **Dependencies**: T1.1
 **Acceptance**:
-- [ ] `copy_file(src, dst)` in `commands.rs` — copies file, creates parent dirs
-- [ ] `write_binary(path, base64_data)` in `commands.rs` — decodes base64 and writes bytes
-- [ ] `get_file_size(path)` in `commands.rs` — returns file size in bytes
-- [ ] All three commands handle missing parent directories gracefully
+- [x] `copy_file(src, dst)` in `commands.rs` — copies file, creates parent dirs
+- [x] `write_binary(path, base64_data)` in `commands.rs` — decodes base64 and writes bytes
+- [x] `get_file_size(path)` in `commands.rs` — returns file size in bytes
+- [x] All three commands handle missing parent directories gracefully
 
 **Verify**: Call each command via `invoke` from frontend, confirm file operations work
 
@@ -34,8 +34,8 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: Design §7.2
 **Dependencies**: T1.2
 **Acceptance**:
-- [ ] `copy_file`, `write_binary`, `get_file_size` imported in `lib.rs`
-- [ ] All three added to `tauri::generate_handler![]` macro
+- [x] `copy_file`, `write_binary`, `get_file_size` imported in `lib.rs`
+- [x] All three added to `tauri::generate_handler![]` macro
 
 **Verify**: App compiles and starts without errors
 
@@ -45,9 +45,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.6, Design §7.4
 **Dependencies**: T1.3
 **Acceptance**:
-- [ ] `runtime.copyFile(src, dst)` — invokes `copy_file` in Tauri, `POST /api/files/copy` in web
-- [ ] `runtime.writeBinary(path, base64Data)` — invokes `write_binary` in Tauri, `PUT /api/files/binary` in web
-- [ ] `runtime.getFileSize(path)` — invokes `get_file_size` in Tauri, `GET /api/files/size` in web
+- [x] `runtime.copyFile(src, dst)` — invokes `copy_file` in Tauri, `POST /api/files/copy` in web
+- [x] `runtime.writeBinary(path, base64Data)` — invokes `write_binary` in Tauri, `PUT /api/files/binary` in web
+- [x] `runtime.getFileSize(path)` — invokes `get_file_size` in Tauri, `GET /api/files/size` in web
 
 **Verify**: Round-trip write binary + read file works in both Tauri and web mode
 
@@ -57,11 +57,11 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §2.6, Design §7.5
 **Dependencies**: None
 **Acceptance**:
-- [ ] `GET /api/assets?path={relative-path}` — serves image binary with correct `Content-Type`
-- [ ] `POST /api/files/copy` — copies file from `src` to `dst`
-- [ ] `PUT /api/files/binary` — writes base64-decoded data to `path`
-- [ ] `GET /api/files/size?path={path}` — returns `{ size: number }`
-- [ ] Path parameter for `/api/assets` is relative to notes root
+- [x] `GET /api/assets?path={relative-path}` — serves image binary with correct `Content-Type`
+- [x] `POST /api/files/copy` — copies file from `src` to `dst`
+- [x] `PUT /api/files/binary` — writes base64-decoded data to `path`
+- [x] `GET /api/files/size?path={path}` — returns `{ size: number }`
+- [x] Path parameter for `/api/assets` is relative to notes root
 
 **Verify**: `curl` each endpoint, confirm correct responses and file operations
 
@@ -73,10 +73,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.2, Design §2, §4
 **Dependencies**: None
 **Acceptance**:
-- [ ] `src/types/search.ts` with `SearchFilter` (`"all" | "notes" | "tasks" | "docs" | "images"`)
-- [ ] `SearchResult` type with entity reference, matched line(s), highlight ranges
-- [ ] `SearchState` type with query, filter, results array
-- [ ] Types exported from `src/types/index.ts`
+- [x] `src/types/search.ts` with `SearchFilter` (`"all" | "notes" | "tasks" | "docs" | "images"`)
+- [x] `SearchResult` type with entity reference, matched line(s), highlight ranges
+- [x] `SearchState` type with query, filter, results array
+- [x] Types exported from `src/types/index.ts`
 
 **Verify**: Types import cleanly, TypeScript compiles
 
@@ -86,9 +86,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: Design §4.1, §4.2
 **Dependencies**: T2.1
 **Acceptance**:
-- [ ] `"search"` added to `ViewType` union in `src/types/stores.ts`
-- [ ] `searchState: SearchState | null` added to `ContextState` in `src/types/stores.ts`
-- [ ] `contextStore` initialized with `searchState: null`
+- [x] `"search"` added to `ViewType` union in `src/types/stores.ts`
+- [x] `searchState: SearchState | null` added to `ContextState` in `src/types/stores.ts`
+- [x] `contextStore` initialized with `searchState: null`
 
 **Verify**: Setting `activeView: "search"` type-checks; `searchState` accessible from store
 
@@ -98,13 +98,13 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.2, §1.4, Design §3.1
 **Dependencies**: T2.1
 **Acceptance**:
-- [ ] `IndexService.search(query, filter)` performs case-insensitive substring match
-- [ ] Searches body content of notes, tasks, and docs
-- [ ] Also matches entity titles, topic refs, and dates
-- [ ] Returns `SearchResult[]` with entity reference, matched lines, highlight ranges
-- [ ] Respects filter parameter to restrict entity types
-- [ ] Minimum query length of 2 characters enforced
-- [ ] Results ordered by date (reverse chronological)
+- [x] `IndexService.search(query, filter)` performs case-insensitive substring match
+- [x] Searches body content of notes, tasks, and docs
+- [x] Also matches entity titles, topic refs, and dates
+- [x] Returns `SearchResult[]` with entity reference, matched lines, highlight ranges
+- [x] Respects filter parameter to restrict entity types
+- [x] Minimum query length of 2 characters enforced
+- [x] Results ordered by date (reverse chronological)
 
 **Verify**: Search for known content returns correct results; filter restricts by type; short queries return empty
 
@@ -114,9 +114,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.1, Design §3.2
 **Dependencies**: T2.2
 **Acceptance**:
-- [ ] `NavigationService.goToSearch(query?, filter?)` sets `activeView: "search"`
-- [ ] Populates `searchState` with provided query/filter or defaults
-- [ ] Clears relevance context (search is a neutral view)
+- [x] `NavigationService.goToSearch(query?, filter?)` sets `activeView: "search"`
+- [x] Populates `searchState` with provided query/filter or defaults
+- [x] Clears relevance context (search is a neutral view)
 
 **Verify**: Call `goToSearch()`, store reflects search view state
 
@@ -128,13 +128,13 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.1, §1.2, Design §5.2
 **Dependencies**: T2.3, T2.4
 **Acceptance**:
-- [ ] `src/components/search/SearchView.tsx` with search input, auto-focused on mount
-- [ ] Filter tabs: All | Notes | Tasks | Docs | Images
-- [ ] Input debounced at ~200ms before triggering search
-- [ ] Results rendered as list with entity type badge, title/date, highlighted snippet
-- [ ] Clicking a result calls `NavigationService.navigateTo(entity)`
-- [ ] Escape calls `NavigationService.goHome()`
-- [ ] Empty state shown when no results
+- [x] `src/components/search/SearchView.tsx` with search input, auto-focused on mount
+- [x] Filter tabs: All | Notes | Tasks | Docs | Images
+- [x] Input debounced at ~200ms before triggering search
+- [x] Results rendered as list with entity type badge, title/date, highlighted snippet
+- [x] Clicking a result calls `NavigationService.navigateTo(entity)`
+- [x] Escape calls `NavigationService.goHome()`
+- [x] Empty state shown when no results
 
 **Verify**: Type query, results appear after debounce; click result to navigate; Escape returns to journal
 
@@ -144,8 +144,8 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: Design §5.6
 **Dependencies**: T3.1
 **Acceptance**:
-- [ ] `<Match when={props.activeView === "search"}>` added to `CenterPanel.tsx`
-- [ ] Renders `SearchView` component
+- [x] `<Match when={props.activeView === "search"}>` added to `CenterPanel.tsx`
+- [x] Renders `SearchView` component
 
 **Verify**: Set `activeView` to `"search"`, SearchView renders in center panel
 
@@ -155,9 +155,9 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.1, Design §5.5
 **Dependencies**: T2.4
 **Acceptance**:
-- [ ] Subtle Search button added below TodayButton in `LeftSidebar.tsx`
-- [ ] Click calls `NavigationService.goToSearch()`
-- [ ] Visually consistent with TodayButton style
+- [x] Subtle Search button added below TodayButton in `LeftSidebar.tsx`
+- [x] Click calls `NavigationService.goToSearch()`
+- [x] Visually consistent with TodayButton style
 
 **Verify**: Button visible in sidebar; click opens search view
 
@@ -167,10 +167,10 @@ Tasks are ordered by dependency. Each references requirements (SPEC §*) and des
 **Satisfies**: SPEC §1.1, Design §5.7
 **Dependencies**: T2.4
 **Acceptance**:
-- [ ] `Cmd/Ctrl+K` keydown handler added to `App.tsx`
-- [ ] Calls `NavigationService.goToSearch()`
-- [ ] Prevents default browser behavior
-- [ ] Works from any view
+- [x] `Cmd/Ctrl+K` keydown handler added to `App.tsx`
+- [x] Calls `NavigationService.goToSearch()`
+- [x] Prevents default browser behavior
+- [x] Works from any view
 
 **Verify**: Press Cmd+K from journal view, search opens; press from doc view, search opens
 
