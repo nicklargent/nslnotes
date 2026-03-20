@@ -1,6 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { runtime } from "../lib/runtime";
-import { IMAGE_MIME_TYPES, MIME_TO_EXT } from "../types/images";
+import { IMAGE_MIME_TYPES, MIME_TO_EXT, EXT_TO_MIME } from "../types/images";
 import type { ImageMimeType } from "../types/images";
 import { indexStore, setIndexStore } from "../stores/indexStore";
 
@@ -136,6 +136,7 @@ export const ImageService = {
     );
     const imagePath = `${assetsDir}/${filename}`;
     await runtime.writeBinary(imagePath, base64);
+    addImageToIndex(imagePath, filename, entityPath);
 
     // Return relative markdown path
     const entitySlug = entityPath
@@ -166,6 +167,7 @@ export const ImageService = {
     );
     const imagePath = `${assetsDir}/${storedFilename}`;
     await runtime.writeBinary(imagePath, base64);
+    addImageToIndex(imagePath, storedFilename, entityPath);
 
     const entitySlug = entityPath
       .substring(entityPath.lastIndexOf("/") + 1)
@@ -173,6 +175,41 @@ export const ImageService = {
     const alt = stripExtension(filename);
     return `![${alt}](./${entitySlug}.assets/${storedFilename})`;
   },
+  /**
+   * Ingest an image by copying from a filesystem path (for Tauri native drag-drop).
+   * Returns the markdown string to insert, or null if the file is not a supported image.
+   */
+  async ingestFromFilePath(
+    entityPath: string,
+    sourcePath: string
+  ): Promise<string | null> {
+    const ext = sourcePath
+      .substring(sourcePath.lastIndexOf(".") + 1)
+      .toLowerCase();
+    const mimeType = EXT_TO_MIME[ext];
+    if (!mimeType) return null;
+
+    const assetsDir = ImageService.getAssetsDir(entityPath);
+    await runtime.ensureDirectory(assetsDir);
+
+    const originalFilename = sourcePath.substring(
+      sourcePath.lastIndexOf("/") + 1
+    );
+    const storedFilename = ImageService.generateImageFilename(
+      originalFilename,
+      mimeType
+    );
+    const imagePath = `${assetsDir}/${storedFilename}`;
+    await runtime.copyFile(sourcePath, imagePath);
+    addImageToIndex(imagePath, storedFilename, entityPath);
+
+    const entitySlug = entityPath
+      .substring(entityPath.lastIndexOf("/") + 1)
+      .replace(/\.md$/, "");
+    const alt = stripExtension(originalFilename);
+    return `![${alt}](./${entitySlug}.assets/${storedFilename})`;
+  },
+
   /**
    * Copy images referenced in markdown from source entity's .assets/ to target entity's .assets/.
    * Rewrites relative paths in the markdown to point to the new location.
@@ -265,6 +302,34 @@ export const ImageService = {
     setIndexStore("imageToEntities", newImageToEntities);
   },
 };
+
+/** Update the image index store with a newly ingested image. */
+function addImageToIndex(
+  imagePath: string,
+  filename: string,
+  entityPath: string
+) {
+  const newImageFiles = new Map(indexStore.imageFiles);
+  newImageFiles.set(imagePath, {
+    path: imagePath,
+    filename,
+    entityPath,
+    size: 0,
+    isOrphan: false,
+  });
+  setIndexStore("imageFiles", newImageFiles);
+
+  const newImageToEntities = new Map(indexStore.imageToEntities);
+  const existing = newImageToEntities.get(imagePath);
+  if (existing) {
+    if (!existing.includes(entityPath)) {
+      newImageToEntities.set(imagePath, [...existing, entityPath]);
+    }
+  } else {
+    newImageToEntities.set(imagePath, [entityPath]);
+  }
+  setIndexStore("imageToEntities", newImageToEntities);
+}
 
 /** Slugify a string for use as filename prefix. */
 function slugify(str: string): string {

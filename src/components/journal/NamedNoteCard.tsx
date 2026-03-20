@@ -53,7 +53,10 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
   });
 
   onCleanup(() => {
-    if (saveTimeout) window.clearTimeout(saveTimeout);
+    if (saveTimeout) {
+      window.clearTimeout(saveTimeout);
+      void saveNamedNote(props.note.path, content());
+    }
   });
 
   function handleUpdate(newContent: string) {

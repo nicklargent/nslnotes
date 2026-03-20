@@ -14,6 +14,7 @@ import { ImageMagnifyPlugin } from "./ImageMagnifyPlugin";
 import { ImageService, rootPathFromEntity } from "../../services/ImageService";
 import { showToast } from "../Toast";
 import { IMAGE_MIME_TYPES } from "../../types/images";
+import { runtime } from "../../lib/runtime";
 
 /** Read a File as base64, stripping the data URL prefix. */
 function readFileAsBase64(file: File): Promise<string> {
@@ -540,7 +541,89 @@ export function ProseEditor(props: ProseEditorProps) {
     document.addEventListener("keyup", handleKeyUp);
     window.addEventListener("blur", handleBlurWindow);
 
+    // Tauri native drag-drop: the webview intercepts OS file drops so
+    // dataTransfer.files is empty in the DOM drop handler. Listen for
+    // Tauri's own drag-drop event which provides file paths directly.
+    // The event is global, so we hit-test against this editor's container
+    // to only handle drops that land within this specific editor instance.
+    let tauriUnlisten: (() => void) | null = null;
+    if (runtime.isNative() && props.entityPath) {
+      import("@tauri-apps/api/event").then(({ listen }) => {
+        listen<{ paths: string[]; position: { x: number; y: number } }>(
+          "tauri://drag-drop",
+          (event) => {
+            if (
+              !editor ||
+              editor.isDestroyed ||
+              !props.entityPath ||
+              !containerRef
+            )
+              return;
+            const { paths, position } = event.payload;
+
+            // Hit-test: only handle if the drop landed within this editor
+            const rect = containerRef.getBoundingClientRect();
+            if (
+              position.x < rect.left ||
+              position.x > rect.right ||
+              position.y < rect.top ||
+              position.y > rect.bottom
+            )
+              return;
+
+            for (const filePath of paths) {
+              const ext = filePath
+                .substring(filePath.lastIndexOf(".") + 1)
+                .toLowerCase();
+              if (!["png", "jpg", "jpeg", "gif", "webp"].includes(ext))
+                continue;
+
+              const dropCoords = editor.view.posAtCoords({
+                left: position.x,
+                top: position.y,
+              });
+
+              void ImageService.ingestFromFilePath(props.entityPath, filePath)
+                .then((md) => {
+                  if (!md || !editor || editor.isDestroyed) return;
+                  const resolved = resolveImageMarkdownSrc(
+                    md,
+                    props.entityPath,
+                    rootPath()
+                  );
+                  if (dropCoords) {
+                    editor
+                      .chain()
+                      .focus()
+                      .command(({ tr }) => {
+                        tr.setSelection(
+                          TextSelection.create(tr.doc, dropCoords.pos)
+                        );
+                        return true;
+                      })
+                      .setImage({ src: resolved.src, alt: resolved.alt })
+                      .run();
+                  } else {
+                    editor
+                      .chain()
+                      .focus()
+                      .setImage({ src: resolved.src, alt: resolved.alt })
+                      .run();
+                  }
+                })
+                .catch(() => {
+                  showToast("Failed to insert dropped image", "error");
+                });
+            }
+          }
+        ).then((unlisten) => {
+          tauriUnlisten = unlisten;
+        });
+      });
+    }
+
     onCleanup(() => {
+      tauriUnlisten?.();
       containerRef!.removeEventListener("click", handleLinkClick, true);
       containerRef!.removeEventListener("mousedown", handleMouseDown, true);
       document.removeEventListener("mouseup", handleMouseUp);

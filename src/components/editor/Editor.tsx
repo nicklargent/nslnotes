@@ -8,6 +8,7 @@ import { PromoteConfirmBar } from "./PromoteConfirmBar";
 import { detectPromoteRange } from "./promoteRange";
 import { promoteHighlightKey } from "./PromoteHighlightPlugin";
 import { EntityService } from "../../services/EntityService";
+import { rootPathFromEntity } from "../../services/ImageService";
 import { NavigationService } from "../../services/NavigationService";
 import { IndexService } from "../../services/IndexService";
 import { contextStore } from "../../stores/contextStore";
@@ -185,7 +186,10 @@ export function Editor(props: EditorProps) {
     const dom = serializer.serializeFragment(fragment);
     const wrapper = document.createElement("div");
     wrapper.appendChild(dom);
-    return markdownFromHtml(wrapper.innerHTML);
+    const rp = props.entityPath
+      ? rootPathFromEntity(props.entityPath)
+      : undefined;
+    return markdownFromHtml(wrapper.innerHTML, props.entityPath, rp);
   }
 
   /**

@@ -19,6 +19,14 @@ export const MIME_TO_EXT: Record<ImageMimeType, string> = {
   "image/webp": "webp",
 };
 
+export const EXT_TO_MIME: Record<string, ImageMimeType> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
 /** Reference to an image within a markdown entity */
 export interface ImageRef {
   alt: string;
