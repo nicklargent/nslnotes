@@ -23,7 +23,10 @@ export function TopicView() {
     if (!ref) return [];
     const notes: Note[] = [];
     for (const note of indexStore.notes.values()) {
-      if (note.topics.includes(ref) || note.content.includes(ref)) {
+      if (
+        note.topics.includes(ref) ||
+        note.content.toLowerCase().includes(ref)
+      ) {
         notes.push(note);
       }
     }
@@ -36,7 +39,7 @@ export function TopicView() {
     if (!ref) return [];
     const docs: Doc[] = [];
     for (const doc of indexStore.docs.values()) {
-      if (doc.topics.includes(ref) || doc.content.includes(ref)) {
+      if (doc.topics.includes(ref) || doc.content.toLowerCase().includes(ref)) {
         docs.push(doc);
       }
     }
@@ -53,7 +56,7 @@ export function TopicView() {
     for (const task of indexStore.tasks.values()) {
       if (
         task.status === "open" &&
-        (task.topics.includes(ref) || task.content.includes(ref))
+        (task.topics.includes(ref) || task.content.toLowerCase().includes(ref))
       ) {
         tasks.push(task);
       }

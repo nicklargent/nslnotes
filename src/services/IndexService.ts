@@ -892,7 +892,9 @@ function getEntitySortDate(entity: Entity): string {
  * Collect all topic references from an entity (frontmatter + body).
  */
 export function collectAllTopics(entity: Entity): TopicRef[] {
-  const topics = new Set<TopicRef>(entity.topics);
+  const topics = new Set<TopicRef>(
+    entity.topics.map((t) => t.toLowerCase() as TopicRef)
+  );
   const inlineTopics = parseTopicRefs(entity.content);
   for (const t of inlineTopics) {
     topics.add(t);

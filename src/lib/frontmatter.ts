@@ -197,7 +197,7 @@ function validateTopics(
         error: `invalid topic reference: ${String(item)} (must start with # or @)`,
       };
     }
-    topics.push(item);
+    topics.push(item.toLowerCase() as TopicRef);
   }
 
   return { valid: true, topics };
