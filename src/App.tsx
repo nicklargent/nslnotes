@@ -27,7 +27,7 @@ import {
   FileService,
 } from "./services";
 import { clearIndexCache } from "./lib/indexCache";
-import { indexStore } from "./stores/indexStore";
+import { indexStore, setIndexStore } from "./stores/indexStore";
 import { contextStore, setContextStore } from "./stores/contextStore";
 import { uiStore, setUIStore } from "./stores/uiStore";
 import { debouncedSave } from "./components/layout/Layout";
@@ -174,6 +174,55 @@ function App() {
     showToast("Notes folder configured successfully", "success");
   }
 
+  async function switchFolder() {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "Select Notes Folder",
+      });
+
+      if (!selected || typeof selected !== "string") return;
+
+      const status = await FileService.verifyDirectory(selected);
+      if (!status.readable || !status.writable) {
+        showToast("Selected folder is not readable/writable", "error");
+        return;
+      }
+
+      await FileService.ensureDirectory(selected);
+
+      // Tear down current state
+      unwatchFn?.();
+      unwatchFn = null;
+      await FileService.stopWatching();
+      clearIndexCache();
+      setIndexStore("notes", new Map());
+      setIndexStore("tasks", new Map());
+      setIndexStore("docs", new Map());
+      setIndexStore("topics", new Map());
+      setIndexStore("topicsYaml", new Map());
+      setIndexStore("imageFiles", new Map());
+      setIndexStore("entityToImages", new Map());
+      setIndexStore("imageToEntities", new Map());
+      setIndexStore("lastIndexed", null);
+
+      // Initialize with new folder
+      await SettingsService.setRootPath(selected);
+      setRootPath(selected);
+      await IndexService.buildIndex(selected);
+      startFileWatcher(selected);
+      NavigationService.goHome();
+      showToast("Switched notes folder", "success");
+    } catch (err) {
+      showToast(
+        `Failed to switch folder: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "error"
+      );
+    }
+  }
+
   /**
    * Active topics, sorted with context-based reordering (T3.11).
    */
@@ -207,6 +256,12 @@ function App() {
   const highlightedTaskPath = createMemo(() => {
     const entity = contextStore.activeEntity;
     if (entity && entity.type === "task") return entity.path;
+    return null;
+  });
+
+  const activeDocPath = createMemo(() => {
+    const entity = contextStore.activeEntity;
+    if (entity && entity.type === "doc") return entity.path;
     return null;
   });
 
@@ -275,11 +330,13 @@ function App() {
               docs={sortedDocs()}
               activeTopics={activeTopics()}
               linkedPaths={linkedPaths()}
+              activeDocPath={activeDocPath()}
               onTodayClick={() => NavigationService.goHome()}
               onSearchClick={() => NavigationService.goToSearch()}
               onTopicClick={(ref) => NavigationService.navigateToTopic(ref)}
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
               onCreateDoc={() => setContextStore("draft", { type: "doc" })}
+              onSwitchFolder={switchFolder}
             />
           }
           center={

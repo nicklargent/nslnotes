@@ -4,6 +4,7 @@ import type { Doc } from "../../types/entities";
 interface DocItemProps {
   doc: Doc;
   isRelevant: boolean;
+  isActive: boolean;
   onClick: (doc: Doc) => void;
 }
 
@@ -14,10 +15,12 @@ interface DocItemProps {
 export function DocItem(props: DocItemProps) {
   return (
     <button
-      class={`w-full truncate rounded px-2 py-1 text-left text-sm text-gray-700 dark:text-gray-200 transition-colors duration-200 ${
-        props.isRelevant
-          ? "border-l-2 border-blue-300 bg-blue-50 dark:bg-blue-900/30"
-          : "hover:bg-gray-100 dark:hover:bg-gray-700"
+      class={`w-full truncate rounded px-2 py-1 text-left text-sm transition-colors duration-200 ${
+        props.isActive
+          ? "bg-blue-50 text-gray-700 ring-1 ring-blue-200 dark:bg-blue-900/30 dark:text-gray-200"
+          : props.isRelevant
+            ? "border-l-2 border-blue-300 bg-blue-50 text-gray-700 dark:bg-blue-900/30 dark:text-gray-200"
+            : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
       }`}
       title={`[[doc:${props.doc.slug}]]`}
       onClick={() => props.onClick(props.doc)}
