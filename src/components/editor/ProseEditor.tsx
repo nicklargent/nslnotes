@@ -762,7 +762,7 @@ function htmlFromMarkdown(
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     // Images — must run BEFORE links to avoid ![...]() being consumed as [...]()
     .replace(
-      /!\[([^\]]*)\]\(([^)]+)\)(?:\{width=(\d+)\})?/g,
+      /!\[([^\]]*)\]\(((?:[^()]*|\([^()]*\))*)\)(?:\{width=(\d+)\})?/g,
       (_match, alt: string, src: string, width: string) => {
         const resolvedSrc =
           entityPath && rootPath
@@ -773,7 +773,7 @@ function htmlFromMarkdown(
       }
     )
     // Markdown links [text](url) — must run before wikilinks and topic refs
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g, '<a href="$2">$1</a>')
     // Wikilinks
     .replace(/\[\[(task|doc|note):([^\]]+)\]\]/g, "[[$1:$2]]")
     // Topic/person refs
@@ -870,9 +870,12 @@ function htmlFromMarkdown(
       result.push(trimmed);
     } else if (/^(\s*)([-*])\s(.*)$/.test(line)) {
       const match = /^(\s*)([-*])\s(.*)$/.exec(line)!;
-      const indent = match[1]?.length ?? 0;
+      const rawIndent = match[1] ?? "";
       const content = match[3] ?? "";
-      const level = Math.floor(indent / 2);
+      // Expand tabs: each tab = 1 nesting level, each 2 spaces = 1 nesting level
+      const tabCount = (rawIndent.match(/\t/g) ?? []).length;
+      const spaceCount = (rawIndent.match(/ /g) ?? []).length;
+      const level = tabCount + Math.floor(spaceCount / 2);
 
       if (level > currentListDepth) {
         const levelsToOpen = level - currentListDepth;
@@ -909,6 +912,9 @@ function htmlFromMarkdown(
         inTable = false;
         tableLines = [];
       }
+    } else if (currentListDepth >= 0 && /^\s/.test(line)) {
+      // Continuation line inside a list item — append to current <li>
+      result.push(`<p>${trimmed}</p>`);
     } else {
       closeListsTo(-1);
       if (inTable) {
