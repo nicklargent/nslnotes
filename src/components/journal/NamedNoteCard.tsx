@@ -93,7 +93,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
 
   return (
     <div
-      class={`mt-2 rounded-lg border p-3 transition-colors ${
+      class={`mt-2 overflow-hidden rounded-lg border p-3 transition-colors ${
         props.isFocused
           ? "border-blue-300 bg-blue-50 dark:bg-blue-900/30"
           : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600"

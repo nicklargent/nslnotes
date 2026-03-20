@@ -112,7 +112,7 @@ export function DailyNote(props: DailyNoteProps) {
   return (
     <div class="min-h-[60px] py-1">
       <div class="flex items-center justify-between">
-        <div class="flex-1">
+        <div class="flex-1 min-w-0">
           <Show
             when={rawMode() && props.note}
             fallback={

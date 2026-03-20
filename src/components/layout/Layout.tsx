@@ -52,7 +52,9 @@ export function Layout(props: LayoutProps) {
         }}
         onResizeEnd={debouncedSave}
       />
-      <main class="flex flex-col overflow-y-auto">{props.center}</main>
+      <main class="flex flex-col overflow-y-auto overflow-x-hidden">
+        {props.center}
+      </main>
       <ResizeHandle
         onResize={(delta) => {
           setUIStore(
