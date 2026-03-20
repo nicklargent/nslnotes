@@ -249,6 +249,28 @@ export const InlineDecorations = Extension.create({
                 decorations.push(
                   Decoration.inline(pos, pos + 1, { class: cls })
                 );
+                const label =
+                  ch === "\u2610"
+                    ? "TODO"
+                    : ch === "\u25a3"
+                      ? "DOING"
+                      : ch === "\u22A1"
+                        ? "WAITING"
+                        : ch === "\u229F"
+                          ? "LATER"
+                          : "DONE";
+                decorations.push(
+                  Decoration.widget(
+                    pos + 1,
+                    () => {
+                      const span = document.createElement("span");
+                      span.className = `todo-label ${cls.replace("todo-marker ", "")}`;
+                      span.textContent = label;
+                      return span;
+                    },
+                    { side: -1, key: `todo-label:${pos}:${label}` }
+                  )
+                );
               }
 
               // Wikilinks [[type:target]]

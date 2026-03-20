@@ -174,6 +174,36 @@
   color: var(--color-todo-done);
 }
 
+/* TODO state labels */
+.todo-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.125rem;
+  margin-right: 0.25rem;
+  user-select: none;
+  pointer-events: none;
+}
+
+.todo-label.todo-open {
+  color: var(--color-todo-open);
+}
+
+.todo-label.todo-doing {
+  color: var(--color-todo-doing);
+}
+
+.todo-label.todo-waiting {
+  color: var(--color-todo-waiting);
+}
+
+.todo-label.todo-later {
+  color: var(--color-todo-later);
+}
+
+.todo-label.todo-done {
+  color: var(--color-todo-done);
+}
+
 /* Links */
 .prose-editor .tiptap a {
   color: var(--color-link);
