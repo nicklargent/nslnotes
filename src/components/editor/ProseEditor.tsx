@@ -4,6 +4,10 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import { Table } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table-row";
+import { TableCell } from "@tiptap/extension-table-cell";
+import { TableHeader } from "@tiptap/extension-table-header";
 import { DOMSerializer } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { WIKILINK_MIME } from "../../lib/drag";
@@ -132,6 +136,10 @@ export function ProseEditor(props: ProseEditorProps) {
           inline: false,
           allowBase64: false,
         }),
+        Table.configure({ resizable: false }),
+        TableRow,
+        TableHeader,
+        TableCell,
         InlineDecorations,
         PromoteHighlightPlugin,
         ImageResizePlugin,
@@ -217,17 +225,22 @@ export function ProseEditor(props: ProseEditorProps) {
             }
           }
 
-          // Check for TODO marker click (Unicode chars ☐✎☑)
-          const todoMatch = /^([\u2610\u25a3\u2611])\s/.exec(nodeText);
+          // Check for TODO marker click (Unicode chars ☐◣⌛▷☑)
+          const todoMatch = /^([\u2610\u25a3\u22A1\u229F\u2611])\s/.exec(
+            nodeText
+          );
           if (todoMatch && clickOffset <= 1) {
             event.preventDefault();
             const markerChar = todoMatch[1]!;
+            // Cycle: TODO→DOING→DONE→TODO. WAITING/LATER click→DONE.
             const nextChar =
               markerChar === "\u2610"
                 ? "\u25a3"
                 : markerChar === "\u25a3"
                   ? "\u2611"
-                  : "\u2610";
+                  : markerChar === "\u22A1" || markerChar === "\u229F"
+                    ? "\u2611"
+                    : "\u2610";
             // Replace just the marker character at the exact position
             const markerPos = $pos.start();
             editor!
@@ -696,6 +709,27 @@ export function ProseEditor(props: ProseEditorProps) {
 /**
  * Simple markdown to HTML conversion for TipTap content.
  */
+/** Convert collected markdown table lines to HTML <table>. */
+function tableLinesToHtml(lines: string[]): string {
+  // Filter out separator rows (| --- | --- |)
+  const dataRows = lines.filter((l) => !/^\|[\s:|-]+\|$/.test(l));
+  if (dataRows.length === 0) return "";
+
+  let html = "<table>";
+  for (let i = 0; i < dataRows.length; i++) {
+    const cells = dataRows[i]!.slice(1, -1)
+      .split("|")
+      .map((c) => c.trim());
+    const tag = i === 0 ? "th" : "td";
+    html +=
+      "<tr>" +
+      cells.map((c) => `<${tag}><p>${c}</p></${tag}>`).join("") +
+      "</tr>";
+  }
+  html += "</table>";
+  return html;
+}
+
 function htmlFromMarkdown(
   md: string,
   entityPath?: string,
@@ -703,11 +737,25 @@ function htmlFromMarkdown(
 ): string {
   if (!md.trim()) return "<p></p>";
 
-  let html = md
+  // Code blocks must be extracted BEFORE inline code to avoid backtick conflicts.
+  // Replace with placeholders, then restore after all other replacements.
+  const codeBlocks: string[] = [];
+  let html = md.replace(
+    /```(\w*)\n([\s\S]*?)```/g,
+    (_match, _lang: string, content: string) => {
+      const idx = codeBlocks.length;
+      codeBlocks.push(`<pre><code>${escapeHtml(content.trim())}</code></pre>`);
+      return `\uFFFFCODEBLOCK${idx}\uFFFF`;
+    }
+  );
+
+  html = html
     // Headers
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")
     .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    // Strikethrough
+    .replace(/~~(.+?)~~/g, "<s>$1</s>")
     // Bold and italic
     .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
@@ -730,13 +778,10 @@ function htmlFromMarkdown(
     .replace(/\[\[(task|doc|note):([^\]]+)\]\]/g, "[[$1:$2]]")
     // Topic/person refs
     .replace(/(?<!\w)([#@][a-z0-9-]+)/gi, "$1")
-    // Inline code
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    // Code blocks
-    .replace(/```[\s\S]*?```/g, (match) => {
-      const content = match.slice(3, -3).replace(/^\w*\n/, "");
-      return `<pre><code>${escapeHtml(content.trim())}</code></pre>`;
-    });
+    // Inline code (single backticks only — code blocks already extracted)
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+
+  // NOTE: code block placeholders (\uFFFFCODEBLOCKn\uFFFF) are restored in the line-by-line loop below.
 
   // TODO/DOING/DONE markers (in list items and plain paragraphs)
   html = html
@@ -749,6 +794,14 @@ function htmlFromMarkdown(
       '$1<span class="todo-marker todo-doing" data-todo="DOING">&#9635;</span> '
     )
     .replace(
+      /^(\s*[-*] )WAITING /gm,
+      '$1<span class="todo-marker todo-waiting" data-todo="WAITING">&#8865;</span> '
+    )
+    .replace(
+      /^(\s*[-*] )LATER /gm,
+      '$1<span class="todo-marker todo-later" data-todo="LATER">&#8863;</span> '
+    )
+    .replace(
       /^(\s*[-*] )DONE /gm,
       '$1<span class="todo-marker todo-done" data-todo="DONE">&#9745;</span> <s>'
     )
@@ -756,7 +809,7 @@ function htmlFromMarkdown(
       /^(\s*[-*] <span class="todo-marker todo-done"[^>]*>&#9745;<\/span> <s>)(.+)$/gm,
       "$1$2</s>"
     )
-    // Top-level TODO/DOING/DONE (not in list items)
+    // Top-level TODO/DOING/WAITING/LATER/DONE (not in list items)
     .replace(
       /^TODO /gm,
       '<span class="todo-marker todo-open" data-todo="TODO">&#9744;</span> '
@@ -764,6 +817,14 @@ function htmlFromMarkdown(
     .replace(
       /^DOING /gm,
       '<span class="todo-marker todo-doing" data-todo="DOING">&#9635;</span> '
+    )
+    .replace(
+      /^WAITING /gm,
+      '<span class="todo-marker todo-waiting" data-todo="WAITING">&#8865;</span> '
+    )
+    .replace(
+      /^LATER /gm,
+      '<span class="todo-marker todo-later" data-todo="LATER">&#8863;</span> '
     )
     .replace(
       /^DONE /gm,
@@ -778,6 +839,8 @@ function htmlFromMarkdown(
   const lines = html.split("\n");
   const result: string[] = [];
   let currentListDepth = -1;
+  let inTable = false;
+  let tableLines: string[] = [];
 
   function closeListsTo(depth: number) {
     while (currentListDepth > depth) {
@@ -791,6 +854,13 @@ function htmlFromMarkdown(
 
   for (const line of lines) {
     const trimmed = line.trim();
+    // Code block placeholder — restore as <pre> block
+    const cbMatch = /^\uFFFFCODEBLOCK(\d+)\uFFFF$/.exec(trimmed);
+    if (cbMatch) {
+      closeListsTo(-1);
+      result.push(codeBlocks[parseInt(cbMatch[1]!, 10)] ?? "");
+      continue;
+    }
     if (trimmed.startsWith("<img ")) {
       // Block-level image — do not wrap in <p>
       closeListsTo(-1);
@@ -824,14 +894,35 @@ function htmlFromMarkdown(
         result.push("</li>");
       }
       result.push(`<li><p>${trimmed.replace(/^\d+\. /, "")}</p>`);
+    } else if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      // Markdown table row
+      closeListsTo(-1);
+      if (!inTable) {
+        inTable = true;
+        tableLines = [];
+      }
+      tableLines.push(trimmed);
     } else if (trimmed === "") {
       closeListsTo(-1);
+      if (inTable) {
+        result.push(tableLinesToHtml(tableLines));
+        inTable = false;
+        tableLines = [];
+      }
     } else {
       closeListsTo(-1);
+      if (inTable) {
+        result.push(tableLinesToHtml(tableLines));
+        inTable = false;
+        tableLines = [];
+      }
       result.push(`<p>${trimmed}</p>`);
     }
   }
   closeListsTo(-1);
+  if (inTable) {
+    result.push(tableLinesToHtml(tableLines));
+  }
 
   return result.join("") || "<p></p>";
 }
@@ -865,6 +956,8 @@ export function markdownFromHtml(
         text = text
           .replace(/^\u2610\s*/, "TODO ")
           .replace(/^\u25a3\s*/, "DOING ")
+          .replace(/^\u22A1\s*/, "WAITING ")
+          .replace(/^\u229F\s*/, "LATER ")
           .replace(/^\u2611\s*/, "DONE ");
         result += text;
       } else if (child.nodeType === Node.ELEMENT_NODE) {
@@ -906,6 +999,10 @@ export function markdownFromHtml(
             }
             break;
           }
+          case "s":
+          case "del":
+            result += `~~${convert(el, listDepth)}~~`;
+            break;
           case "a": {
             const href =
               el.getAttribute("href") || el.getAttribute("data-href") || "";
@@ -941,6 +1038,9 @@ export function markdownFromHtml(
             break;
           case "li":
             result += convert(el, listDepth);
+            break;
+          case "table":
+            result += convertTable(el);
             break;
           case "br":
             result += "\n";
@@ -996,6 +1096,20 @@ export function markdownFromHtml(
       const tag = child.tagName.toLowerCase();
       if (tag === "ul" || tag === "ol") {
         result += convert(child, listDepth);
+      }
+    }
+    return result;
+  }
+
+  function convertTable(table: HTMLElement): string {
+    let result = "";
+    const rows = Array.from(table.querySelectorAll("tr"));
+    for (let i = 0; i < rows.length; i++) {
+      const cells = Array.from(rows[i]!.querySelectorAll("th, td"));
+      const cellTexts = cells.map((c) => (c.textContent ?? "").trim());
+      result += `| ${cellTexts.join(" | ")} |\n`;
+      if (i === 0) {
+        result += `| ${cellTexts.map((c) => "-".repeat(Math.max(c.length, 3))).join(" | ")} |\n`;
       }
     }
     return result;

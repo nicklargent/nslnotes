@@ -1,7 +1,7 @@
 /**
  * TODO item states (LogSeq-style)
  */
-export type TodoState = "TODO" | "DOING" | "DONE";
+export type TodoState = "TODO" | "DOING" | "WAITING" | "LATER" | "DONE";
 
 /**
  * Parsed TODO item

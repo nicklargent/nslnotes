@@ -5,7 +5,7 @@ import type { TopicRef } from "../types/topics";
  * Regex for TODO items: "- TODO|DOING|DONE text"
  * Captures indentation, state, and text.
  */
-const TODO_PATTERN = /^(\s*)- (TODO|DOING|DONE)\s+(.*)/;
+const TODO_PATTERN = /^(\s*)- (TODO|DOING|WAITING|LATER|DONE)\s+(.*)/;
 
 /**
  * Regex for wikilinks: [[type:target]]

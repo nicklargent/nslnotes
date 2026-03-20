@@ -113,6 +113,34 @@
   margin: 1rem 0;
 }
 
+.prose-editor .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+}
+
+.prose-editor .tiptap th,
+.prose-editor .tiptap td {
+  border: 1px solid var(--color-hr);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose-editor .tiptap th {
+  font-weight: 600;
+  background-color: color-mix(
+    in srgb,
+    var(--color-bg-secondary),
+    transparent 50%
+  );
+}
+
+.prose-editor .tiptap th p,
+.prose-editor .tiptap td p {
+  margin: 0;
+}
+
 .prose-editor .tiptap strong {
   font-weight: 600;
 }
@@ -132,6 +160,14 @@
 
 .todo-marker.todo-doing {
   color: var(--color-todo-doing);
+}
+
+.todo-marker.todo-waiting {
+  color: var(--color-todo-waiting);
+}
+
+.todo-marker.todo-later {
+  color: var(--color-todo-later);
 }
 
 .todo-marker.todo-done {

@@ -16,6 +16,10 @@ export function TodoCheckbox(props: TodoCheckboxProps) {
         return "\u2610"; // Empty checkbox
       case "DOING":
         return "\u25a3"; // Square with inner square
+      case "WAITING":
+        return "\u22A1"; // Squared dot
+      case "LATER":
+        return "\u229F"; // Squared minus
       case "DONE":
         return "\u2611"; // Checked checkbox
     }
@@ -27,6 +31,10 @@ export function TodoCheckbox(props: TodoCheckboxProps) {
         return "text-gray-400 dark:text-gray-500";
       case "DOING":
         return "text-blue-500";
+      case "WAITING":
+        return "text-amber-500";
+      case "LATER":
+        return "text-purple-500";
       case "DONE":
         return "text-green-500";
     }

@@ -14,6 +14,16 @@ describe("parseTodos", () => {
     expect(todos[2]?.text).toBe("send email");
   });
 
+  it("parses WAITING and LATER items", () => {
+    const content = "- WAITING check back\n- LATER someday";
+    const todos = parseTodos(content);
+    expect(todos).toHaveLength(2);
+    expect(todos[0]?.state).toBe("WAITING");
+    expect(todos[0]?.text).toBe("check back");
+    expect(todos[1]?.state).toBe("LATER");
+    expect(todos[1]?.text).toBe("someday");
+  });
+
   it("tracks line numbers", () => {
     const content = "some text\n- TODO item\nmore text";
     const todos = parseTodos(content);

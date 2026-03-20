@@ -82,8 +82,8 @@ export const InlineDecorations = Extension.create({
             if (!node.isTextblock) return;
             const text = node.textContent;
 
-            // Match TODO/DOING/DONE text that needs replacing with Unicode
-            const textMatch = /^(TODO|DOING|DONE) /.exec(text);
+            // Match TODO/DOING/WAITING/LATER/DONE text that needs replacing with Unicode
+            const textMatch = /^(TODO|DOING|WAITING|LATER|DONE) /.exec(text);
             if (textMatch) {
               const marker = textMatch[1];
               const unicode =
@@ -91,7 +91,11 @@ export const InlineDecorations = Extension.create({
                   ? "\u2610"
                   : marker === "DOING"
                     ? "\u25a3"
-                    : "\u2611";
+                    : marker === "WAITING"
+                      ? "\u22A1"
+                      : marker === "LATER"
+                        ? "\u229F"
+                        : "\u2611";
               replacements.push({
                 from: pos + 1,
                 to: pos + 1 + marker!.length,
@@ -111,7 +115,9 @@ export const InlineDecorations = Extension.create({
             }
 
             // Handle existing Unicode markers — manage strike on state changes
-            const unicodeMatch = /^([\u2610\u25a3\u2611])\s/.exec(text);
+            const unicodeMatch = /^([\u2610\u25a3\u22A1\u229F\u2611])\s/.exec(
+              text
+            );
             if (unicodeMatch && strikeMark && text.length > 2) {
               const isDone = unicodeMatch[1] === "\u2611";
               const contentFrom = pos + 1 + 2; // after marker char + space
@@ -224,8 +230,10 @@ export const InlineDecorations = Extension.create({
               if (!node.isText) return;
               const text = node.text || "";
 
-              // TODO markers (☐ = \u2610, ✎ = \u25a3, ☑ = \u2611)
-              const todoMatch = /^([\u2610\u25a3\u2611])/.exec(text);
+              // TODO markers (☐ = \u2610, ◣ = \u25a3, ⌛ = \u231B, ▷ = \u25B7, ☑ = \u2611)
+              const todoMatch = /^([\u2610\u25a3\u22A1\u229F\u2611])/.exec(
+                text
+              );
               if (todoMatch) {
                 const ch = todoMatch[1]!;
                 const cls =
@@ -233,7 +241,11 @@ export const InlineDecorations = Extension.create({
                     ? "todo-marker todo-open"
                     : ch === "\u25a3"
                       ? "todo-marker todo-doing"
-                      : "todo-marker todo-done";
+                      : ch === "\u22A1"
+                        ? "todo-marker todo-waiting"
+                        : ch === "\u229F"
+                          ? "todo-marker todo-later"
+                          : "todo-marker todo-done";
                 decorations.push(
                   Decoration.inline(pos, pos + 1, { class: cls })
                 );
