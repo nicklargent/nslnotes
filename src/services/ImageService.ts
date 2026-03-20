@@ -300,6 +300,19 @@ export const ImageService = {
     const newImageToEntities = new Map(indexStore.imageToEntities);
     newImageToEntities.delete(imagePath);
     setIndexStore("imageToEntities", newImageToEntities);
+
+    // Clean up empty .assets/ directory
+    const assetsDir = imagePath.substring(0, imagePath.lastIndexOf("/"));
+    if (assetsDir.endsWith(".assets")) {
+      try {
+        const remaining = await runtime.listDirectory(assetsDir);
+        if (remaining.length === 0) {
+          await runtime.deleteDirectory(assetsDir);
+        }
+      } catch {
+        // Directory may already be gone
+      }
+    }
   },
 };
 
