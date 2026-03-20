@@ -32,6 +32,13 @@ export function DateHeader(props: DateHeaderProps) {
               — {formatLongDate(props.date)}
             </span>
           </>
+        ) : relativeDays() === -1 ? (
+          <>
+            <span class="text-base font-semibold">Yesterday</span>
+            <span class="ml-1.5 text-sm text-gray-500 dark:text-gray-400">
+              — {formatLongDate(props.date)}
+            </span>
+          </>
         ) : isRecent() ? (
           <>
             <span class="text-base font-semibold">
