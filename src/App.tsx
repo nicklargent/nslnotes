@@ -230,9 +230,23 @@ function App() {
     const topics = Array.from(indexStore.topics.values()).filter(
       (t) => t.isActive
     );
-    return topics.sort((a, b) =>
-      a.label.toLowerCase().localeCompare(b.label.toLowerCase())
-    );
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
+
+    function weightedScore(t: Topic): number {
+      let score = 0;
+      for (const ref of t.references) {
+        score += ref.date && ref.date >= sevenDaysAgoStr ? 2 : 1;
+      }
+      return score;
+    }
+
+    return topics.sort((a, b) => {
+      const diff = weightedScore(b) - weightedScore(a);
+      if (diff !== 0) return diff;
+      return a.label.toLowerCase().localeCompare(b.label.toLowerCase());
+    });
   });
 
   /**
