@@ -218,12 +218,36 @@
   text-decoration-color: var(--color-link);
 }
 
+/* Resolved regular link (widget shown when cursor outside) */
+.md-link-resolved {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-decoration-color: var(--color-link-underline);
+  cursor: text;
+}
+.md-link-resolved:hover {
+  text-decoration-color: var(--color-link);
+}
+
+/* Raw markdown link syntax when cursor is inside */
+.md-link {
+  color: var(--color-link);
+}
+
+/* URL portion — dimmed and allows wrapping */
+.md-link-url {
+  color: var(--color-editor-placeholder);
+  font-size: 0.9em;
+  word-break: break-all;
+}
+
 /* Pointer cursor on Cmd/Ctrl hold for clickable elements */
 .prose-editor.ctrl-held .tiptap a,
 .prose-editor.ctrl-held .tiptap .wikilink,
 .prose-editor.ctrl-held .tiptap .topic-ref,
 .prose-editor.ctrl-held .tiptap .wikilink-resolved,
-.prose-editor.ctrl-held .tiptap .topic-resolved {
+.prose-editor.ctrl-held .tiptap .topic-resolved,
+.prose-editor.ctrl-held .tiptap .md-link-resolved {
   cursor: pointer;
 }
 

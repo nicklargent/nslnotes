@@ -112,8 +112,8 @@ export function ProseEditor(props: ProseEditorProps) {
           },
         }).configure({
           openOnClick: false,
-          autolink: true,
-          linkOnPaste: true,
+          autolink: false,
+          linkOnPaste: false,
         }),
         Image.extend({
           addAttributes() {
@@ -214,14 +214,18 @@ export function ProseEditor(props: ProseEditorProps) {
           const nodeText = $pos.parent.textContent;
           const clickOffset = pos - $pos.start();
 
-          // Cmd/Ctrl+click to open links
+          // Cmd/Ctrl+click to open links (raw markdown links)
           if (event.metaKey || event.ctrlKey) {
-            const marks = $pos.marks();
-            const linkMark = marks.find((m) => m.type.name === "link");
-            if (linkMark) {
-              const href = linkMark.attrs["href"] as string | undefined;
-              if (href) {
+            const mdLinkRegex =
+              /(?<!\[!?)\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g;
+            let mlMatch;
+            while ((mlMatch = mdLinkRegex.exec(nodeText)) !== null) {
+              if (
+                clickOffset >= mlMatch.index &&
+                clickOffset <= mlMatch.index + mlMatch[0].length
+              ) {
                 event.preventDefault();
+                const href = mlMatch[2]!;
                 window.open(href, "_blank");
                 return true;
               }
@@ -473,11 +477,47 @@ export function ProseEditor(props: ProseEditorProps) {
 
     // Prevent native <a> click navigation — links are opened via Cmd/Ctrl+click.
     // Use capture phase to intercept before ProseMirror or browser default handling.
+    // Also handle clicks on resolved link widgets to place cursor at the raw text.
     function handleLinkClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
       const anchor = target.tagName === "A" ? target : target.closest("a");
       if (anchor && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
+      }
+
+      // Click on resolved markdown link widget → place cursor at raw text position
+      const resolved = target.closest(
+        ".md-link-resolved"
+      ) as HTMLElement | null;
+      if (resolved && editor && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        const posStr = resolved.getAttribute("data-link-pos");
+        if (posStr) {
+          const pos = parseInt(posStr, 10);
+          // Place cursor inside the link text (after the opening "[")
+          const safePos = Math.min(pos + 1, editor.state.doc.content.size);
+          editor
+            .chain()
+            .focus()
+            .command(({ tr }) => {
+              tr.setSelection(TextSelection.create(tr.doc, safePos));
+              return true;
+            })
+            .run();
+        }
+        return;
+      }
+
+      // Ctrl+click on resolved link widget → open URL
+      if (resolved && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const href = resolved.getAttribute("data-link-href");
+        if (href) {
+          window.open(href, "_blank");
+        }
+        return;
       }
     }
     containerRef.addEventListener("click", handleLinkClick, true);
@@ -775,8 +815,7 @@ function htmlFromMarkdown(
         return `<img src="${resolvedSrc}" alt="${alt}"${widthAttr}>`;
       }
     )
-    // Markdown links [text](url) — must run before wikilinks and topic refs
-    .replace(/\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g, '<a href="$2">$1</a>')
+    // Markdown links [text](url) — kept as raw text, rendered via decorations
     // Wikilinks
     .replace(/\[\[(task|doc|note):([^\]]+)\]\]/g, "[[$1:$2]]")
     // Topic/person refs

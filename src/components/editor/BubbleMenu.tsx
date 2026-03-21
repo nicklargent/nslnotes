@@ -22,10 +22,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
     top: 0,
     left: 0,
   });
-  const [linkMode, setLinkMode] = createSignal(false);
-  const [linkUrl, setLinkUrl] = createSignal("");
   let menuRef: HTMLDivElement | undefined;
-  let linkInputRef: HTMLInputElement | undefined;
 
   function updatePosition() {
     const { state, view } = props.editor;
@@ -51,7 +48,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !linkMode()) {
+      if (e.key === "Escape") {
         e.preventDefault();
         props.onClose();
       }
@@ -89,43 +86,10 @@ export function BubbleMenu(props: BubbleMenuProps) {
   }
 
   function isActive(
-    format: ToggleFormat | "link",
+    format: ToggleFormat,
     attrs?: Record<string, unknown>
   ): boolean {
     return props.editor.isActive(format, attrs);
-  }
-
-  function handleLinkClick(e: MouseEvent) {
-    e.stopPropagation();
-    const existingHref = props.editor.getAttributes("link")["href"] as
-      | string
-      | undefined;
-    setLinkUrl(existingHref ?? "");
-    setLinkMode(true);
-    setTimeout(() => linkInputRef?.focus(), 0);
-  }
-
-  function applyLink() {
-    const url = linkUrl().trim();
-    if (url) {
-      props.editor.chain().focus().setLink({ href: url }).run();
-    }
-    setLinkMode(false);
-  }
-
-  function removeLink() {
-    props.editor.chain().focus().unsetLink().run();
-    setLinkMode(false);
-  }
-
-  function handleLinkKeyDown(e: KeyboardEvent) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      applyLink();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      setLinkMode(false);
-    }
   }
 
   const btnClass = (active: boolean) =>
@@ -148,121 +112,74 @@ export function BubbleMenu(props: BubbleMenuProps) {
         transform: "translate(-50%, -100%)",
       }}
     >
-      <Show
-        when={!linkMode()}
-        fallback={
-          <div class="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 shadow-lg dark:shadow-gray-900/50">
-            <input
-              ref={linkInputRef}
-              type="text"
-              class="w-48 border-0 bg-transparent text-sm outline-none"
-              placeholder="Enter URL..."
-              value={linkUrl()}
-              onInput={(e) => setLinkUrl(e.currentTarget.value)}
-              onKeyDown={handleLinkKeyDown}
-            />
-            <button
-              class="px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
-              onClick={applyLink}
-            >
-              Apply
-            </button>
-            <Show when={isActive("link")}>
-              <button
-                class="px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded"
-                onClick={removeLink}
-              >
-                Remove
-              </button>
-            </Show>
-            <button
-              class="px-1 py-0.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
-              onClick={() => setLinkMode(false)}
-            >
-              Esc
-            </button>
-          </div>
-        }
-      >
-        <div class="flex items-center gap-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-1 py-0.5 shadow-lg dark:shadow-gray-900/50">
-          <button
-            class={btnClass(isActive("bold"))}
-            onClick={() => toggle("bold")}
-            title="Bold"
-          >
-            <span class="font-bold">B</span>
-          </button>
-          <button
-            class={btnClass(isActive("italic"))}
-            onClick={() => toggle("italic")}
-            title="Italic"
-          >
-            <span class="italic">I</span>
-          </button>
-          <button
-            class={btnClass(isActive("strike"))}
-            onClick={() => toggle("strike")}
-            title="Strikethrough"
-          >
-            <span class="line-through">S</span>
-          </button>
-          <button
-            class={btnClass(isActive("code"))}
-            onClick={() => toggle("code")}
-            title="Inline Code"
-          >
-            <span class="font-mono text-xs">&lt;&gt;</span>
-          </button>
+      <div class="flex items-center gap-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-1 py-0.5 shadow-lg dark:shadow-gray-900/50">
+        <button
+          class={btnClass(isActive("bold"))}
+          onClick={() => toggle("bold")}
+          title="Bold"
+        >
+          <span class="font-bold">B</span>
+        </button>
+        <button
+          class={btnClass(isActive("italic"))}
+          onClick={() => toggle("italic")}
+          title="Italic"
+        >
+          <span class="italic">I</span>
+        </button>
+        <button
+          class={btnClass(isActive("strike"))}
+          onClick={() => toggle("strike")}
+          title="Strikethrough"
+        >
+          <span class="line-through">S</span>
+        </button>
+        <button
+          class={btnClass(isActive("code"))}
+          onClick={() => toggle("code")}
+          title="Inline Code"
+        >
+          <span class="font-mono text-xs">&lt;&gt;</span>
+        </button>
 
+        <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-600" />
+
+        <button
+          class={btnClass(isActive("heading", { level: 1 }))}
+          onClick={() => toggle("heading", { level: 1 })}
+          title="Heading 1"
+        >
+          <span class="text-xs font-bold">H1</span>
+        </button>
+        <button
+          class={btnClass(isActive("heading", { level: 2 }))}
+          onClick={() => toggle("heading", { level: 2 })}
+          title="Heading 2"
+        >
+          <span class="text-xs font-bold">H2</span>
+        </button>
+        <button
+          class={btnClass(isActive("heading", { level: 3 }))}
+          onClick={() => toggle("heading", { level: 3 })}
+          title="Heading 3"
+        >
+          <span class="text-xs font-bold">H3</span>
+        </button>
+
+        <Show when={props.onExtract}>
           <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-600" />
-
           <button
-            class={btnClass(isActive("heading", { level: 1 }))}
-            onClick={() => toggle("heading", { level: 1 })}
-            title="Heading 1"
+            class={btnClass(false)}
+            onClick={() => {
+              props.onExtract?.();
+              props.onClose();
+            }}
+            title="Extract to task or document"
           >
-            <span class="text-xs font-bold">H1</span>
+            <span class="text-xs">Extract</span>
           </button>
-          <button
-            class={btnClass(isActive("heading", { level: 2 }))}
-            onClick={() => toggle("heading", { level: 2 })}
-            title="Heading 2"
-          >
-            <span class="text-xs font-bold">H2</span>
-          </button>
-          <button
-            class={btnClass(isActive("heading", { level: 3 }))}
-            onClick={() => toggle("heading", { level: 3 })}
-            title="Heading 3"
-          >
-            <span class="text-xs font-bold">H3</span>
-          </button>
-
-          <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-600" />
-
-          <button
-            class={btnClass(isActive("link"))}
-            onClick={handleLinkClick}
-            title="Link"
-          >
-            <span class="text-xs">Link</span>
-          </button>
-
-          <Show when={props.onExtract}>
-            <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-600" />
-            <button
-              class={btnClass(false)}
-              onClick={() => {
-                props.onExtract?.();
-                props.onClose();
-              }}
-              title="Extract to task or document"
-            >
-              <span class="text-xs">Extract</span>
-            </button>
-          </Show>
-        </div>
-      </Show>
+        </Show>
+      </div>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import type { EntityType } from "../../types/entities";
 
 const WIKILINK_RE = /\[\[(task|doc|note):([^\]]+)\]\]/g;
 const TOPIC_RE = /(?:^|(?<=\s))([#@][a-z0-9-]+)/gi;
+const MD_LINK_RE = /(?<!\[!?)\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g;
 const HIDDEN_STYLE = "font-size:0;letter-spacing:-1ch;color:transparent;";
 
 function resolveWikilinkTitle(type: EntityType, target: string): string | null {
@@ -174,9 +175,9 @@ export const InlineDecorations = Extension.create({
           return changed ? tr : null;
         },
       }),
-      // Plugin to convert markdown link syntax [text](url) into link marks
+      // Plugin to convert any link marks (from paste, etc.) back to raw [text](url)
       new Plugin({
-        key: new PluginKey("markdownLinkConvert"),
+        key: new PluginKey("linkMarkToRawText"),
         appendTransaction(
           transactions: readonly Transaction[],
           _oldState,
@@ -190,31 +191,36 @@ export const InlineDecorations = Extension.create({
           const tr = newState.tr;
           let changed = false;
 
+          // Collect replacements first to avoid modifying during traversal
+          const replacements: Array<{
+            from: number;
+            to: number;
+            text: string;
+            href: string;
+          }> = [];
+
           newState.doc.descendants((node, pos) => {
-            if (changed) return false; // Only process first match per transaction
-            if (!node.isTextblock) return undefined;
-            const text = node.textContent;
-
-            // Match [text](url) but not [[wikilinks]]
-            const mdLinkRegex = /(?<!\[)\[([^\]]+)\]\(([^)]+)\)/g;
-            const match = mdLinkRegex.exec(text);
-            if (match) {
-              const fullMatch = match[0]!;
-              const linkText = match[1]!;
-              const href = match[2]!;
-
-              const from = pos + 1 + match.index;
-              const to = from + fullMatch.length;
-
-              // Replace markdown syntax with linked text + trailing space to break mark
-              const mark = linkMark.create({ href });
-              const linkedText = newState.schema.text(linkText, [mark]);
-              tr.replaceWith(from, to, [linkedText, newState.schema.text(" ")]);
-              changed = true;
-              return false;
+            if (!node.isText) return;
+            const mark = node.marks.find((m) => m.type === linkMark);
+            if (mark) {
+              const href = mark.attrs["href"] as string;
+              const text = node.text || "";
+              replacements.push({
+                from: pos,
+                to: pos + node.nodeSize,
+                text,
+                href,
+              });
             }
-            return undefined;
           });
+
+          // Apply in reverse to preserve positions
+          for (let i = replacements.length - 1; i >= 0; i--) {
+            const r = replacements[i]!;
+            const raw = `[${r.text}](${r.href})`;
+            tr.replaceWith(r.from, r.to, newState.schema.text(raw));
+            changed = true;
+          }
 
           return changed ? tr : null;
         },
@@ -304,6 +310,52 @@ export const InlineDecorations = Extension.create({
                           "data-wikilink-target": target,
                         }),
                       { side: -1, key: `wl:${type}:${target}` }
+                    )
+                  );
+                }
+              }
+
+              // Markdown links [text](url)
+              MD_LINK_RE.lastIndex = 0;
+              let mdLinkMatch;
+              while ((mdLinkMatch = MD_LINK_RE.exec(text)) !== null) {
+                const mlFrom = pos + mdLinkMatch.index;
+                const mlTo = mlFrom + mdLinkMatch[0].length;
+                const linkText = mdLinkMatch[1]!;
+                const linkUrl = mdLinkMatch[2]!;
+                const cursorInside = selFrom <= mlTo && selTo >= mlFrom;
+
+                if (cursorInside) {
+                  // Show full raw text; style the whole thing as a link
+                  decorations.push(
+                    Decoration.inline(mlFrom, mlTo, { class: "md-link" })
+                  );
+                  // Dim the URL portion: (url)
+                  // The URL portion starts after "[text]" = 1 + linkText.length + 1 chars from mlFrom
+                  const urlFrom = mlFrom + 1 + linkText.length + 1; // after "[text]"
+                  const urlTo = mlTo; // includes closing ")"
+                  decorations.push(
+                    Decoration.inline(urlFrom, urlTo, {
+                      class: "md-link-url",
+                    })
+                  );
+                } else {
+                  // Hide raw text, show widget
+                  decorations.push(
+                    Decoration.inline(mlFrom, mlTo, {
+                      class: "md-link-hidden",
+                      style: HIDDEN_STYLE,
+                    })
+                  );
+                  decorations.push(
+                    Decoration.widget(
+                      mlFrom,
+                      () =>
+                        createResolvedSpan("md-link-resolved", linkText, {
+                          "data-link-pos": String(mlFrom),
+                          "data-link-href": linkUrl,
+                        }),
+                      { side: -1, key: `mdlink:${mlFrom}:${linkText}` }
                     )
                   );
                 }
