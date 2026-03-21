@@ -21,6 +21,17 @@ const SKIP_PAGES = new Set([
   "Queries.md",
 ]);
 
+const SKIP_WIKILINKS = new Set([
+  "todo", "now", "later", "done", "doing", "waiting",
+  "priority categories", "templates", "tasks dashboard", "contents",
+  "progress check",
+]);
+
+/** Heuristic: 1-3 capitalized words with only letters = person */
+function classifyReference(name: string): "@" | "#" {
+  return /^[A-Z][a-zA-Z']+(\s+[A-Z][a-zA-Z']+){0,2}$/.test(name) ? "@" : "#";
+}
+
 // --- Slug generation (mirrors src/lib/slug.ts) ---
 function generateSlug(title: string): string {
   return title
@@ -80,10 +91,14 @@ function stripTopLevelProperties(content: string): {
   for (const line of lines) {
     const tagMatch = line.match(/^tags::\s*(.+)$/);
     if (tagMatch) {
-      // Parse comma-separated tags
-      tags.push(
-        ...tagMatch[1].split(",").map((t) => t.trim()).filter(Boolean),
-      );
+      // Extract [[...]] values first, fall back to comma-split
+      const raw = tagMatch[1];
+      const wikiMatches = [...raw.matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1]);
+      if (wikiMatches.length > 0) {
+        tags.push(...wikiMatches);
+      } else {
+        tags.push(...raw.split(",").map((t) => t.trim()).filter(Boolean));
+      }
       continue;
     }
     // Skip other top-level properties
@@ -179,8 +194,11 @@ function stripQueryBlocks(content: string): string {
 function convertWikilinks(
   content: string,
   entityMap: Map<string, { type: "task" | "doc"; slug: string }>,
-): string {
-  return content.replace(/\[\[([^\]]+)\]\]/g, (_match, inner: string) => {
+  topicRegistry: Map<string, { label: string; prefix: "@" | "#" }>,
+): { content: string; inlineTopics: string[] } {
+  const inlineTopics: string[] = [];
+
+  const result = content.replace(/\[\[([^\]]+)\]\]/g, (_match, inner: string) => {
     // Handle task/slug and doc/slug prefixed references
     const slashIdx = inner.indexOf("/");
     if (slashIdx !== -1) {
@@ -197,9 +215,20 @@ function convertWikilinks(
       return `[[${entry.type}:${entry.slug}]]`;
     }
 
-    // Unknown page — strip brackets (people names, dead links, etc.)
-    return inner;
+    // Skip Logseq artifacts
+    if (SKIP_WIKILINKS.has(inner.toLowerCase())) return inner;
+
+    // Classify and register as topic/person
+    const slug = generateSlug(inner);
+    if (!slug) return inner;
+    const prefix = classifyReference(inner);
+    const ref = `${prefix}${slug}`;
+    topicRegistry.set(slug, { label: inner, prefix });
+    inlineTopics.push(ref);
+    return ref; // replace with topic ref for inline decoration
   });
+
+  return { content: result, inlineTopics };
 }
 
 /** Strip block references: ((uuid)) */
@@ -494,12 +523,32 @@ function getFileMtime(filePath: string): string {
   return stat.mtime.toISOString().slice(0, 10);
 }
 
+/** Merge tags and inline topics into deduplicated, sorted topic refs */
+function buildTopicRefs(
+  rawTags: string[],
+  inlineTopics: string[],
+  topicRegistry: Map<string, { label: string; prefix: "@" | "#" }>,
+): string[] {
+  const refs = new Set<string>();
+  for (const tag of rawTags) {
+    if (SKIP_WIKILINKS.has(tag.toLowerCase())) continue;
+    const slug = generateSlug(tag);
+    if (!slug) continue;
+    const prefix = classifyReference(tag);
+    topicRegistry.set(slug, { label: tag, prefix });
+    refs.add(`${prefix}${slug}`);
+  }
+  for (const ref of inlineTopics) refs.add(ref);
+  return [...refs].sort();
+}
+
 /** Apply all content transformations */
 function transformContent(
   content: string,
   slug: string,
   entityMap: Map<string, { type: "task" | "doc"; slug: string }>,
-): { body: string; tags: string[]; assets: string[] } {
+  topicRegistry: Map<string, { label: string; prefix: "@" | "#" }>,
+): { body: string; tags: string[]; inlineTopics: string[]; assets: string[] } {
   // 1. Strip top-level properties
   const { content: c1, tags } = stripTopLevelProperties(content);
   // 3. Strip inline properties
@@ -507,7 +556,7 @@ function transformContent(
   // 4. Strip query blocks
   const c3 = stripQueryBlocks(c2);
   // 5. Convert wikilinks
-  const c4 = convertWikilinks(c3, entityMap);
+  const { content: c4, inlineTopics } = convertWikilinks(c3, entityMap, topicRegistry);
   // 5b. Convert bare task/slug and doc/slug references to wikilinks
   const c4b = c4.replace(
     /(?<!\[)\b(task|doc)\/([a-zA-Z0-9_-]+)\b/g,
@@ -528,7 +577,7 @@ function transformContent(
   // 10. Clean whitespace
   const body = cleanWhitespace(c8);
 
-  return { body, tags, assets };
+  return { body, tags, inlineTopics, assets };
 }
 
 /** Copy assets for an entity */
@@ -601,6 +650,8 @@ function main(): void {
 
   console.log(`  Page entity map: ${pageEntityMap.size} entries`);
 
+  const topicRegistry = new Map<string, { label: string; prefix: "@" | "#" }>();
+
   // --- Convert journals → daily notes ---
   const journalsDir = path.join(SOURCE, "journals");
   if (fs.existsSync(journalsDir)) {
@@ -628,17 +679,20 @@ function main(): void {
         continue;
       }
 
-      const { body, assets } = transformContent(content, slug, pageEntityMap);
+      const { body, tags, assets } = transformContent(content, slug, pageEntityMap, topicRegistry);
 
       if (body.trim() === "") {
         stats.skipped++;
         continue;
       }
 
+      // Only add frontmatter topics from tags:: (inline refs are already in body)
+      const topics = buildTopicRefs(tags, [], topicRegistry);
       const frontmatter: Record<string, unknown> = {
         type: "note",
         date,
       };
+      if (topics.length > 0) frontmatter.topics = topics;
 
       const output = serialize(frontmatter, body);
       fs.writeFileSync(path.join(notesDir, `${date}.md`), output);
@@ -681,8 +735,9 @@ function main(): void {
         const { status, title, due, body: taskBody } = parseTaskHeader(
           content,
         );
-        const { body, assets } = transformContent(taskBody, slug, pageEntityMap);
+        const { body, tags, assets } = transformContent(taskBody, slug, pageEntityMap, topicRegistry);
 
+        const topics = buildTopicRefs(tags, [], topicRegistry);
         const frontmatter: Record<string, unknown> = {
           type: "task",
           status,
@@ -690,6 +745,7 @@ function main(): void {
         };
         if (due) frontmatter.due = due;
         if (title) frontmatter.title = title;
+        if (topics.length > 0) frontmatter.topics = topics;
 
         const output = serialize(frontmatter, body);
         fs.writeFileSync(path.join(tasksDir, `${slug}.md`), output);
@@ -724,24 +780,20 @@ function main(): void {
           }
         }
 
-        const { body, tags, assets } = transformContent(docContent, slug, pageEntityMap);
+        const { body, tags, assets } = transformContent(docContent, slug, pageEntityMap, topicRegistry);
 
         if (body.trim() === "") {
           stats.skipped++;
           continue;
         }
 
+        const topics = buildTopicRefs(tags, [], topicRegistry);
         const frontmatter: Record<string, unknown> = {
           type: "doc",
           title,
           created,
         };
-        if (tags.length > 0) {
-          frontmatter.topics = tags.map((t) => {
-            const slug = generateSlug(t);
-            return `#${slug}`;
-          });
-        }
+        if (topics.length > 0) frontmatter.topics = topics;
 
         const output = serialize(frontmatter, body);
         fs.writeFileSync(path.join(docsDir, `${slug}.md`), output);
@@ -755,6 +807,16 @@ function main(): void {
       }
     }
   }
+
+  // Generate topics.yaml
+  const topicEntries = [...topicRegistry.entries()]
+    .map(([slug, { label, prefix }]) => ({ id: `${prefix}${slug}`, label }))
+    .sort((a, b) => {
+      if (a.id[0] !== b.id[0]) return a.id[0] === "@" ? -1 : 1;
+      return a.id.localeCompare(b.id);
+    });
+  fs.writeFileSync(path.join(TARGET, "topics.yaml"), stringifyYaml(topicEntries));
+  console.log(`  Topics:      ${topicEntries.length} (${topicEntries.filter(t => t.id[0] === "@").length} people, ${topicEntries.filter(t => t.id[0] === "#").length} topics)`);
 
   console.log("\n=== Conversion Complete ===");
   console.log(`  Daily notes: ${stats.notes}`);
