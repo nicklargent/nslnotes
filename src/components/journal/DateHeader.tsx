@@ -23,33 +23,36 @@ export function DateHeader(props: DateHeaderProps) {
   };
 
   return (
-    <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 px-1 py-2 backdrop-blur-sm">
-      <h3 class="text-gray-600 dark:text-gray-300">
+    <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 px-1 pb-1 backdrop-blur-sm">
+      <h3
+        class="text-gray-500 dark:text-gray-400 tracking-wide"
+        style={{ "font-variant": "small-caps" }}
+      >
         {isToday(props.date) ? (
           <>
-            <span class="text-base font-semibold">Today</span>
-            <span class="ml-1.5 text-sm text-gray-500 dark:text-gray-400">
+            <span class="text-xl font-semibold">Today</span>
+            <span class="ml-1.5 text-base text-gray-500 dark:text-gray-400">
               — {formatLongDate(props.date)}
             </span>
           </>
         ) : relativeDays() === -1 ? (
           <>
-            <span class="text-base font-semibold">Yesterday</span>
-            <span class="ml-1.5 text-sm text-gray-500 dark:text-gray-400">
+            <span class="text-xl font-semibold">Yesterday</span>
+            <span class="ml-1.5 text-base text-gray-500 dark:text-gray-400">
               — {formatLongDate(props.date)}
             </span>
           </>
         ) : isRecent() ? (
           <>
-            <span class="text-base font-semibold">
+            <span class="text-xl font-semibold">
               {getWeekdayName(props.date)}
             </span>
-            <span class="ml-1.5 text-sm text-gray-500 dark:text-gray-400">
+            <span class="ml-1.5 text-base text-gray-500 dark:text-gray-400">
               — {formatLongDate(props.date)}
             </span>
           </>
         ) : (
-          <span class="text-sm font-semibold">
+          <span class="text-xl font-semibold">
             {formatLongDate(props.date)}
           </span>
         )}

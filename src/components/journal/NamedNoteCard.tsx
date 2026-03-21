@@ -117,7 +117,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
           onSave={(title) =>
             void EntityService.updateFrontmatter(props.note.path, { title })
           }
-          class="text-sm font-medium text-gray-800 dark:text-gray-100"
+          class="text-lg font-semibold text-gray-800 dark:text-gray-100"
         />
         <div
           class={`ml-2 flex shrink-0 items-center gap-1 transition-opacity duration-300 ${props.hovered || props.isFocused ? "opacity-100" : "opacity-0 pointer-events-none"}`}
