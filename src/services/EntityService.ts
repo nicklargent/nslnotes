@@ -342,6 +342,38 @@ export const EntityService = {
    * Promote selected text to a named note.
    * Creates a note file with the promoted content on the same date.
    */
+  /**
+   * Append text to today's daily note, creating it if needed.
+   */
+  appendToDailyNote: async (text: string): Promise<Note | null> => {
+    const rootPath = await SettingsService.getRootPath();
+    if (!rootPath) return null;
+
+    const today = getTodayISO();
+    const path = `${rootPath}/notes/${today}.md`;
+
+    const existing = indexStore.notes.get(path);
+    if (existing) {
+      const fileContent = await FileService.read(path);
+      const parsed = parse(fileContent);
+      if (!parsed) return null;
+      const newBody = parsed.body ? `${parsed.body}\n\n${text}` : text;
+      const newContent = serialize(parsed.frontmatter, newBody);
+      await FileService.write(path, newContent);
+      await IndexService.invalidate(path, rootPath);
+      return indexStore.notes.get(path) ?? null;
+    }
+
+    const frontmatter: Record<string, unknown> = {
+      type: "note",
+      date: today,
+    };
+    const content = serialize(frontmatter, text);
+    await FileService.write(path, content);
+    await IndexService.invalidate(path, rootPath);
+    return indexStore.notes.get(path) ?? null;
+  },
+
   promoteToNote: async (params: {
     title: string;
     slug?: string;

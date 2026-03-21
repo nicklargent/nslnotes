@@ -17,6 +17,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
         keys: "Click Today",
         description: "Go to home state (today's journal)",
       },
+      { keys: "Ctrl/\u2318 + N", description: "Quick capture to today's note" },
       { keys: "Click topic/doc", description: "Navigate to topic or document" },
       { keys: "Click task", description: "Open task detail view" },
       { keys: "?", description: "Show this help" },

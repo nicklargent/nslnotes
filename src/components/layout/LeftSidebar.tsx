@@ -23,6 +23,7 @@ interface LeftSidebarProps {
   onTopicClick: (ref: TopicRef) => void;
   onDocClick: (doc: Doc) => void;
   onCreateDoc: () => void;
+  onQuickCapture: () => void;
   onSwitchFolder: () => void;
   datesWithNotes: Set<string>;
   onDateSelect: (date: string) => void;
@@ -106,6 +107,23 @@ export function LeftSidebar(props: LeftSidebarProps) {
               />
             )}
           </Show>
+          <button
+            type="button"
+            class="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            onClick={() => props.onQuickCapture()}
+            title={`Quick capture (${navigator.platform.includes("Mac") ? "\u2318" : "Ctrl+"}N)`}
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5" />
+              <path d="M18 2l4 4-10 10H8v-4L18 2z" />
+            </svg>
+          </button>
         </div>
         <button
           type="button"

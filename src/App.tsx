@@ -15,6 +15,7 @@ import {
   TaskListSkeleton,
 } from "./components/LoadingSkeleton";
 import { KeyboardShortcutsModal } from "./components/modals/KeyboardShortcutsModal";
+import { QuickCapture } from "./components/QuickCapture";
 import { ImagePreview } from "./components/shared/ImagePreview";
 import { Layout } from "./components/layout/Layout";
 import { LeftSidebar } from "./components/layout/LeftSidebar";
@@ -47,6 +48,7 @@ function App() {
   // eslint-disable-next-line solid/reactivity
   const [, setRootPath] = createSignal<string | null>(null);
   const [showShortcuts, setShowShortcuts] = createSignal(false);
+  const [showQuickCapture, setShowQuickCapture] = createSignal(false);
   let unwatchFn: (() => void) | null = null;
 
   // Apply font size to document root reactively
@@ -117,6 +119,13 @@ function App() {
   // Global keyboard shortcuts
   function handleGlobalKeyDown(e: KeyboardEvent) {
     const mod = e.ctrlKey || e.metaKey;
+
+    // Cmd/Ctrl+N: Quick capture
+    if (mod && e.key === "n") {
+      e.preventDefault();
+      setShowQuickCapture(true);
+      return;
+    }
 
     // Cmd/Ctrl+K: Open search
     if (mod && e.key === "k") {
@@ -369,6 +378,7 @@ function App() {
               activeDocPath={activeDocPath()}
               onTodayClick={() => NavigationService.goHome()}
               onSearchClick={() => NavigationService.goToSearch()}
+              onQuickCapture={() => setShowQuickCapture(true)}
               onTopicClick={(ref) => NavigationService.navigateToTopic(ref)}
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
               onCreateDoc={() => setContextStore("draft", { type: "doc" })}
@@ -402,6 +412,10 @@ function App() {
 
       <Show when={showShortcuts()}>
         <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
+      </Show>
+
+      <Show when={showQuickCapture()}>
+        <QuickCapture onClose={() => setShowQuickCapture(false)} />
       </Show>
 
       <ImagePreview />
