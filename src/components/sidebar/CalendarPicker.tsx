@@ -69,7 +69,11 @@ export function CalendarPicker(props: CalendarPickerProps) {
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") props.onClose();
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      props.onClose();
+    }
   }
 
   function handleClickOutside(e: MouseEvent) {
@@ -79,12 +83,12 @@ export function CalendarPicker(props: CalendarPickerProps) {
   }
 
   onMount(() => {
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown, true);
     document.addEventListener("mousedown", handleClickOutside);
   });
 
   onCleanup(() => {
-    document.removeEventListener("keydown", handleKeyDown);
+    document.removeEventListener("keydown", handleKeyDown, true);
     document.removeEventListener("mousedown", handleClickOutside);
   });
 

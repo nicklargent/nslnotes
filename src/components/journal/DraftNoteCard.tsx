@@ -17,6 +17,7 @@ interface DraftNoteCardProps {
 export function DraftNoteCard(props: DraftNoteCardProps) {
   const [title, setTitle] = createSignal("");
   const [committed, setCommitted] = createSignal(false);
+  let cancelled = false;
   const [body, setBody] = createSignal("");
   const [showEditor, setShowEditor] = createSignal(false);
   let titleRef: HTMLInputElement | undefined;
@@ -25,19 +26,23 @@ export function DraftNoteCard(props: DraftNoteCardProps) {
     titleRef?.focus();
   });
 
+  // Capture-phase Esc listener — fires before SolidJS delegation and other
+  // bubble-phase handlers, ensuring the cancel always takes effect.
   function handleGlobalKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape" && !committed()) {
       e.preventDefault();
+      e.stopPropagation();
+      cancelled = true;
       props.onCancel();
     }
   }
 
   onMount(() => {
-    document.addEventListener("keydown", handleGlobalKeyDown);
+    document.addEventListener("keydown", handleGlobalKeyDown, true);
   });
 
   onCleanup(() => {
-    document.removeEventListener("keydown", handleGlobalKeyDown);
+    document.removeEventListener("keydown", handleGlobalKeyDown, true);
   });
 
   async function commit() {
@@ -63,14 +68,11 @@ export function DraftNoteCard(props: DraftNoteCardProps) {
         setShowEditor(true);
         void commit();
       }
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      props.onCancel();
     }
   }
 
   function handleTitleBlur() {
-    if (title().trim() && !committed()) {
+    if (title().trim() && !committed() && !cancelled) {
       setShowEditor(true);
       void commit();
     }

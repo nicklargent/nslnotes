@@ -16,28 +16,26 @@ export function QuickCapture(props: QuickCaptureProps) {
   });
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      props.onClose();
-    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void submit();
     }
   }
 
-  // Close on outside keydown (Escape) at document level
+  // Capture-phase listener: close overlay and stop Escape from reaching
+  // other document-level listeners (e.g. draft cancel handlers)
   function handleGlobalKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       e.preventDefault();
+      e.stopPropagation();
       props.onClose();
     }
   }
 
   onMount(() => {
-    document.addEventListener("keydown", handleGlobalKeyDown);
+    document.addEventListener("keydown", handleGlobalKeyDown, true);
     onCleanup(() => {
-      document.removeEventListener("keydown", handleGlobalKeyDown);
+      document.removeEventListener("keydown", handleGlobalKeyDown, true);
     });
   });
 

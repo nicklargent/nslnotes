@@ -22,6 +22,7 @@ export function consumeAutofocus(): boolean {
 export function DraftView() {
   const [title, setTitle] = createSignal("");
   const [committed, setCommitted] = createSignal(false);
+  let cancelled = false;
   let titleRef: HTMLInputElement | undefined;
 
   const draft = () => contextStore.draft as DraftState;
@@ -31,24 +32,27 @@ export function DraftView() {
   });
 
   function cancelDraft() {
+    cancelled = true;
     setContextStore("draft", null);
     NavigationService.goHome();
   }
 
-  // Global Esc listener
+  // Capture-phase Esc listener — fires before SolidJS delegation and other
+  // bubble-phase handlers, ensuring the cancel always takes effect.
   function handleGlobalKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape" && contextStore.draft && !committed()) {
       e.preventDefault();
+      e.stopPropagation();
       cancelDraft();
     }
   }
 
   onMount(() => {
-    document.addEventListener("keydown", handleGlobalKeyDown);
+    document.addEventListener("keydown", handleGlobalKeyDown, true);
   });
 
   onCleanup(() => {
-    document.removeEventListener("keydown", handleGlobalKeyDown);
+    document.removeEventListener("keydown", handleGlobalKeyDown, true);
   });
 
   async function commit() {
@@ -82,14 +86,11 @@ export function DraftView() {
     if (e.key === "Enter") {
       e.preventDefault();
       void commit();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      cancelDraft();
     }
   }
 
   function handleTitleBlur() {
-    if (title().trim() && !committed()) {
+    if (title().trim() && !committed() && !cancelled) {
       void commit();
     }
   }
