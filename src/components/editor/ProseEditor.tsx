@@ -157,6 +157,9 @@ export function ProseEditor(props: ProseEditorProps) {
         props.onUpdate(md);
       },
       editorProps: {
+        // Prevent ProseMirror from scrolling parent containers (e.g. the
+        // journal's virtual scroller) when the selection changes on click.
+        handleScrollToSelection: () => true,
         clipboardTextSerializer: (slice) => {
           const serializer = DOMSerializer.fromSchema(editor!.schema);
           const wrapper = document.createElement("div");

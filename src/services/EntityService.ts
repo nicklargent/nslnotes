@@ -337,4 +337,54 @@ export const EntityService = {
     if (!doc) return null;
     return { doc, slug };
   },
+
+  /**
+   * Promote selected text to a named note.
+   * Creates a note file with the promoted content on the same date.
+   */
+  promoteToNote: async (params: {
+    title: string;
+    slug?: string;
+    date: string;
+    sourceTopics: TopicRef[];
+    body?: string;
+    sourceEntityPath?: string;
+  }): Promise<{ note: Note; slug: string } | null> => {
+    const rootPath = await SettingsService.getRootPath();
+    if (!rootPath) return null;
+
+    const notesDir = `${rootPath}/notes`;
+    const slug = await generateUniqueSlug(
+      params.slug ?? `${params.date}-${params.title}`,
+      notesDir
+    );
+    const path = `${notesDir}/${slug}.md`;
+
+    const frontmatter: Record<string, unknown> = {
+      type: "note",
+      date: params.date,
+      title: params.title,
+    };
+    if (params.sourceTopics.length > 0) {
+      frontmatter["topics"] = params.sourceTopics;
+    }
+
+    // Copy images if body contains image references
+    let body = params.body ?? "";
+    if (body && params.sourceEntityPath && /!\[/.test(body)) {
+      body = await ImageService.copyImagesForPromotion(
+        params.sourceEntityPath,
+        path,
+        body
+      );
+    }
+
+    const fileContent = serialize(frontmatter, body);
+    await FileService.write(path, fileContent);
+    await IndexService.invalidate(path, rootPath);
+
+    const note = indexStore.notes.get(path);
+    if (!note) return null;
+    return { note, slug };
+  },
 };

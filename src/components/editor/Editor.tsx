@@ -12,6 +12,7 @@ import { rootPathFromEntity } from "../../services/ImageService";
 import { NavigationService } from "../../services/NavigationService";
 import { IndexService } from "../../services/IndexService";
 import { contextStore } from "../../stores/contextStore";
+import { indexStore } from "../../stores/indexStore";
 import type { Editor as TiptapEditor } from "@tiptap/core";
 import type { PromoteRange } from "./promoteRange";
 import type { TopicRef } from "../../types/topics";
@@ -170,6 +171,12 @@ export function Editor(props: EditorProps) {
     setAutocomplete(null);
   }
 
+  function isDailyNote(): boolean {
+    if (!props.entityPath) return false;
+    const note = indexStore.notes.get(props.entityPath);
+    return note?.isDaily === true;
+  }
+
   function getSourceTopics(): TopicRef[] {
     const entity = contextStore.activeEntity;
     if (entity) return entity.topics;
@@ -272,7 +279,7 @@ export function Editor(props: EditorProps) {
   }
 
   async function handlePromoteConfirm(
-    type: "task" | "doc",
+    type: "task" | "doc" | "note",
     topics: TopicRef[],
     slug: string
   ) {
@@ -295,7 +302,7 @@ export function Editor(props: EditorProps) {
         replaceRangeWithWikilink(range, `[[task:${result.slug}]]`);
         NavigationService.navigateTo(result.task);
       }
-    } else {
+    } else if (type === "doc") {
       const result = await EntityService.promoteToDoc({
         title,
         slug,
@@ -306,6 +313,35 @@ export function Editor(props: EditorProps) {
       if (result) {
         replaceRangeWithWikilink(range, `[[doc:${result.slug}]]`);
         NavigationService.navigateTo(result.doc);
+      }
+    } else {
+      // note — only available from daily notes
+      const sourceNote = props.entityPath
+        ? indexStore.notes.get(props.entityPath)
+        : undefined;
+      if (!sourceNote) return;
+
+      // Delete content from editor first so the save completes before
+      // promoteToNote invalidates the index and triggers a re-render
+      editorRef
+        .chain()
+        .focus()
+        .command(({ tr }) => {
+          tr.delete(range.from, range.to);
+          return true;
+        })
+        .run();
+
+      const result = await EntityService.promoteToNote({
+        title,
+        slug,
+        date: sourceNote.date,
+        sourceTopics: topics.length > 0 ? topics : getSourceTopics(),
+        ...(body ? { body } : {}),
+        ...(props.entityPath ? { sourceEntityPath: props.entityPath } : {}),
+      });
+      if (result) {
+        NavigationService.focusEntity(result.note);
       }
     }
   }
@@ -440,6 +476,12 @@ export function Editor(props: EditorProps) {
           }
           onConfirmDoc={(topics, slug) =>
             void handlePromoteConfirm("doc", topics, slug)
+          }
+          onConfirmNote={
+            isDailyNote()
+              ? (topics, slug) =>
+                  void handlePromoteConfirm("note", topics, slug)
+              : undefined
           }
           onCancel={cancelPromote}
           ref={(el) => (confirmBarRef = el)}

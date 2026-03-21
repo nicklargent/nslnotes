@@ -171,7 +171,10 @@ export function JournalView(props: JournalViewProps) {
           if (Math.abs(drift) > 1) {
             programmaticScroll = true;
             scrollRef.scrollTop += drift;
-            programmaticScroll = false;
+            // Release after browser processes the scroll event (fires async)
+            requestAnimationFrame(() => {
+              programmaticScroll = false;
+            });
           }
         }
       }
@@ -395,58 +398,56 @@ export function JournalView(props: JournalViewProps) {
                 />
               </div>
 
-              {(() => {
-                const daily = getDailyNote(date);
-                return (
-                  <div
-                    class={`mb-6${daily?.path === highlightPath() ? " animate-flash" : ""}`}
-                  >
-                    <DailyNote
+              <div
+                class="mb-6"
+                classList={{
+                  "animate-flash": getDailyNote(date)?.path === highlightPath(),
+                }}
+              >
+                <DailyNote
+                  date={date}
+                  note={getDailyNote(date)}
+                  hovered={hoveredDate() === date}
+                />
+
+                <For each={getNamedNotePaths(date)}>
+                  {(path) => {
+                    const note = () => indexStore.notes.get(path);
+                    return (
+                      <Show when={note()}>
+                        {(n) => (
+                          <div data-note-card>
+                            <NamedNoteCard
+                              note={n()}
+                              isFocused={focusedNoteSlug() === n().slug}
+                              hovered={hoveredDate() === date}
+                              autofocus={autofocusNotePath() === n().path}
+                              highlight={n().path === highlightPath()}
+                              onClick={(nn) => handleNamedNoteFocus(nn)}
+                            />
+                          </div>
+                        )}
+                      </Show>
+                    );
+                  }}
+                </For>
+
+                <Show when={props.draftDate === date}>
+                  <div data-note-card>
+                    <DraftNoteCard
                       date={date}
-                      note={daily}
-                      hovered={hoveredDate() === date}
-                    />
-
-                    <For each={getNamedNotePaths(date)}>
-                      {(path) => {
-                        const note = () => indexStore.notes.get(path);
-                        return (
-                          <Show when={note()}>
-                            {(n) => (
-                              <div data-note-card>
-                                <NamedNoteCard
-                                  note={n()}
-                                  isFocused={focusedNoteSlug() === n().slug}
-                                  hovered={hoveredDate() === date}
-                                  autofocus={autofocusNotePath() === n().path}
-                                  highlight={n().path === highlightPath()}
-                                  onClick={(nn) => handleNamedNoteFocus(nn)}
-                                />
-                              </div>
-                            )}
-                          </Show>
-                        );
+                      onCommit={(note) => {
+                        setAutofocusNotePath(note.path);
+                        props.onDraftClear();
+                        handleNamedNoteFocus(note);
+                        // Clear after render so the NamedNoteCard picks it up on mount
+                        setTimeout(() => setAutofocusNotePath(null), 0);
                       }}
-                    </For>
-
-                    <Show when={props.draftDate === date}>
-                      <div data-note-card>
-                        <DraftNoteCard
-                          date={date}
-                          onCommit={(note) => {
-                            setAutofocusNotePath(note.path);
-                            props.onDraftClear();
-                            handleNamedNoteFocus(note);
-                            // Clear after render so the NamedNoteCard picks it up on mount
-                            setTimeout(() => setAutofocusNotePath(null), 0);
-                          }}
-                          onCancel={() => props.onDraftClear()}
-                        />
-                      </div>
-                    </Show>
+                      onCancel={() => props.onDraftClear()}
+                    />
                   </div>
-                );
-              })()}
+                </Show>
+              </div>
             </div>
           )}
         </For>

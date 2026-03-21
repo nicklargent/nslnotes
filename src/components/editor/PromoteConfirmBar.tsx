@@ -10,6 +10,7 @@ interface PromoteConfirmBarProps {
   sourceTopics: TopicRef[];
   onConfirmTask: (topics: TopicRef[], slug: string) => void;
   onConfirmDoc: (topics: TopicRef[], slug: string) => void;
+  onConfirmNote?: ((topics: TopicRef[], slug: string) => void) | undefined;
   onCancel: () => void;
   ref?: ((el: HTMLDivElement) => void) | undefined;
 }
@@ -143,6 +144,16 @@ export function PromoteConfirmBar(props: PromoteConfirmBarProps) {
           >
             Doc
           </button>
+          <Show when={props.onConfirmNote}>
+            {(handler) => (
+              <button
+                class="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+                onClick={() => handler()(topicsArray(), slug())}
+              >
+                Note
+              </button>
+            )}
+          </Show>
           <button
             class="ml-1 rounded px-1.5 py-1 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             onClick={() => props.onCancel()}
