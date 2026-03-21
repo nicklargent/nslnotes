@@ -24,6 +24,7 @@ interface NamedNoteCardProps {
   isFocused: boolean;
   hovered: boolean;
   autofocus?: boolean;
+  highlight?: boolean;
   onClick: (note: Note) => void;
 }
 
@@ -97,7 +98,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
         props.isFocused
           ? "border-blue-300 bg-blue-50 dark:bg-blue-900/30"
           : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600"
-      }`}
+      }${props.highlight ? " animate-flash" : ""}`}
       onClick={(e) => {
         if (!props.isFocused) {
           e.stopPropagation();

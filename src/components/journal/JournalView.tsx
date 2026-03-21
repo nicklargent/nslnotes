@@ -47,8 +47,10 @@ export function JournalView(props: JournalViewProps) {
     null
   );
   const [hoveredDate, setHoveredDate] = createSignal<string | null>(null);
+  const [highlightPath, setHighlightPath] = createSignal<string | null>(null);
   let scrollRef: HTMLDivElement | undefined;
   let observer: IntersectionObserver | undefined;
+  let programmaticScroll = false;
   const heightCache = new Map<string, number>();
 
   /** All dates with content, sorted reverse-chronologically, today always first. */
@@ -120,7 +122,7 @@ export function JournalView(props: JournalViewProps) {
 
   /** Handle scroll to update virtual window. */
   function handleScroll() {
-    if (!scrollRef) return;
+    if (!scrollRef || programmaticScroll) return;
 
     const { scrollTop } = scrollRef;
     const all = allDatesWithContent();
@@ -141,7 +143,38 @@ export function JournalView(props: JournalViewProps) {
     }
 
     if (newStart !== startIndex()) {
+      // Anchor a visible date element so we can compensate for topPadding drift.
+      // When startIndex changes, topPadding recalculates using height estimates
+      // that may differ from actual rendered heights, shifting all content.
+      const containerTop = scrollRef.getBoundingClientRect().top;
+      const dateEls = scrollRef.querySelectorAll("[data-date]");
+      let anchorDate: string | undefined;
+      let anchorVisualTop = 0;
+
+      for (const el of dateEls) {
+        const top = el.getBoundingClientRect().top;
+        if (top >= containerTop - 50) {
+          anchorDate = (el as HTMLElement).dataset["date"];
+          anchorVisualTop = top;
+          break;
+        }
+      }
+
+      // Solid updates DOM synchronously on signal change
       setStartIndex(newStart);
+
+      // Measure how far the anchor drifted and compensate
+      if (anchorDate) {
+        const el = scrollRef.querySelector(`[data-date="${anchorDate}"]`);
+        if (el) {
+          const drift = el.getBoundingClientRect().top - anchorVisualTop;
+          if (Math.abs(drift) > 1) {
+            programmaticScroll = true;
+            scrollRef.scrollTop += drift;
+            programmaticScroll = false;
+          }
+        }
+      }
     }
   }
 
@@ -160,12 +193,29 @@ export function JournalView(props: JournalViewProps) {
   const visibleDateSet = new Set<string>();
   const pendingHeaders: HTMLDivElement[] = [];
 
+  /** Schedule flash highlight after scroll settles. */
+  let highlightTimer: number | undefined;
+  function triggerHighlight(path: string, delay = 150) {
+    window.clearTimeout(highlightTimer);
+    highlightTimer = window.setTimeout(() => {
+      setHighlightPath(path);
+      highlightTimer = window.setTimeout(() => setHighlightPath(null), 1500);
+    }, delay);
+  }
+  onCleanup(() => window.clearTimeout(highlightTimer));
+
   /** Capture navigation intent on mount — set pending scroll target. */
   onMount(() => {
     if (contextStore.isHomeState) return; // home state starts at top, nothing to do
     const anchorDate = contextStore.journalAnchorDate;
+    const entityPath = contextStore.activeEntity?.path;
     if (anchorDate) {
       setPendingScrollDate(anchorDate);
+      // For today (index 0) or already-visible dates, highlight immediately
+      const all = allDatesWithContent();
+      if (all.indexOf(anchorDate) === 0 && entityPath) {
+        requestAnimationFrame(() => triggerHighlight(entityPath, 50));
+      }
     }
   });
 
@@ -185,19 +235,47 @@ export function JournalView(props: JournalViewProps) {
     const target = pendingScrollDate();
     if (!target || !scrollRef) return;
 
+    // Capture entity path now before scroll/observers can clear it
+    const entityPath = contextStore.activeEntity?.path ?? null;
+
     const all = allDatesWithContent();
     const dateIndex = all.indexOf(target);
     if (dateIndex > 0) {
       const newStart = Math.max(0, dateIndex - BUFFER_SIZE);
+      programmaticScroll = true;
       setStartIndex(newStart);
-      requestAnimationFrame(() => {
-        if (!scrollRef) return;
-        const el = scrollRef.querySelector(`[data-date="${target}"]`);
-        if (el) {
-          el.scrollIntoView({ block: "start" });
-        }
-        setPendingScrollDate(null);
-      });
+      // Double rAF ensures Solid has flushed DOM updates from setStartIndex
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (!scrollRef) {
+            programmaticScroll = false;
+            return;
+          }
+          const tryScroll = (attempts: number) => {
+            const el = scrollRef!.querySelector(`[data-date="${target}"]`);
+            if (el) {
+              // Use manual scroll position instead of scrollIntoView to stay
+              // consistent with handleScroll's height-accumulation model.
+              const container = scrollRef!;
+              const elTop = (el as HTMLElement).offsetTop;
+              programmaticScroll = true;
+              container.scrollTop = elTop;
+              setPendingScrollDate(null);
+              // Release lock after browser processes the scroll
+              requestAnimationFrame(() => {
+                programmaticScroll = false;
+              });
+              if (entityPath) triggerHighlight(entityPath);
+            } else if (attempts > 0) {
+              requestAnimationFrame(() => tryScroll(attempts - 1));
+            } else {
+              programmaticScroll = false;
+              setPendingScrollDate(null);
+            }
+          };
+          tryScroll(3);
+        })
+      );
     } else {
       setPendingScrollDate(null);
     }
@@ -317,50 +395,58 @@ export function JournalView(props: JournalViewProps) {
                 />
               </div>
 
-              <div class="mb-6">
-                <DailyNote
-                  date={date}
-                  note={getDailyNote(date)}
-                  hovered={hoveredDate() === date}
-                />
-
-                <For each={getNamedNotePaths(date)}>
-                  {(path) => {
-                    const note = () => indexStore.notes.get(path);
-                    return (
-                      <Show when={note()}>
-                        {(n) => (
-                          <div data-note-card>
-                            <NamedNoteCard
-                              note={n()}
-                              isFocused={focusedNoteSlug() === n().slug}
-                              hovered={hoveredDate() === date}
-                              autofocus={autofocusNotePath() === n().path}
-                              onClick={(nn) => handleNamedNoteFocus(nn)}
-                            />
-                          </div>
-                        )}
-                      </Show>
-                    );
-                  }}
-                </For>
-
-                <Show when={props.draftDate === date}>
-                  <div data-note-card>
-                    <DraftNoteCard
+              {(() => {
+                const daily = getDailyNote(date);
+                return (
+                  <div
+                    class={`mb-6${daily?.path === highlightPath() ? " animate-flash" : ""}`}
+                  >
+                    <DailyNote
                       date={date}
-                      onCommit={(note) => {
-                        setAutofocusNotePath(note.path);
-                        props.onDraftClear();
-                        handleNamedNoteFocus(note);
-                        // Clear after render so the NamedNoteCard picks it up on mount
-                        setTimeout(() => setAutofocusNotePath(null), 0);
-                      }}
-                      onCancel={() => props.onDraftClear()}
+                      note={daily}
+                      hovered={hoveredDate() === date}
                     />
+
+                    <For each={getNamedNotePaths(date)}>
+                      {(path) => {
+                        const note = () => indexStore.notes.get(path);
+                        return (
+                          <Show when={note()}>
+                            {(n) => (
+                              <div data-note-card>
+                                <NamedNoteCard
+                                  note={n()}
+                                  isFocused={focusedNoteSlug() === n().slug}
+                                  hovered={hoveredDate() === date}
+                                  autofocus={autofocusNotePath() === n().path}
+                                  highlight={n().path === highlightPath()}
+                                  onClick={(nn) => handleNamedNoteFocus(nn)}
+                                />
+                              </div>
+                            )}
+                          </Show>
+                        );
+                      }}
+                    </For>
+
+                    <Show when={props.draftDate === date}>
+                      <div data-note-card>
+                        <DraftNoteCard
+                          date={date}
+                          onCommit={(note) => {
+                            setAutofocusNotePath(note.path);
+                            props.onDraftClear();
+                            handleNamedNoteFocus(note);
+                            // Clear after render so the NamedNoteCard picks it up on mount
+                            setTimeout(() => setAutofocusNotePath(null), 0);
+                          }}
+                          onCancel={() => props.onDraftClear()}
+                        />
+                      </div>
+                    </Show>
                   </div>
-                </Show>
-              </div>
+                );
+              })()}
             </div>
           )}
         </For>
