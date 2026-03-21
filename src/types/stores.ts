@@ -65,6 +65,18 @@ export interface ContextState {
 }
 
 /**
+ * Serializable navigation state for browser history integration.
+ */
+export interface NavHistoryEntry {
+  activeView: ViewType;
+  activeEntity: Entity | null;
+  activeTopic: TopicRef | null;
+  isHomeState: boolean;
+  journalAnchorDate: string | null;
+  searchState: SearchState | null;
+}
+
+/**
  * Editor store state
  */
 export interface EditorState {

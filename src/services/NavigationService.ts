@@ -3,11 +3,130 @@ import { IndexService } from "./IndexService";
 import type { Entity } from "../types/entities";
 import type { TopicRef } from "../types/topics";
 import type { SearchFilter } from "../types/search";
+import type { NavHistoryEntry } from "../types/stores";
+
+/**
+ * Suppression depth counter for history pushes.
+ * Cleared via queueMicrotask so SolidJS effects triggered by restoreState
+ * (which run after the synchronous call returns) are also suppressed
+ * and don't wipe the forward stack.
+ */
+let suppressHistoryDepth = 0;
+
+/**
+ * Deep-clone a value into a plain object safe for history.pushState.
+ * SolidJS store proxies carry internal symbols that cause DataCloneError
+ * with the structured clone algorithm used by pushState.
+ */
+function cloneForHistory(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function snapshotEntry(): NavHistoryEntry {
+  return {
+    activeView: contextStore.activeView,
+    activeEntity: cloneForHistory(
+      contextStore.activeEntity
+    ) as NavHistoryEntry["activeEntity"],
+    activeTopic: contextStore.activeTopic,
+    isHomeState: contextStore.isHomeState,
+    journalAnchorDate: contextStore.journalAnchorDate,
+    searchState: cloneForHistory(
+      contextStore.searchState
+    ) as NavHistoryEntry["searchState"],
+  };
+}
+
+/** Push the current (post-mutation) state as a new history entry. */
+function pushHistory(): void {
+  if (suppressHistoryDepth > 0) return;
+  history.pushState(snapshotEntry(), "");
+}
 
 /**
  * NavigationService manages view navigation and context state (Design §6.5).
  */
 export const NavigationService = {
+  /**
+   * Initialize browser history integration.
+   * Call once on app mount.
+   */
+  initHistory: (): void => {
+    // Seed current state so first back works
+    history.replaceState(snapshotEntry(), "");
+
+    window.addEventListener("popstate", (event: PopStateEvent) => {
+      const entry = event.state as NavHistoryEntry | null;
+      if (!entry) return;
+      NavigationService.restoreState(entry);
+    });
+  },
+
+  /**
+   * Restore context from a history entry without pushing to history.
+   * Suppression persists through microtask to cover SolidJS reactive effects.
+   */
+  restoreState: (entry: NavHistoryEntry): void => {
+    suppressHistoryDepth++;
+
+    setContextStore({
+      activeView: entry.activeView,
+      activeEntity: entry.activeEntity,
+      activeTopic: entry.activeTopic,
+      isHomeState: entry.isHomeState,
+      journalAnchorDate: entry.journalAnchorDate,
+      draft: null,
+      searchState: entry.searchState,
+    });
+
+    // Recompute relevance based on restored state
+    if (entry.activeEntity) {
+      const weights = IndexService.computeRelevance(entry.activeEntity);
+      setContextStore("relevanceWeights", weights);
+    } else if (entry.activeTopic) {
+      const weights = new Map<string, number>();
+      const refs = IndexService.getTopicReferences(entry.activeTopic);
+      for (const entityRef of refs) {
+        weights.set(entityRef.path, 1);
+      }
+      setContextStore("relevanceWeights", weights);
+    } else {
+      setContextStore("relevanceWeights", new Map());
+    }
+
+    // Clear after microtasks settle so reactive effects are also suppressed
+    queueMicrotask(() => {
+      suppressHistoryDepth--;
+    });
+  },
+
+  /**
+   * Focus an entity within the current view without creating a history entry.
+   * Used for in-view actions like clicking a note card in the journal.
+   */
+  focusEntity: (entity: Entity): void => {
+    const viewMap = { note: "journal", task: "task", doc: "doc" } as const;
+    const activeView = viewMap[entity.type];
+
+    setContextStore({
+      activeView,
+      activeEntity: entity,
+      activeTopic: null,
+      isHomeState: false,
+      draft: null,
+      searchState: null,
+      ...(entity.type === "note" && entity.date
+        ? { journalAnchorDate: entity.date }
+        : {}),
+    });
+
+    NavigationService.updateRelevance();
+
+    // Update the current history entry in-place (no new entry)
+    history.replaceState(snapshotEntry(), "");
+  },
+
   /**
    * Navigate to home state (Today button).
    * Sets journal view, clears relevance, resets scroll (FR-NAV-001–003).
@@ -23,6 +142,7 @@ export const NavigationService = {
       draft: null,
       searchState: null,
     });
+    pushHistory();
   },
 
   /**
@@ -46,6 +166,7 @@ export const NavigationService = {
     });
 
     NavigationService.updateRelevance();
+    pushHistory();
   },
 
   /**
@@ -66,6 +187,7 @@ export const NavigationService = {
       weights.set(entityRef.path, 1);
     }
     setContextStore("relevanceWeights", weights);
+    pushHistory();
   },
 
   /**
@@ -107,5 +229,6 @@ export const NavigationService = {
         results: [],
       },
     });
+    pushHistory();
   },
 };

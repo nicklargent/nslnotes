@@ -94,6 +94,7 @@ function App() {
           }
           startFileWatcher(path);
         }
+        NavigationService.initHistory();
         setAppState("ready");
       } else {
         setAppState("setup");

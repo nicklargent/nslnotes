@@ -350,7 +350,7 @@ export function JournalView(props: JournalViewProps) {
 
   function handleNamedNoteFocus(note: Note) {
     setFocusedNoteSlug(note.slug);
-    NavigationService.navigateTo(note);
+    NavigationService.focusEntity(note);
   }
 
   function handleBackgroundClick(e: MouseEvent) {
