@@ -1,8 +1,10 @@
 import { createSignal, Show } from "solid-js";
 import { TaskGroup } from "../tasks/TaskGroup";
 import { ClosedTaskItem } from "../tasks/ClosedTaskItem";
+import { BacklinksSection } from "../backlinks/BacklinksSection";
 import type { Task } from "../../types/entities";
 import type { GroupedTasks, GroupedClosedTasks } from "../../types/task-groups";
+import type { BacklinkEntry } from "../../types/backlinks";
 
 interface RightPanelProps {
   groupedTasks: GroupedTasks;
@@ -11,6 +13,8 @@ interface RightPanelProps {
   linkedPaths: Set<string>;
   onTaskClick: (task: Task) => void;
   onCreateTask: () => void;
+  backlinks: BacklinkEntry[];
+  onBacklinkClick: (path: string) => void;
 }
 
 /**
@@ -114,6 +118,12 @@ export function RightPanel(props: RightPanelProps) {
           />
         </Show>
       </div>
+
+      {/* Backlinks */}
+      <BacklinksSection
+        backlinks={props.backlinks}
+        onBacklinkClick={props.onBacklinkClick}
+      />
     </div>
   );
 }

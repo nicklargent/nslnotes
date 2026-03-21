@@ -2,7 +2,7 @@ import { FileService } from "./FileService";
 import { TopicService } from "./TopicService";
 import { indexStore, setIndexStore } from "../stores/indexStore";
 import { parseNote, parseTask, parseDoc } from "../lib/entityParser";
-import { parseTopicRefs } from "../lib/markdown";
+import { parseTopicRefs, parseWikilinks } from "../lib/markdown";
 import { computeRelevance } from "../lib/relevance";
 import { isOverdue, isWithinDays, getToday, addDays } from "../lib/dates";
 import { saveIndexCache, loadIndexCache } from "../lib/indexCache";
@@ -12,6 +12,7 @@ import type { GroupedTasks, GroupedClosedTasks } from "../types/task-groups";
 import type { WikiLink } from "../types/inline";
 import type { SearchFilter, SearchResult } from "../types/search";
 import type { ImageRef, ImageFile } from "../types/images";
+import type { BacklinkEntry } from "../types/backlinks";
 
 /**
  * Join path segments (simple implementation).
@@ -63,6 +64,7 @@ export const IndexService = {
         topicsYaml: cached.topicsYaml,
         lastIndexed: new Date(),
       });
+      buildBacklinks();
       // Rebuild in background to pick up any changes since cache
       void IndexService._rebuildFresh(rootPath);
       const durationMs = performance.now() - startTime;
@@ -148,6 +150,9 @@ export const IndexService = {
     // Build image index (T6.4)
     void IndexService.buildImageIndex(rootPath);
 
+    // Build backlinks
+    buildBacklinks();
+
     const durationMs = performance.now() - startTime;
     return {
       durationMs,
@@ -219,6 +224,9 @@ export const IndexService = {
 
     // Build image index (T6.4)
     void IndexService.buildImageIndex(rootPath);
+
+    // Build backlinks
+    buildBacklinks();
   },
 
   /**
@@ -297,6 +305,9 @@ export const IndexService = {
       indexStore.topicsYaml
     );
     setIndexStore("topics", topics);
+
+    // Rebuild backlinks
+    buildBacklinks();
   },
 
   /**
@@ -428,6 +439,18 @@ export const IndexService = {
   getTopicReferences: (ref: TopicRef): EntityReference[] => {
     const topic = indexStore.topics.get(ref);
     return topic?.references ?? [];
+  },
+
+  /**
+   * Look up an entity by its absolute path across all entity maps.
+   */
+  resolveEntityByPath: (path: string): Entity | null => {
+    return (
+      indexStore.notes.get(path) ??
+      indexStore.tasks.get(path) ??
+      indexStore.docs.get(path) ??
+      null
+    );
   },
 
   /**
@@ -751,6 +774,72 @@ export const IndexService = {
     return computeRelevance(entity, allEntities);
   },
 };
+
+/**
+ * Build backlink index from all entities' wikilinks.
+ * Scans every entity for [[type:slug]] references, resolves them,
+ * and groups BacklinkEntry items by target path.
+ */
+function buildBacklinks(): void {
+  const backlinkIndex = new Map<string, BacklinkEntry[]>();
+
+  function processEntity(entity: Entity): void {
+    const links = parseWikilinks(entity.content);
+    if (links.length === 0) return;
+
+    const sourceTitle =
+      entity.type === "note" ? (entity.title ?? entity.date) : entity.title;
+    const sourceDate = entity.type === "note" ? entity.date : entity.created;
+
+    // Build a map of wikilink raw → context lines in one pass
+    const linkRaws = new Set(links.map((l) => l.raw));
+    const contextByRaw = new Map<string, string[]>();
+    for (const line of entity.content.split("\n")) {
+      for (const raw of linkRaws) {
+        if (line.includes(raw)) {
+          const ctx = contextByRaw.get(raw);
+          const stripped = line.replace(/^[\s#>*-]+/, "").trim();
+          if (ctx) {
+            if (ctx.length < 2) ctx.push(stripped);
+          } else {
+            contextByRaw.set(raw, [stripped]);
+          }
+        }
+      }
+    }
+
+    // Deduplicate targets within this entity
+    const seen = new Set<string>();
+
+    for (const link of links) {
+      const resolved = IndexService.resolveWikilink(link);
+      if (!resolved || resolved.path === entity.path) continue;
+      if (seen.has(resolved.path)) continue;
+      seen.add(resolved.path);
+
+      const entry: BacklinkEntry = {
+        sourcePath: entity.path,
+        sourceType: entity.type,
+        sourceTitle,
+        sourceDate,
+        contextLines: contextByRaw.get(link.raw) ?? [],
+      };
+
+      const existing = backlinkIndex.get(resolved.path);
+      if (existing) {
+        existing.push(entry);
+      } else {
+        backlinkIndex.set(resolved.path, [entry]);
+      }
+    }
+  }
+
+  for (const entity of indexStore.notes.values()) processEntity(entity);
+  for (const entity of indexStore.tasks.values()) processEntity(entity);
+  for (const entity of indexStore.docs.values()) processEntity(entity);
+
+  setIndexStore("backlinkIndex", backlinkIndex);
+}
 
 /**
  * Build the topics map from all entities.

@@ -35,6 +35,7 @@ import { parseWikilinks } from "./lib/markdown";
 import { collectAllTopics } from "./services/IndexService";
 import type { Topic, TopicRef } from "./types/topics";
 import type { Doc, Note } from "./types/entities";
+import type { BacklinkEntry } from "./types/backlinks";
 
 /**
  * Application state
@@ -207,6 +208,7 @@ function App() {
       setIndexStore("imageFiles", new Map());
       setIndexStore("entityToImages", new Map());
       setIndexStore("imageToEntities", new Map());
+      setIndexStore("backlinkIndex", new Map());
       setIndexStore("lastIndexed", null);
 
       // Initialize with new folder
@@ -317,6 +319,17 @@ function App() {
     return paths;
   });
 
+  const activeBacklinks = createMemo((): BacklinkEntry[] => {
+    const entity = contextStore.activeEntity;
+    if (!entity || entity.type === "note") return [];
+    return indexStore.backlinkIndex.get(entity.path) ?? [];
+  });
+
+  const handleBacklinkClick = (path: string) => {
+    const entity = IndexService.resolveEntityByPath(path);
+    if (entity) NavigationService.navigateTo(entity);
+  };
+
   const [noteDraftDate, setNoteDraftDate] = createSignal<string | null>(null);
 
   function handleNewNote(date: string) {
@@ -370,6 +383,8 @@ function App() {
               linkedPaths={linkedPaths()}
               onTaskClick={(task) => NavigationService.navigateTo(task)}
               onCreateTask={() => setContextStore("draft", { type: "task" })}
+              backlinks={activeBacklinks()}
+              onBacklinkClick={handleBacklinkClick}
             />
           }
         />

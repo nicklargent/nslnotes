@@ -2,6 +2,7 @@ import type { Note, Task, Doc, Entity } from "./entities";
 import type { TopicRef, Topic, TopicDecoration } from "./topics";
 import type { SearchState } from "./search";
 import type { ImageFile } from "./images";
+import type { BacklinkEntry } from "./backlinks";
 
 /**
  * Index store state
@@ -25,6 +26,8 @@ export interface IndexState {
   entityToImages: Map<string, string[]>;
   /** Image absolute path → entity paths that reference it */
   imageToEntities: Map<string, string[]>;
+  /** Target entity path → backlink entries pointing to it */
+  backlinkIndex: Map<string, BacklinkEntry[]>;
 }
 
 /**
