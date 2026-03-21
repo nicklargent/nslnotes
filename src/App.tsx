@@ -330,6 +330,14 @@ function App() {
     if (entity) NavigationService.navigateTo(entity);
   };
 
+  const datesWithNotes = createMemo((): Set<string> => {
+    const dates = new Set<string>();
+    for (const note of indexStore.notes.values()) {
+      if (note.date) dates.add(note.date);
+    }
+    return dates;
+  });
+
   const [noteDraftDate, setNoteDraftDate] = createSignal<string | null>(null);
 
   function handleNewNote(date: string) {
@@ -365,6 +373,8 @@ function App() {
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
               onCreateDoc={() => setContextStore("draft", { type: "doc" })}
               onSwitchFolder={switchFolder}
+              datesWithNotes={datesWithNotes()}
+              onDateSelect={(date) => NavigationService.navigateToDate(date)}
             />
           }
           center={

@@ -11,6 +11,7 @@ const [contextStore, setContextStore] = createStore<ContextState>({
   visibleDates: new Set<string>(),
   draft: null,
   searchState: null,
+  scrollToDate: null,
 });
 
 export { contextStore, setContextStore };

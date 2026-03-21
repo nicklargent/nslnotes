@@ -65,6 +65,8 @@ export interface ContextState {
   draft: DraftState | null;
   /** Search view state (null when not searching) */
   searchState: SearchState | null;
+  /** One-shot command: scroll journal to this date, then clear */
+  scrollToDate: string | null;
 }
 
 /**

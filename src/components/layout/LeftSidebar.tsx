@@ -1,4 +1,6 @@
+import { createSignal, Show } from "solid-js";
 import { TodayButton } from "../sidebar/TodayButton";
+import { CalendarPicker } from "../sidebar/CalendarPicker";
 import { TopicsList } from "../sidebar/TopicsList";
 import { DocsList } from "../sidebar/DocsList";
 import { uiStore, setUIStore } from "../../stores/uiStore";
@@ -22,6 +24,8 @@ interface LeftSidebarProps {
   onDocClick: (doc: Doc) => void;
   onCreateDoc: () => void;
   onSwitchFolder: () => void;
+  datesWithNotes: Set<string>;
+  onDateSelect: (date: string) => void;
 }
 
 function clampFontSize(size: number): number {
@@ -46,11 +50,63 @@ export function LeftSidebar(props: LeftSidebarProps) {
     }
   }
 
+  const [calendarOpen, setCalendarOpen] = createSignal(false);
+  const [anchorRect, setAnchorRect] = createSignal<DOMRect | null>(null);
+  let calendarBtnRef: HTMLButtonElement | undefined;
+
+  function toggleCalendar() {
+    if (calendarOpen()) {
+      setCalendarOpen(false);
+    } else if (calendarBtnRef) {
+      setAnchorRect(calendarBtnRef.getBoundingClientRect());
+      setCalendarOpen(true);
+    }
+  }
+
+  function handleDateSelect(date: string) {
+    setCalendarOpen(false);
+    props.onDateSelect(date);
+  }
+
   return (
     <div class="flex h-full flex-col">
-      {/* Today + Search buttons - pinned at top */}
+      {/* Today + Calendar + Search buttons - pinned at top */}
       <div class="border-b border-gray-200 p-3 dark:border-gray-700">
-        <TodayButton onClick={() => props.onTodayClick()} />
+        <div class="relative flex items-center gap-2">
+          <div class="flex-1">
+            <TodayButton onClick={() => props.onTodayClick()} />
+          </div>
+          <button
+            ref={calendarBtnRef}
+            type="button"
+            class="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            onClick={toggleCalendar}
+            title="Calendar"
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </button>
+          <Show when={calendarOpen() && anchorRect()}>
+            {(rect) => (
+              <CalendarPicker
+                datesWithNotes={props.datesWithNotes}
+                onSelectDate={handleDateSelect}
+                onClose={() => setCalendarOpen(false)}
+                anchorRect={rect()}
+              />
+            )}
+          </Show>
+        </div>
         <button
           type="button"
           class="mt-2 flex w-full items-center gap-2 rounded-lg border border-gray-300 px-4 py-1.5 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-300"

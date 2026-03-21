@@ -222,6 +222,14 @@ export function JournalView(props: JournalViewProps) {
     }
   });
 
+  /** React to scrollToDate command (calendar picker, etc.). */
+  createEffect(() => {
+    const target = contextStore.scrollToDate;
+    if (!target) return;
+    setContextStore("scrollToDate", null);
+    setPendingScrollDate(target);
+  });
+
   /** React to home state changes (Today button while already on journal). */
   createEffect(() => {
     if (contextStore.isHomeState) {

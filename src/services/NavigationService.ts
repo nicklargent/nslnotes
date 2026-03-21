@@ -128,6 +128,26 @@ export const NavigationService = {
   },
 
   /**
+  /**
+   * Navigate to a specific date in the journal.
+   * Sets journal view anchored to the given date.
+   */
+  navigateToDate: (date: string): void => {
+    setContextStore({
+      activeView: "journal",
+      activeEntity: null,
+      activeTopic: null,
+      relevanceWeights: new Map(),
+      isHomeState: false,
+      journalAnchorDate: date,
+      draft: null,
+      searchState: null,
+      scrollToDate: date,
+    });
+    pushHistory();
+  },
+
+  /**
    * Navigate to home state (Today button).
    * Sets journal view, clears relevance, resets scroll (FR-NAV-001–003).
    */
