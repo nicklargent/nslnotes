@@ -4,7 +4,7 @@ import { ImageService } from "./ImageService";
 import { NavigationService } from "./NavigationService";
 import { SettingsService } from "./SettingsService";
 import { serialize, parse } from "../lib/frontmatter";
-import { generateUniqueSlug } from "../lib/slug";
+import { generateSlug, generateUniqueSlug } from "../lib/slug";
 import { getTodayISO } from "../lib/dates";
 import { runtime } from "../lib/runtime";
 import { indexStore } from "../stores/indexStore";
@@ -387,7 +387,7 @@ export const EntityService = {
 
     const notesDir = `${rootPath}/notes`;
     const slug = await generateUniqueSlug(
-      params.slug ?? `${params.date}-${params.title}`,
+      `${params.date}-${params.slug ?? generateSlug(params.title)}`,
       notesDir
     );
     const path = `${notesDir}/${slug}.md`;
