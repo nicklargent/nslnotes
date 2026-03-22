@@ -290,3 +290,120 @@ export function getWeekdayName(date: Date | string): string {
   ];
   return dayNames[targetDate.getDay()] ?? "";
 }
+
+/**
+ * Extract month key "YYYY-MM" from an ISO date string.
+ */
+export function getMonthKey(date: string): string {
+  return date.slice(0, 7);
+}
+
+/**
+ * Get all ISO dates for a given month in reverse chronological order.
+ * For the current month, starts from today instead of the last day.
+ */
+export function getDaysInMonth(year: number, month: number): string[] {
+  const today = getToday();
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() + 1 === month;
+
+  const lastDay = isCurrentMonth
+    ? today.getDate()
+    : new Date(year, month, 0).getDate();
+
+  const dates: string[] = [];
+  for (let d = lastDay; d >= 1; d--) {
+    const iso = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    dates.push(iso);
+  }
+  return dates;
+}
+
+/**
+ * Get the month key after a given month key.
+ * E.g., "2026-03" → "2026-04", "2026-12" → "2027-01"
+ */
+export function nextMonthKey(mk: string): string {
+  const [y, m] = mk.split("-").map(Number) as [number, number];
+  if (m === 12) return `${y + 1}-01`;
+  return `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Get the month key before a given month key.
+ * E.g., "2026-03" → "2026-02", "2026-01" → "2025-12"
+ */
+export function prevMonthKey(mk: string): string {
+  const [y, m] = mk.split("-").map(Number) as [number, number];
+  if (m === 1) return `${y - 1}-12`;
+  return `${y}-${String(m - 1).padStart(2, "0")}`;
+}
+
+/**
+ * Get the first N days of the NEXT month after (year, month), in reverse chronological order.
+ * If the next month is the current calendar month, cap at today's date.
+ * If the next month is entirely in the future, return empty array.
+ */
+export function getLeadingBufferDays(
+  year: number,
+  month: number,
+  count: number
+): string[] {
+  let nextYear = year;
+  let nextMonth = month + 1;
+  if (nextMonth > 12) {
+    nextMonth = 1;
+    nextYear++;
+  }
+
+  const today = getToday();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1;
+
+  // If next month is entirely in the future, return empty
+  if (
+    nextYear > todayYear ||
+    (nextYear === todayYear && nextMonth > todayMonth)
+  ) {
+    return [];
+  }
+
+  const isCurrentMonth = nextYear === todayYear && nextMonth === todayMonth;
+  const maxDay = isCurrentMonth ? today.getDate() : count;
+  const actualCount = Math.min(count, maxDay);
+
+  const dates: string[] = [];
+  for (let d = actualCount; d >= 1; d--) {
+    dates.push(
+      `${nextYear}-${String(nextMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+    );
+  }
+  return dates;
+}
+
+/**
+ * Get the last N days of the month before the given month, in reverse chronological order.
+ * Used for buffer days at month boundaries.
+ */
+export function getBufferDays(
+  year: number,
+  month: number,
+  count: number
+): string[] {
+  // Previous month
+  let prevYear = year;
+  let prevMonth = month - 1;
+  if (prevMonth < 1) {
+    prevMonth = 12;
+    prevYear--;
+  }
+
+  const lastDay = new Date(prevYear, prevMonth, 0).getDate();
+  const dates: string[] = [];
+  for (let d = lastDay; d > lastDay - count && d >= 1; d--) {
+    dates.push(
+      `${prevYear}-${String(prevMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+    );
+  }
+  return dates;
+}

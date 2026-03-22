@@ -1,5 +1,6 @@
 import { contextStore, setContextStore } from "../stores/contextStore";
 import { IndexService } from "./IndexService";
+import { getMonthKey } from "../lib/dates";
 import type { Entity } from "../types/entities";
 import type { TopicRef } from "../types/topics";
 import type { SearchFilter } from "../types/search";
@@ -35,6 +36,7 @@ function snapshotEntry(): NavHistoryEntry {
     searchState: cloneForHistory(
       contextStore.searchState
     ) as NavHistoryEntry["searchState"],
+    currentMonth: contextStore.currentMonth,
   };
 }
 
@@ -78,6 +80,7 @@ export const NavigationService = {
       journalAnchorDate: entry.journalAnchorDate,
       draft: null,
       searchState: entry.searchState,
+      currentMonth: entry.currentMonth ?? null,
     });
 
     // Recompute relevance based on restored state
@@ -143,6 +146,7 @@ export const NavigationService = {
       draft: null,
       searchState: null,
       scrollToDate: date,
+      currentMonth: getMonthKey(date),
     });
     pushHistory();
   },
@@ -161,6 +165,7 @@ export const NavigationService = {
       journalAnchorDate: null,
       draft: null,
       searchState: null,
+      currentMonth: null,
     });
     pushHistory();
   },
@@ -181,7 +186,11 @@ export const NavigationService = {
       draft: null,
       searchState: null,
       ...(entity.type === "note" && entity.date
-        ? { journalAnchorDate: entity.date }
+        ? {
+            journalAnchorDate: entity.date,
+            currentMonth: getMonthKey(entity.date),
+            scrollToDate: entity.date,
+          }
         : {}),
     });
 

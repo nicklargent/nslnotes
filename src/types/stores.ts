@@ -67,6 +67,8 @@ export interface ContextState {
   searchState: SearchState | null;
   /** One-shot command: scroll journal to this date, then clear */
   scrollToDate: string | null;
+  /** Current month key "YYYY-MM" for month-based navigation (null = today's month) */
+  currentMonth: string | null;
 }
 
 /**
@@ -79,6 +81,7 @@ export interface NavHistoryEntry {
   isHomeState: boolean;
   journalAnchorDate: string | null;
   searchState: SearchState | null;
+  currentMonth: string | null;
 }
 
 /**

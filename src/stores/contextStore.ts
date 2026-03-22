@@ -12,6 +12,7 @@ const [contextStore, setContextStore] = createStore<ContextState>({
   draft: null,
   searchState: null,
   scrollToDate: null,
+  currentMonth: null,
 });
 
 export { contextStore, setContextStore };

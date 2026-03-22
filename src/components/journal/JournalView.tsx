@@ -11,7 +11,16 @@ import { DateHeader } from "./DateHeader";
 import { DailyNote } from "./DailyNote";
 import { NamedNoteCard } from "./NamedNoteCard";
 import { DraftNoteCard } from "./DraftNoteCard";
-import { getTodayISO } from "../../lib/dates";
+import { MonthBar } from "./MonthBar";
+import {
+  getTodayISO,
+  getMonthKey,
+  getDaysInMonth,
+  getBufferDays,
+  getLeadingBufferDays,
+  nextMonthKey,
+  prevMonthKey,
+} from "../../lib/dates";
 import { indexStore } from "../../stores/indexStore";
 import { contextStore, setContextStore } from "../../stores/contextStore";
 import { NavigationService } from "../../services/NavigationService";
@@ -23,20 +32,15 @@ interface JournalViewProps {
   onDraftClear: () => void;
 }
 
-/** How many dates to render above/below viewport for smooth scrolling. */
-const BUFFER_SIZE = 5;
-/** Estimated height of a single date section. */
-const ESTIMATED_DATE_HEIGHT = 160;
-/** Max dates rendered at once. */
-const MAX_RENDERED = 30;
+/** Number of buffer days shown from adjacent months. */
+const BUFFER_DAY_COUNT = 4;
 
 /**
- * Virtual-scrolling journal view (T7.1).
- * Only renders dates within a window around the scroll position.
- * Today at top, past dates below. Scroll triggers context updates (FR-CTX-020–022).
+ * Month-based journal view.
+ * Renders exactly one month with grey buffer zones at top (next month) and bottom (prev month).
+ * Scrolling through buffer zones seamlessly transitions to the adjacent month.
  */
 export function JournalView(props: JournalViewProps) {
-  const [startIndex, setStartIndex] = createSignal(0);
   const [focusedNoteSlug, setFocusedNoteSlug] = createSignal<string | null>(
     null
   );
@@ -49,55 +53,72 @@ export function JournalView(props: JournalViewProps) {
   const [hoveredDate, setHoveredDate] = createSignal<string | null>(null);
   const [highlightPath, setHighlightPath] = createSignal<string | null>(null);
   let scrollRef: HTMLDivElement | undefined;
+  let topSentinelRef: HTMLDivElement | undefined;
+  let bottomSentinelRef: HTMLDivElement | undefined;
   let observer: IntersectionObserver | undefined;
+  let sentinelObserver: IntersectionObserver | undefined;
   let programmaticScroll = false;
-  const heightCache = new Map<string, number>();
+  let lastTransitionTime = 0;
 
-  /** All dates with content, sorted reverse-chronologically, today always first. */
-  const allDatesWithContent = createMemo(() => {
-    const todayISO = getTodayISO();
+  /** Effective current month (null → today's month). */
+  const effectiveMonth = createMemo(() => {
+    return contextStore.currentMonth ?? getMonthKey(getTodayISO());
+  });
+
+  /** Set of all dates that have notes, for quick lookup. */
+  const datesWithContent = createMemo(() => {
     const dateSet = new Set<string>();
     for (const note of indexStore.notes.values()) {
       if (note.date) dateSet.add(note.date);
     }
-    dateSet.delete(todayISO);
-    const sorted = [...dateSet].sort((a, b) => b.localeCompare(a));
-    return [todayISO, ...sorted];
+    return dateSet;
   });
 
-  /** Windowed dates to render. */
-  const visibleDates = createMemo(() => {
-    const all = allDatesWithContent();
-    const start = startIndex();
-    const end = Math.min(start + MAX_RENDERED, all.length);
-    return all.slice(start, end);
-  });
-
-  /** Total height of all dates before the visible window (for padding). */
-  const topPadding = createMemo(() => {
-    const all = allDatesWithContent();
-    let height = 0;
-    for (let i = 0; i < startIndex(); i++) {
-      const date = all[i];
-      height += date
-        ? (heightCache.get(date) ?? ESTIMATED_DATE_HEIGHT)
-        : ESTIMATED_DATE_HEIGHT;
+  /** Earliest month with content — used for boundary checks. */
+  const earliestMonth = createMemo(() => {
+    let earliest = getMonthKey(getTodayISO());
+    for (const d of datesWithContent()) {
+      const mk = getMonthKey(d);
+      if (mk < earliest) earliest = mk;
     }
-    return height;
+    return earliest;
   });
 
-  /** Total height of all dates after the visible window. */
-  const bottomPadding = createMemo(() => {
-    const all = allDatesWithContent();
-    let height = 0;
-    const end = Math.min(startIndex() + MAX_RENDERED, all.length);
-    for (let i = end; i < all.length; i++) {
-      const date = all[i];
-      height += date
-        ? (heightCache.get(date) ?? ESTIMATED_DATE_HEIGHT)
-        : ESTIMATED_DATE_HEIGHT;
+  /** All rendered date entries: top buffer + main month + bottom buffer. */
+  const allRenderedDates = createMemo(() => {
+    const todayISO = getTodayISO();
+    const todayMonth = getMonthKey(todayISO);
+    const contentDates = datesWithContent();
+    const mk = effectiveMonth();
+    const [y, m] = mk.split("-").map(Number) as [number, number];
+    const entries: { date: string; isBuffer: boolean }[] = [];
+
+    // 1. Top buffer: leading days from NEXT month (skip if current month)
+    if (mk !== todayMonth) {
+      const leadingDays = getLeadingBufferDays(y, m, BUFFER_DAY_COUNT);
+      for (const ld of leadingDays) {
+        if (contentDates.has(ld)) {
+          entries.push({ date: ld, isBuffer: true });
+        }
+      }
     }
-    return height;
+
+    // 2. Main entries: dates with content for this month, reverse chrono
+    for (const iso of getDaysInMonth(y, m)) {
+      if (iso === todayISO || contentDates.has(iso)) {
+        entries.push({ date: iso, isBuffer: false });
+      }
+    }
+
+    // 3. Bottom buffer: trailing days from PREVIOUS month
+    const bufferDays = getBufferDays(y, m, BUFFER_DAY_COUNT);
+    for (const bd of bufferDays) {
+      if (contentDates.has(bd)) {
+        entries.push({ date: bd, isBuffer: true });
+      }
+    }
+
+    return entries;
   });
 
   /** Get daily note for a date. */
@@ -120,81 +141,80 @@ export function JournalView(props: JournalViewProps) {
       .map((n) => n.path);
   };
 
-  /** Handle scroll to update virtual window. */
-  function handleScroll() {
-    if (!scrollRef || programmaticScroll) return;
+  /**
+   * Transition to an adjacent month, anchoring scroll so the given date
+   * stays at the same pixel position.
+   */
+  function transitionToMonth(newMonth: string, anchorDate: string) {
+    if (!scrollRef) return;
 
-    const { scrollTop } = scrollRef;
-    const all = allDatesWithContent();
-
-    // Find which date should be at the top of the viewport
-    let accHeight = 0;
-    let newStart = 0;
-    for (let i = 0; i < all.length; i++) {
-      const date = all[i];
-      const h = date
-        ? (heightCache.get(date) ?? ESTIMATED_DATE_HEIGHT)
-        : ESTIMATED_DATE_HEIGHT;
-      if (accHeight + h > scrollTop - BUFFER_SIZE * ESTIMATED_DATE_HEIGHT) {
-        newStart = Math.max(0, i - BUFFER_SIZE);
-        break;
-      }
-      accHeight += h;
+    // Find anchor element and record its position
+    const el = scrollRef.querySelector(
+      `[data-date="${anchorDate}"]`
+    ) as HTMLElement | null;
+    let anchorOffset = 0;
+    if (el) {
+      anchorOffset =
+        el.getBoundingClientRect().top - scrollRef.getBoundingClientRect().top;
     }
 
-    if (newStart !== startIndex()) {
-      // Anchor a visible date element so we can compensate for topPadding drift.
-      // When startIndex changes, topPadding recalculates using height estimates
-      // that may differ from actual rendered heights, shifting all content.
-      const containerTop = scrollRef.getBoundingClientRect().top;
-      const dateEls = scrollRef.querySelectorAll("[data-date]");
-      let anchorDate: string | undefined;
-      let anchorVisualTop = 0;
+    programmaticScroll = true;
+    lastTransitionTime = Date.now();
+    setContextStore("currentMonth", newMonth);
 
-      for (const el of dateEls) {
-        const top = el.getBoundingClientRect().top;
-        if (top >= containerTop - 50) {
-          anchorDate = (el as HTMLElement).dataset["date"];
-          anchorVisualTop = top;
-          break;
-        }
-      }
-
-      // Solid updates DOM synchronously on signal change
-      setStartIndex(newStart);
-
-      // Measure how far the anchor drifted and compensate
-      if (anchorDate) {
-        const el = scrollRef.querySelector(`[data-date="${anchorDate}"]`);
-        if (el) {
-          const drift = el.getBoundingClientRect().top - anchorVisualTop;
-          if (Math.abs(drift) > 1) {
-            programmaticScroll = true;
-            scrollRef.scrollTop += drift;
-            // Release after browser processes the scroll event (fires async)
+    // Double-rAF with retry to find the anchor in the new DOM
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const tryScroll = (attempts: number) => {
+          if (!scrollRef) return;
+          const newEl = scrollRef.querySelector(
+            `[data-date="${anchorDate}"]`
+          ) as HTMLElement | null;
+          if (newEl) {
+            scrollRef.scrollTop = newEl.offsetTop - anchorOffset;
             requestAnimationFrame(() => {
               programmaticScroll = false;
             });
+          } else if (attempts > 0) {
+            requestAnimationFrame(() => tryScroll(attempts - 1));
+          } else {
+            programmaticScroll = false;
           }
+        };
+        tryScroll(5);
+      })
+    );
+  }
+
+  /** Handle month selection from MonthBar. */
+  function handleMonthSelect(mk: string) {
+    programmaticScroll = true;
+    setContextStore("currentMonth", mk);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (!scrollRef) {
+          programmaticScroll = false;
+          return;
         }
-      }
-    }
+        const first = scrollRef.querySelector(
+          "[data-date]:not([data-buffer])"
+        ) as HTMLElement | null;
+        if (first) {
+          scrollRef.scrollTop = first.offsetTop;
+        } else {
+          scrollRef.scrollTop = 0;
+        }
+        requestAnimationFrame(() => {
+          programmaticScroll = false;
+        });
+      })
+    );
   }
 
-  /** Cache the measured height of a date section. */
-  function cacheDateHeight(date: string, el: HTMLDivElement) {
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        heightCache.set(date, entry.contentRect.height);
-      }
-    });
-    ro.observe(el);
-    onCleanup(() => ro.disconnect());
+  /** Handle buffer day click: transition to that month with the clicked date visible. */
+  function handleBufferDayClick(date: string) {
+    transitionToMonth(getMonthKey(date), date);
   }
-
-  /** Track which dates are currently visible in the viewport. */
-  const visibleDateSet = new Set<string>();
-  const pendingHeaders: HTMLDivElement[] = [];
 
   /** Schedule flash highlight after scroll settles. */
   let highlightTimer: number | undefined;
@@ -207,19 +227,41 @@ export function JournalView(props: JournalViewProps) {
   }
   onCleanup(() => window.clearTimeout(highlightTimer));
 
-  /** Capture navigation intent on mount — set pending scroll target. */
+  /** Track which dates are currently visible in the viewport. */
+  const visibleDateSet = new Set<string>();
+  const pendingHeaders: HTMLDivElement[] = [];
+
+  /** Capture navigation intent on mount. */
   onMount(() => {
-    if (contextStore.isHomeState) return; // home state starts at top, nothing to do
+    if (contextStore.isHomeState) return;
     const anchorDate = contextStore.journalAnchorDate;
     const entityPath = contextStore.activeEntity?.path;
     if (anchorDate) {
       setPendingScrollDate(anchorDate);
-      // For today (index 0) or already-visible dates, highlight immediately
-      const all = allDatesWithContent();
-      if (all.indexOf(anchorDate) === 0 && entityPath) {
+      if (entityPath) {
         requestAnimationFrame(() => triggerHighlight(entityPath, 50));
       }
     }
+  });
+
+  /** On initial mount, scroll past top buffer to first regular entry. */
+  onMount(() => {
+    if (pendingScrollDate()) return; // will be handled by scroll-to-date effect
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (!scrollRef) return;
+        const first = scrollRef.querySelector(
+          "[data-date]:not([data-buffer])"
+        ) as HTMLElement | null;
+        if (first) {
+          programmaticScroll = true;
+          scrollRef.scrollTop = first.offsetTop;
+          requestAnimationFrame(() => {
+            programmaticScroll = false;
+          });
+        }
+      })
+    );
   });
 
   /** React to scrollToDate command (calendar picker, etc.). */
@@ -233,8 +275,9 @@ export function JournalView(props: JournalViewProps) {
   /** React to home state changes (Today button while already on journal). */
   createEffect(() => {
     if (contextStore.isHomeState) {
-      setStartIndex(0);
       setPendingScrollDate(null);
+      const todayMonth = getMonthKey(getTodayISO());
+      setContextStore("currentMonth", todayMonth);
       requestAnimationFrame(() => {
         if (scrollRef) scrollRef.scrollTop = 0;
       });
@@ -246,53 +289,44 @@ export function JournalView(props: JournalViewProps) {
     const target = pendingScrollDate();
     if (!target || !scrollRef) return;
 
-    // Capture entity path now before scroll/observers can clear it
     const entityPath = contextStore.activeEntity?.path ?? null;
 
-    const all = allDatesWithContent();
-    const dateIndex = all.indexOf(target);
-    if (dateIndex > 0) {
-      const newStart = Math.max(0, dateIndex - BUFFER_SIZE);
-      programmaticScroll = true;
-      setStartIndex(newStart);
-      // Double rAF ensures Solid has flushed DOM updates from setStartIndex
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          if (!scrollRef) {
-            programmaticScroll = false;
-            return;
-          }
-          const tryScroll = (attempts: number) => {
-            const el = scrollRef!.querySelector(`[data-date="${target}"]`);
-            if (el) {
-              // Use manual scroll position instead of scrollIntoView to stay
-              // consistent with handleScroll's height-accumulation model.
-              const container = scrollRef!;
-              const elTop = (el as HTMLElement).offsetTop;
-              programmaticScroll = true;
-              container.scrollTop = elTop;
-              setPendingScrollDate(null);
-              // Release lock after browser processes the scroll
-              requestAnimationFrame(() => {
-                programmaticScroll = false;
-              });
-              if (entityPath) triggerHighlight(entityPath);
-            } else if (attempts > 0) {
-              requestAnimationFrame(() => tryScroll(attempts - 1));
-            } else {
-              programmaticScroll = false;
-              setPendingScrollDate(null);
-            }
-          };
-          tryScroll(3);
-        })
-      );
-    } else {
-      setPendingScrollDate(null);
+    // Make sure the target month is loaded
+    const targetMonth = getMonthKey(target);
+    if (targetMonth !== effectiveMonth()) {
+      setContextStore("currentMonth", targetMonth);
+      // Re-trigger after month loads
+      requestAnimationFrame(() => setPendingScrollDate(target));
+      return;
     }
+
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (!scrollRef) return;
+        const tryScroll = (attempts: number) => {
+          const el = scrollRef!.querySelector(`[data-date="${target}"]`);
+          if (el) {
+            programmaticScroll = true;
+            const container = scrollRef!;
+            const elTop = (el as HTMLElement).offsetTop;
+            container.scrollTop = elTop;
+            setPendingScrollDate(null);
+            requestAnimationFrame(() => {
+              programmaticScroll = false;
+            });
+            if (entityPath) triggerHighlight(entityPath);
+          } else if (attempts > 0) {
+            requestAnimationFrame(() => tryScroll(attempts - 1));
+          } else {
+            setPendingScrollDate(null);
+          }
+        };
+        tryScroll(3);
+      })
+    );
   });
 
-  /** Set up IntersectionObserver to track visible date headers (T4.6). */
+  /** Set up IntersectionObserver to track visible date headers. */
   onMount(() => {
     if (!scrollRef) return;
 
@@ -303,7 +337,8 @@ export function JournalView(props: JournalViewProps) {
         let topY = Infinity;
 
         for (const entry of entries) {
-          const date = (entry.target as HTMLElement).dataset["date"];
+          const el = entry.target as HTMLElement;
+          const date = el.dataset["date"];
           if (!date) continue;
           if (entry.isIntersecting) {
             visibleDateSet.add(date);
@@ -316,7 +351,6 @@ export function JournalView(props: JournalViewProps) {
           }
         }
 
-        // Only update store if the set of visible dates actually changed
         if (visibleDateSet.size !== prevSize || entries.length > 0) {
           setContextStore("visibleDates", new Set(visibleDateSet));
         }
@@ -337,10 +371,61 @@ export function JournalView(props: JournalViewProps) {
       observer.observe(el);
     }
     pendingHeaders.length = 0;
+
+    // Set up dual sentinel observer for seamless month transitions
+    sentinelObserver = new IntersectionObserver(
+      (entries) => {
+        if (programmaticScroll) return;
+        if (Date.now() - lastTransitionTime < 300) return;
+
+        const todayMonth = getMonthKey(getTodayISO());
+        const mk = effectiveMonth();
+
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+
+          if (entry.target === topSentinelRef) {
+            // Scrolled to top → transition to next month
+            if (mk === todayMonth) continue; // No next month for current month
+            const next = nextMonthKey(mk);
+            // Don't go past current month
+            if (next > todayMonth) continue;
+            // Find anchor: first visible non-buffer date, or first buffer date
+            const rendered = allRenderedDates();
+            const topBuffer = rendered.find((e) => e.isBuffer);
+            const firstRegular = rendered.find((e) => !e.isBuffer);
+            const anchor = topBuffer?.date ?? firstRegular?.date;
+            if (anchor) transitionToMonth(next, anchor);
+          } else if (entry.target === bottomSentinelRef) {
+            // Scrolled to bottom → transition to prev month
+            const prev = prevMonthKey(mk);
+            if (prev < earliestMonth()) continue;
+            const rendered = allRenderedDates();
+            let lastBuffer: string | undefined;
+            let lastRegular: string | undefined;
+            for (let j = rendered.length - 1; j >= 0; j--) {
+              const e = rendered[j]!;
+              if (!lastBuffer && e.isBuffer) lastBuffer = e.date;
+              if (!lastRegular && !e.isBuffer) lastRegular = e.date;
+              if (lastBuffer && lastRegular) break;
+            }
+            const anchor = lastBuffer ?? lastRegular;
+            if (anchor) transitionToMonth(prev, anchor);
+          }
+        }
+      },
+      { root: scrollRef, rootMargin: "50px" }
+    );
+
+    if (topSentinelRef) sentinelObserver.observe(topSentinelRef);
+    if (bottomSentinelRef) sentinelObserver.observe(bottomSentinelRef);
   });
 
   onCleanup(() => {
     observer?.disconnect();
+    sentinelObserver?.disconnect();
+    visibleDateSet.clear();
+    pendingHeaders.length = 0;
   });
 
   function observeHeader(el: HTMLDivElement) {
@@ -375,93 +460,109 @@ export function JournalView(props: JournalViewProps) {
   }
 
   return (
-    <div
-      ref={scrollRef}
-      class="h-full overflow-y-auto"
-      onScroll={handleScroll}
-      onClick={(e) => handleBackgroundClick(e)}
-    >
-      <div class="mx-auto max-w-2xl px-4 pb-32">
-        {/* Spacer for virtualized dates above the window */}
-        <div style={{ height: `${topPadding()}px` }} />
+    <div class="flex h-full flex-col">
+      {/* MonthBar pinned at top */}
+      <MonthBar
+        currentMonth={effectiveMonth()}
+        onSelectMonth={handleMonthSelect}
+      />
 
-        <For each={visibleDates()}>
-          {(date) => (
-            <div
-              ref={(el) => cacheDateHeight(date, el)}
-              onMouseEnter={() => setHoveredDate(date)}
-              onMouseLeave={() => {
-                if (hoveredDate() === date) setHoveredDate(null);
-              }}
-            >
-              <div
-                ref={observeHeader}
-                data-date={date}
-                class="sticky top-0 z-10"
-              >
-                <DateHeader
-                  date={date}
-                  hovered={hoveredDate() === date}
-                  onNewNote={(d) => props.onNewNote(d)}
-                />
-              </div>
+      {/* Scrollable journal content */}
+      <div
+        ref={scrollRef}
+        class="flex-1 overflow-y-auto"
+        onClick={(e) => handleBackgroundClick(e)}
+      >
+        <div class="mx-auto max-w-2xl px-4 pb-32 pt-4">
+          <div ref={topSentinelRef} class="h-1" />
 
+          <For each={allRenderedDates()}>
+            {(entry) => (
               <div
-                class="mb-6"
-                classList={{
-                  "animate-flash": getDailyNote(date)?.path === highlightPath(),
+                class={
+                  entry.isBuffer
+                    ? "opacity-60 cursor-pointer hover:opacity-80 transition-opacity"
+                    : ""
+                }
+                onClick={
+                  entry.isBuffer
+                    ? () => handleBufferDayClick(entry.date)
+                    : undefined
+                }
+                onMouseEnter={() => setHoveredDate(entry.date)}
+                onMouseLeave={() => {
+                  if (hoveredDate() === entry.date) setHoveredDate(null);
                 }}
               >
-                <DailyNote
-                  date={date}
-                  note={getDailyNote(date)}
-                  hovered={hoveredDate() === date}
-                />
+                <div
+                  ref={observeHeader}
+                  data-date={entry.date}
+                  data-buffer={entry.isBuffer || undefined}
+                  class="sticky top-0 z-10"
+                >
+                  <DateHeader
+                    date={entry.date}
+                    hovered={hoveredDate() === entry.date}
+                    onNewNote={(d) => props.onNewNote(d)}
+                  />
+                </div>
 
-                <For each={getNamedNotePaths(date)}>
-                  {(path) => {
-                    const note = () => indexStore.notes.get(path);
-                    return (
-                      <Show when={note()}>
-                        {(n) => (
-                          <div data-note-card>
-                            <NamedNoteCard
-                              note={n()}
-                              isFocused={focusedNoteSlug() === n().slug}
-                              hovered={hoveredDate() === date}
-                              autofocus={autofocusNotePath() === n().path}
-                              highlight={n().path === highlightPath()}
-                              onClick={(nn) => handleNamedNoteFocus(nn)}
-                            />
-                          </div>
-                        )}
-                      </Show>
-                    );
+                <div
+                  class="mb-6"
+                  classList={{
+                    "animate-flash":
+                      getDailyNote(entry.date)?.path === highlightPath(),
                   }}
-                </For>
+                >
+                  <DailyNote
+                    date={entry.date}
+                    note={getDailyNote(entry.date)}
+                    hovered={hoveredDate() === entry.date}
+                  />
 
-                <Show when={props.draftDate === date}>
-                  <div data-note-card>
-                    <DraftNoteCard
-                      date={date}
-                      onCommit={(note) => {
-                        setAutofocusNotePath(note.path);
-                        props.onDraftClear();
-                        handleNamedNoteFocus(note);
-                        // Clear after render so the NamedNoteCard picks it up on mount
-                        setTimeout(() => setAutofocusNotePath(null), 0);
-                      }}
-                      onCancel={() => props.onDraftClear()}
-                    />
-                  </div>
-                </Show>
+                  <For each={getNamedNotePaths(entry.date)}>
+                    {(path) => {
+                      const note = () => indexStore.notes.get(path);
+                      return (
+                        <Show when={note()}>
+                          {(n) => (
+                            <div data-note-card>
+                              <NamedNoteCard
+                                note={n()}
+                                isFocused={focusedNoteSlug() === n().slug}
+                                hovered={hoveredDate() === entry.date}
+                                autofocus={autofocusNotePath() === n().path}
+                                highlight={n().path === highlightPath()}
+                                onClick={(nn) => handleNamedNoteFocus(nn)}
+                              />
+                            </div>
+                          )}
+                        </Show>
+                      );
+                    }}
+                  </For>
+
+                  <Show when={props.draftDate === entry.date}>
+                    <div data-note-card>
+                      <DraftNoteCard
+                        date={entry.date}
+                        onCommit={(note) => {
+                          setAutofocusNotePath(note.path);
+                          props.onDraftClear();
+                          handleNamedNoteFocus(note);
+                          setTimeout(() => setAutofocusNotePath(null), 0);
+                        }}
+                        onCancel={() => props.onDraftClear()}
+                      />
+                    </div>
+                  </Show>
+                </div>
               </div>
-            </div>
-          )}
-        </For>
+            )}
+          </For>
 
-        {/* Spacer for virtualized dates below the window */}
-        <div style={{ height: `${bottomPadding()}px` }} />
+          <div ref={bottomSentinelRef} class="h-1" />
+        </div>
       </div>
     </div>
   );
