@@ -277,7 +277,7 @@ export function ProseEditor(props: ProseEditorProps) {
             }
 
             // Check for topic ref click (#topic or @person)
-            const topicRegex = /(?<!\w)([#@][a-z0-9-]+)/gi;
+            const topicRegex = /(?<!\w)([#@][a-z0-9][a-z0-9-]+)/gi;
             let topicMatch;
             while ((topicMatch = topicRegex.exec(nodeText)) !== null) {
               if (
@@ -285,7 +285,7 @@ export function ProseEditor(props: ProseEditorProps) {
                 clickOffset <= topicMatch.index + topicMatch[0].length
               ) {
                 event.preventDefault();
-                props.onTopicClick?.(topicMatch[1]!);
+                props.onTopicClick?.(topicMatch[1]!.toLowerCase());
                 return true;
               }
             }

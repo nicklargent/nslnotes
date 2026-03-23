@@ -8,7 +8,7 @@ import type { TopicRef } from "../../types/topics";
 import type { EntityType } from "../../types/entities";
 
 const WIKILINK_RE = /\[\[(task|doc|note):([^\]]+)\]\]/g;
-const TOPIC_RE = /(?:^|(?<=\s))([#@][a-z0-9-]+)/gi;
+const TOPIC_RE = /(?:^|(?<=\s))([#@][a-z0-9][a-z0-9-]+)/gi;
 const MD_LINK_RE = /(?<!\[!?)\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g;
 const HIDDEN_STYLE = "font-size:0;letter-spacing:-1ch;color:transparent;";
 

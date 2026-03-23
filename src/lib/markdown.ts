@@ -17,7 +17,7 @@ const WIKILINK_PATTERN = /\[\[(task|doc|note):([^\]]+)\]\]/g;
  * Must be preceded by whitespace or start of line, followed by non-alphanumeric or end.
  */
 const TOPIC_REF_PATTERN =
-  /(?:^|(?<=\s))[#@][a-z0-9][a-z0-9-]*(?=[\s.,;:!?)\]|}]|$)/gi;
+  /(?:^|(?<=\s))[#@][a-z0-9][a-z0-9-]+(?=[\s.,;:!?)\]|}]|$)/gi;
 
 /**
  * Check if a line is inside a fenced code block.

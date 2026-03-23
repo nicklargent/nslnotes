@@ -142,4 +142,17 @@ describe("parseTopicRefs", () => {
   it("returns empty for content without refs", () => {
     expect(parseTopicRefs("no refs here")).toHaveLength(0);
   });
+
+  it("ignores single-char refs like #4 or @1", () => {
+    const content = "item #4 and @1 should not match";
+    const refs = parseTopicRefs(content);
+    expect(refs).toHaveLength(0);
+  });
+
+  it("matches two-char refs like #ab and @me", () => {
+    const content = "#ab and @me are valid";
+    const refs = parseTopicRefs(content);
+    expect(refs).toContain("#ab");
+    expect(refs).toContain("@me");
+  });
 });
