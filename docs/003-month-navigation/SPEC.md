@@ -4,6 +4,8 @@
 
 The infinite-scroll journal renders TipTap editors for every visible date, causing performance issues as the number of notes grows. Rather than optimizing with lazy rendering (which introduces UX regressions), this feature **bounds the problem structurally** by replacing infinite scroll with month-based navigation. Only ~30-35 dates are ever rendered, eliminating the performance problem while improving navigation clarity.
 
+Navigation between months is **explicit** — via nav buttons or MonthBar clicks. There are no automatic scroll-based transitions, which were unreliable across Firefox and Tauri/WebKit.
+
 ---
 
 ## MonthBar
@@ -19,7 +21,7 @@ A compact horizontal strip pinned at the top of the journal, inside the center p
 
 ### Controls
 - **Today button**: fixed on the left edge, resets to home state (today's month, scroll to top)
-- **Month pills**: clicking a month selects it, resets `loadedMonths` to just that month, scrolls to top
+- **Month pills**: clicking a month loads it and scrolls to the first regular date
 - Selected month highlighted with a pill style (blue background)
 
 ---
@@ -34,37 +36,45 @@ When a month is selected, its dates render in **reverse chronological order** (m
 - For the current month, dates start from today; for past months, from the last day of the month
 
 ### Buffer Days
-- 4 dimmed days from the previous month appear at the bottom of each month view
+- Up to 7 days from adjacent months appear at the top (next month) and bottom (previous month)
 - Buffer days are only shown if they have content
-- Buffer days are interactive — clicking one navigates to that month
-- Visual distinction: reduced opacity (50%)
+- Buffer days are muted (reduced opacity) but fully editable — no click-to-navigate behavior
+- Top buffer is skipped for the current month (no future dates to show)
 
 ---
 
-## Scroll-to-Load
+## Explicit Month Navigation
 
-When the user scrolls past the buffer days, the previous month's dates load below seamlessly.
+Month transitions happen only through explicit user actions:
 
-- An `IntersectionObserver` on a sentinel `<div>` at the bottom triggers the load
-- Maximum of 3 loaded months at once (~60-90 dates) for performance
-- Only loads if there are notes in or before the target month
+### Nav Buttons
+- A **"Load [Month Name]"** button appears above the top buffer when a more recent month exists
+- A **"Load [Month Name]"** button appears below the bottom buffer when an older month with content exists
+- Clicking a nav button loads that month and scrolls to the first regular date
+
+### MonthBar Click
+- Clicking a month pill loads that month and scrolls to the first regular date (buffer days above viewport)
+
+### Deep-Link Navigation
+- Clicking a date in the calendar, navigating to a note via wikilink, etc. loads the correct month and scrolls the target date into view
+- Uses simple `scrollTop` assignment after render — no programmatic scroll flags needed
+
+### What Was Removed
+- Scroll-based month transitions (`handleMonthScroll`, sentinel markers, `transitionToMonth`)
+- `programmaticScroll`, `lastTransitionTime`, `lastTransitionFrom` flags
+- Buffer day click-to-navigate behavior (`handleBufferDayClick`)
+- Top/bottom marker refs (`topMarkerRef`, `bottomMarkerRef`)
 
 ---
 
 ## Navigation Anchoring
 
-Navigating to a note (from backlinks, search, sidebar, calendar picker) sets `currentMonth` to that note's month, resets loaded months, scrolls to the target date, and highlights the note.
+Navigating to a note (from backlinks, search, sidebar, calendar picker) sets `currentMonth` to that note's month, scrolls to the target date, and highlights the note.
 
 - `NavigationService.navigateToDate(date)`: sets `currentMonth: getMonthKey(date)`
 - `NavigationService.navigateTo(entity)`: for notes with dates, sets `currentMonth` and `scrollToDate`
 - `NavigationService.goHome()`: sets `currentMonth: null` (today's month)
 - History state (`NavHistoryEntry`) includes `currentMonth` for back/forward navigation
-
----
-
-## MonthBar Auto-Tracking
-
-As the user scrolls across month boundaries (when multiple months are loaded), the MonthBar highlights the month of the topmost visible date. This uses the existing `IntersectionObserver` on date headers — when the topmost visible date changes months, `currentMonth` in the context store updates reactively.
 
 ---
 
@@ -77,7 +87,8 @@ As the user scrolls across month boundaries (when multiple months are loaded), t
 | `src/stores/contextStore.ts` | Added `currentMonth: null` to initial state |
 | `src/services/NavigationService.ts` | Wire `currentMonth` in `navigateToDate`, `goHome`, `navigateTo`, `restoreState`, `snapshotEntry` |
 | `src/components/journal/MonthBar.tsx` | **New** — month navigation strip component |
-| `src/components/journal/JournalView.tsx` | **Rewrite** — replaced virtual scroll with month-based rendering |
+| `src/components/journal/MonthNavButton.tsx` | **New** — simple nav button for loading adjacent months |
+| `src/components/journal/JournalView.tsx` | **Rewrite** — explicit month navigation, no scroll-based transitions |
 
 ### Unchanged
 - `DateHeader.tsx`, `DailyNote.tsx`, `NamedNoteCard.tsx`, `DraftNoteCard.tsx` — reused as-is
@@ -89,7 +100,8 @@ As the user scrolls across month boundaries (when multiple months are loaded), t
 
 1. **Year labels**: Skinny bar above spanning its months, not inline with month names — keeps the month strip compact
 2. **Empty days skipped**: Only dates with content shown (matches current behavior) — avoids mounting unnecessary TipTap editors
-3. **Month switch resets**: Clicking a month clears scroll-loaded months for a clean slate — prevents accumulating too many rendered dates
+3. **Month switch resets**: Clicking a month loads just that month for a clean slate — prevents accumulating too many rendered dates
 4. **Today always visible**: Even without notes, today appears in the current month view to preserve the "start writing" experience
-5. **Buffer days**: 4 days from the previous month shown at reduced opacity — softens month boundaries while keeping them navigable
-6. **Max 3 loaded months**: Caps rendered dates at ~60-90 to maintain performance without lazy rendering
+5. **Buffer days**: 7 days from adjacent months shown at reduced opacity — softens month boundaries while keeping them editable
+6. **Explicit navigation only**: No automatic scroll-based transitions — eliminates cross-engine scroll metric inconsistencies (Firefox vs Tauri/WebKit)
+7. **Nav buttons**: Clear affordance for loading adjacent months, placed at natural scroll boundaries

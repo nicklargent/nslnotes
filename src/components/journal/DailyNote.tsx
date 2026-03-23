@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup, Show } from "solid-js";
+import { createSignal, createEffect, on, onCleanup, Show } from "solid-js";
 import { Editor } from "../editor/Editor";
 import { RawEditor } from "../editor/RawEditor";
 import { RawModeToggle } from "../editor/RawModeToggle";
@@ -30,16 +30,27 @@ export function DailyNote(props: DailyNoteProps) {
   const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   let saveTimeout: number | undefined;
   let rawFlush: (() => Promise<void>) | null = null;
+  let lastLocalContent: string | undefined;
 
-  // Track props reactively
-  createEffect(() => {
-    setContent(props.note?.content ?? "");
-    setCreated(!!props.note);
-  });
+  // Only sync content when the note identity (path) changes, not on every re-parse
+  createEffect(
+    on(
+      () => props.note?.path,
+      () => {
+        const noteContent = props.note?.content ?? "";
+        // Skip if this is feedback from our own save
+        if (noteContent !== lastLocalContent) {
+          setContent(noteContent);
+        }
+        setCreated(!!props.note);
+      }
+    )
+  );
 
   let pendingSave: { date: string; body: string } | null = null;
 
   function handleUpdate(value: string) {
+    lastLocalContent = value;
     setContent(value);
     const date = props.date;
 

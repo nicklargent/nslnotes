@@ -171,6 +171,8 @@ function App() {
   function startFileWatcher(path: string) {
     unwatchFn = FileService.onFileChange((event) => {
       if (event.path.endsWith(".md") || event.path.endsWith(".yaml")) {
+        // Skip redundant invalidation for files we just wrote ourselves
+        if (FileService.isRecentWrite(event.path)) return;
         void IndexService.invalidate(event.path, path);
       }
     });

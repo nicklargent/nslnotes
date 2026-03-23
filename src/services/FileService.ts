@@ -50,10 +50,37 @@ export interface DirectoryStatus {
 const REQUIRED_SUBDIRS = ["notes", "tasks", "docs"];
 
 /**
+ * Tracks paths recently written by the app so the file watcher
+ * can skip redundant invalidation for self-triggered events.
+ */
+const recentWrites = new Map<string, number>();
+const RECENT_WRITE_TTL = 1500; // ms
+
+function cleanupRecentWrites() {
+  const now = Date.now();
+  for (const [path, ts] of recentWrites) {
+    if (now - ts > RECENT_WRITE_TTL) recentWrites.delete(path);
+  }
+}
+
+/**
  * FileService provides file system operations for NslNotes.
  * Acts as a facade over the runtime abstraction layer.
  */
 export const FileService = {
+  /**
+   * Check if a path was recently written by the app (for watcher suppression).
+   */
+  isRecentWrite: (path: string): boolean => {
+    const ts = recentWrites.get(path);
+    if (ts == null) return false;
+    if (Date.now() - ts > RECENT_WRITE_TTL) {
+      recentWrites.delete(path);
+      return false;
+    }
+    return true;
+  },
+
   /**
    * Read file content from disk.
    *
@@ -72,6 +99,8 @@ export const FileService = {
    * @param content - Content to write
    */
   write: async (path: string, content: string): Promise<void> => {
+    recentWrites.set(path, Date.now());
+    cleanupRecentWrites();
     return runtime.writeFile(path, content);
   },
 
