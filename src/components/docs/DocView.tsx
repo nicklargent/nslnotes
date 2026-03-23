@@ -111,6 +111,11 @@ export function DocView(props: DocViewProps) {
             }
             class="text-xl font-semibold text-gray-900 dark:text-gray-100"
           />
+          <div class="mt-1">
+            <code class="select-all rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">
+              [[doc:{liveDoc().slug}]]
+            </code>
+          </div>
           <div class="mt-2">
             <EditableTopics
               topics={liveDoc().topics}
@@ -120,9 +125,6 @@ export function DocView(props: DocViewProps) {
             />
           </div>
           <div class="mt-2 flex items-center gap-3">
-            <code class="select-all rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">
-              [[doc:{liveDoc().slug}]]
-            </code>
             <span class="text-xs text-gray-400 dark:text-gray-500">
               Created: {liveDoc().created}
             </span>

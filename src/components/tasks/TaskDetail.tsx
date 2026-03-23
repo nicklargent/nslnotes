@@ -108,6 +108,11 @@ export function TaskDetail(props: TaskDetailProps) {
             }
             class="text-xl font-semibold text-gray-900 dark:text-gray-100"
           />
+          <div class="mt-1">
+            <code class="select-all rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">
+              [[task:{liveTask().slug}]]
+            </code>
+          </div>
           <div class="mt-2">
             <EditableTopics
               topics={liveTask().topics}
@@ -131,9 +136,6 @@ export function TaskDetail(props: TaskDetailProps) {
               }
               label="Due"
             />
-            <code class="select-all rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">
-              [[task:{liveTask().slug}]]
-            </code>
             <span class="text-xs text-gray-400 dark:text-gray-500">
               Created: {liveTask().created}
             </span>
