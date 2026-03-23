@@ -3,7 +3,7 @@ import type { Task } from "./entities";
 /**
  * Task group names as displayed in right panel
  */
-export type TaskGroup = "OVERDUE" | "THIS_WEEK" | "LATER";
+export type TaskGroup = "OVERDUE" | "THIS_WEEK" | "NEXT_WEEK" | "LATER";
 
 /**
  * Grouped tasks for right panel display
@@ -11,6 +11,7 @@ export type TaskGroup = "OVERDUE" | "THIS_WEEK" | "LATER";
 export interface GroupedTasks {
   overdue: Task[];
   thisWeek: Task[];
+  nextWeek: Task[];
   later: Task[];
 }
 

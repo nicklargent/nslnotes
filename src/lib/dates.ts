@@ -120,6 +120,28 @@ export function isWithinDays(date: Date | string, days: number): boolean {
  * @param date - The date to check (Date object or ISO string)
  * @returns True if date is before today
  */
+/**
+ * Get the ISO date string (YYYY-MM-DD) for the end of the current Mon-Sun week.
+ * If today is Sunday, returns today.
+ */
+export function getEndOfWeek(): string {
+  const today = getToday();
+  const dow = today.getDay(); // 0=Sun, 1=Mon, ...
+  const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
+  return toISODate(addDays(today, daysUntilSunday));
+}
+
+/**
+ * Get the ISO date string (YYYY-MM-DD) for the end of next Mon-Sun week.
+ * Returns the Sunday 7 days after getEndOfWeek().
+ */
+export function getEndOfNextWeek(): string {
+  const today = getToday();
+  const dow = today.getDay();
+  const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
+  return toISODate(addDays(today, daysUntilSunday + 7));
+}
+
 export function isOverdue(date: Date | string): boolean {
   return getRelativeDays(date) < 0;
 }

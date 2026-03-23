@@ -4,7 +4,13 @@ import { indexStore, setIndexStore } from "../stores/indexStore";
 import { parseNote, parseTask, parseDoc } from "../lib/entityParser";
 import { parseTopicRefs, parseWikilinks } from "../lib/markdown";
 import { computeRelevance } from "../lib/relevance";
-import { isOverdue, isWithinDays, getToday, addDays } from "../lib/dates";
+import {
+  isOverdue,
+  getEndOfWeek,
+  getEndOfNextWeek,
+  getToday,
+  addDays,
+} from "../lib/dates";
 import { saveIndexCache, loadIndexCache } from "../lib/indexCache";
 import type { Note, Task, Doc, Entity } from "../types/entities";
 import type { TopicRef, Topic, EntityReference } from "../types/topics";
@@ -384,16 +390,21 @@ export const IndexService = {
    */
   getGroupedTasks: (): GroupedTasks => {
     const openTasks = IndexService.getOpenTasks();
+    const endOfThisWeek = getEndOfWeek();
+    const endOfNextWeek = getEndOfNextWeek();
     const overdue: Task[] = [];
     const thisWeek: Task[] = [];
+    const nextWeek: Task[] = [];
     const later: Task[] = [];
 
     for (const task of openTasks) {
       if (task.due) {
         if (isOverdue(task.due)) {
           overdue.push(task);
-        } else if (isWithinDays(task.due, 7)) {
+        } else if (task.due <= endOfThisWeek) {
           thisWeek.push(task);
+        } else if (task.due <= endOfNextWeek) {
+          nextWeek.push(task);
         } else {
           later.push(task);
         }
@@ -405,10 +416,11 @@ export const IndexService = {
     // Sort overdue by due date (most overdue first)
     overdue.sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
 
-    // Sort this week by due date
+    // Sort this week and next week by due date
     thisWeek.sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
+    nextWeek.sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
 
-    return { overdue, thisWeek, later };
+    return { overdue, thisWeek, nextWeek, later };
   },
 
   /**

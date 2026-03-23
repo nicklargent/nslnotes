@@ -110,6 +110,13 @@ export function RightPanel(props: RightPanelProps) {
             onTaskClick={(t) => props.onTaskClick(t)}
           />
           <TaskGroup
+            label="Next Week"
+            tasks={props.groupedTasks.nextWeek}
+            highlightedPath={props.highlightedTaskPath}
+            linkedPaths={props.linkedPaths}
+            onTaskClick={(t) => props.onTaskClick(t)}
+          />
+          <TaskGroup
             label="Later"
             tasks={props.groupedTasks.later}
             highlightedPath={props.highlightedTaskPath}
