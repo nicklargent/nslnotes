@@ -4,7 +4,6 @@ import type { Doc } from "../../types/entities";
 
 interface DocsListProps {
   docs: Doc[];
-  linkedPaths: Set<string>;
   activeDocPath: string | null;
   onDocClick: (doc: Doc) => void;
   onCreateDoc: () => void;
@@ -41,7 +40,6 @@ export function DocsList(props: DocsListProps) {
             {(doc) => (
               <DocItem
                 doc={doc}
-                isRelevant={props.linkedPaths.has(doc.path)}
                 isActive={doc.path === props.activeDocPath}
                 onClick={(d) => props.onDocClick(d)}
               />

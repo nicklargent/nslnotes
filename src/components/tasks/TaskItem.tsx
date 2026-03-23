@@ -7,7 +7,6 @@ import type { Task } from "../../types/entities";
 interface TaskItemProps {
   task: Task;
   isHighlighted: boolean;
-  isRelevant: boolean;
   onClick: (task: Task) => void;
 }
 
@@ -41,9 +40,7 @@ export function TaskItem(props: TaskItemProps) {
             ? "bg-gray-50 dark:bg-gray-900 opacity-60"
             : props.isHighlighted
               ? "bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200"
-              : props.isRelevant
-                ? "border-l-2 border-blue-300 bg-blue-50 dark:bg-blue-900/30"
-                : "hover:bg-gray-100 dark:hover:bg-gray-700"
+              : "hover:bg-gray-100 dark:hover:bg-gray-700"
       }`}
       draggable={true}
       onDragStart={(e: DragEvent) =>

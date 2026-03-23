@@ -3,7 +3,6 @@ import type { Topic } from "../../types/topics";
 
 interface TopicItemProps {
   topic: Topic;
-  isRelevant: boolean;
   onClick: (topic: Topic) => void;
   onEditLabel: (topic: Topic, newLabel: string) => void;
 }
@@ -11,7 +10,6 @@ interface TopicItemProps {
 /**
  * Single topic/person item in the sidebar.
  * Distinguishes # topics from @ people visually.
- * Shows a subtle highlight when the topic is mentioned by the current entity.
  */
 export function TopicItem(props: TopicItemProps) {
   const isPerson = () => props.topic.kind === "person";
@@ -37,13 +35,7 @@ export function TopicItem(props: TopicItemProps) {
 
   return (
     <button
-      class={`group flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors duration-200 ${
-        props.isRelevant
-          ? isPerson()
-            ? "border-l-2 border-purple-300 bg-purple-50 dark:bg-purple-900/30"
-            : "border-l-2 border-blue-300 bg-blue-50 dark:bg-blue-900/30"
-          : "hover:bg-gray-100 dark:hover:bg-gray-700"
-      }`}
+      class="group flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700"
       onClick={() => props.onClick(props.topic)}
     >
       <span class={isPerson() ? "text-purple-500" : "text-blue-500"}>

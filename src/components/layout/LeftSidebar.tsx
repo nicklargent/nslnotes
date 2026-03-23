@@ -15,8 +15,6 @@ import type { Doc } from "../../types/entities";
 interface LeftSidebarProps {
   topics: Topic[];
   docs: Doc[];
-  activeTopics: Set<TopicRef>;
-  linkedPaths: Set<string>;
   activeDocPath: string | null;
   onTodayClick: () => void;
   onSearchClick: () => void;
@@ -151,7 +149,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
       <div class="flex-1 overflow-y-auto">
         <TopicsList
           topics={props.topics.filter((t) => t.kind !== "person")}
-          activeTopics={props.activeTopics}
           onTopicClick={(ref) => props.onTopicClick(ref)}
           onEditLabel={handleEditLabel}
         />
@@ -159,13 +156,11 @@ export function LeftSidebar(props: LeftSidebarProps) {
           title="People"
           fallbackText="No people yet"
           topics={props.topics.filter((t) => t.kind === "person")}
-          activeTopics={props.activeTopics}
           onTopicClick={(ref) => props.onTopicClick(ref)}
           onEditLabel={handleEditLabel}
         />
         <DocsList
           docs={props.docs}
-          linkedPaths={props.linkedPaths}
           activeDocPath={props.activeDocPath}
           onDocClick={(doc) => props.onDocClick(doc)}
           onCreateDoc={() => props.onCreateDoc()}

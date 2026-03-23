@@ -32,10 +32,8 @@ import { indexStore, setIndexStore } from "./stores/indexStore";
 import { contextStore, setContextStore } from "./stores/contextStore";
 import { uiStore, setUIStore } from "./stores/uiStore";
 import { debouncedSave } from "./components/layout/Layout";
-import { parseWikilinks } from "./lib/markdown";
-import { collectAllTopics } from "./services/IndexService";
-import type { Topic, TopicRef } from "./types/topics";
-import type { Doc, Note } from "./types/entities";
+import type { Topic } from "./types/topics";
+import type { Doc } from "./types/entities";
 import type { BacklinkEntry } from "./types/backlinks";
 
 /**
@@ -293,43 +291,6 @@ function App() {
     return null;
   });
 
-  /** Notes on currently visible journal dates (shared by activeTopics + linkedPaths). */
-  const visibleNotes = createMemo((): Note[] => {
-    const visible = contextStore.visibleDates;
-    if (visible.size === 0) return [];
-    const notes: Note[] = [];
-    for (const note of indexStore.notes.values()) {
-      if (note.date && visible.has(note.date)) notes.push(note);
-    }
-    return notes;
-  });
-
-  const activeTopics = createMemo((): Set<TopicRef> => {
-    const entity = contextStore.activeEntity;
-    if (entity) return new Set(collectAllTopics(entity));
-    if (contextStore.activeTopic) return new Set([contextStore.activeTopic]);
-    const topics = new Set<TopicRef>();
-    for (const note of visibleNotes()) {
-      for (const t of collectAllTopics(note)) topics.add(t);
-    }
-    return topics;
-  });
-
-  /** Paths of entities directly wikilinked from the active context. */
-  const linkedPaths = createMemo((): Set<string> => {
-    const entities = contextStore.activeEntity
-      ? [contextStore.activeEntity]
-      : visibleNotes();
-    const paths = new Set<string>();
-    for (const entity of entities) {
-      for (const link of parseWikilinks(entity.content)) {
-        const resolved = IndexService.resolveWikilink(link);
-        if (resolved) paths.add(resolved.path);
-      }
-    }
-    return paths;
-  });
-
   const activeBacklinks = createMemo((): BacklinkEntry[] => {
     const entity = contextStore.activeEntity;
     if (!entity || entity.type === "note") return [];
@@ -375,8 +336,6 @@ function App() {
             <LeftSidebar
               topics={sortedTopics()}
               docs={sortedDocs()}
-              activeTopics={activeTopics()}
-              linkedPaths={linkedPaths()}
               activeDocPath={activeDocPath()}
               onTodayClick={() => NavigationService.goHome()}
               onSearchClick={() => NavigationService.goToSearch()}
@@ -402,7 +361,6 @@ function App() {
               groupedTasks={groupedTasks()}
               groupedClosedTasks={groupedClosedTasks()}
               highlightedTaskPath={highlightedTaskPath()}
-              linkedPaths={linkedPaths()}
               onTaskClick={(task) => NavigationService.navigateTo(task)}
               onCreateTask={() => setContextStore("draft", { type: "task" })}
               backlinks={activeBacklinks()}

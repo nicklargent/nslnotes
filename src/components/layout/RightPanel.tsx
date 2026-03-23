@@ -10,7 +10,6 @@ interface RightPanelProps {
   groupedTasks: GroupedTasks;
   groupedClosedTasks: GroupedClosedTasks;
   highlightedTaskPath: string | null;
-  linkedPaths: Set<string>;
   onTaskClick: (task: Task) => void;
   onCreateTask: () => void;
   backlinks: BacklinkEntry[];
@@ -99,28 +98,24 @@ export function RightPanel(props: RightPanelProps) {
             label="Overdue"
             tasks={props.groupedTasks.overdue}
             highlightedPath={props.highlightedTaskPath}
-            linkedPaths={props.linkedPaths}
             onTaskClick={(t) => props.onTaskClick(t)}
           />
           <TaskGroup
             label="This Week"
             tasks={props.groupedTasks.thisWeek}
             highlightedPath={props.highlightedTaskPath}
-            linkedPaths={props.linkedPaths}
             onTaskClick={(t) => props.onTaskClick(t)}
           />
           <TaskGroup
             label="Next Week"
             tasks={props.groupedTasks.nextWeek}
             highlightedPath={props.highlightedTaskPath}
-            linkedPaths={props.linkedPaths}
             onTaskClick={(t) => props.onTaskClick(t)}
           />
           <TaskGroup
             label="Later"
             tasks={props.groupedTasks.later}
             highlightedPath={props.highlightedTaskPath}
-            linkedPaths={props.linkedPaths}
             onTaskClick={(t) => props.onTaskClick(t)}
           />
         </Show>
