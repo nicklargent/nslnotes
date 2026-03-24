@@ -4,6 +4,7 @@ import type { Transaction } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { IndexService } from "../../services/IndexService";
 import { indexStore } from "../../stores/indexStore";
+import { findHighlightKey } from "./FindHighlightPlugin";
 import type { TopicRef } from "../../types/topics";
 import type { EntityType } from "../../types/entities";
 
@@ -232,6 +233,23 @@ export const InlineDecorations = Extension.create({
             const decorations: Decoration[] = [];
             const { from: selFrom, to: selTo } = state.selection;
 
+            // Check if any find match overlaps a given range.
+            // Matches are sorted by position (produced by doc.descendants),
+            // so use binary search for O(log n) per call.
+            const findState = findHighlightKey.getState(state);
+            const findMatches = findState?.query ? findState.matches : [];
+            function hasFindOverlap(from: number, to: number): boolean {
+              if (findMatches.length === 0) return false;
+              let lo = 0;
+              let hi = findMatches.length - 1;
+              while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (findMatches[mid]!.to <= from) lo = mid + 1;
+                else hi = mid;
+              }
+              return lo < findMatches.length && findMatches[lo]!.from < to;
+            }
+
             state.doc.descendants((node, pos) => {
               if (!node.isText) return;
               const text = node.text || "";
@@ -290,7 +308,7 @@ export const InlineDecorations = Extension.create({
                 const target = wlMatch[2]!;
                 const title = resolveWikilinkTitle(type, target);
 
-                if (cursorInside || !title) {
+                if (cursorInside || !title || hasFindOverlap(wlFrom, wlTo)) {
                   decorations.push(
                     Decoration.inline(wlFrom, wlTo, { class: "wikilink" })
                   );
@@ -325,7 +343,7 @@ export const InlineDecorations = Extension.create({
                 const linkUrl = mdLinkMatch[2]!;
                 const cursorInside = selFrom <= mlTo && selTo >= mlFrom;
 
-                if (cursorInside) {
+                if (cursorInside || hasFindOverlap(mlFrom, mlTo)) {
                   // Show full raw text; style the whole thing as a link
                   decorations.push(
                     Decoration.inline(mlFrom, mlTo, { class: "md-link" })
@@ -371,7 +389,11 @@ export const InlineDecorations = Extension.create({
                 const cursorInside = selFrom <= topicTo && selTo >= topicFrom;
                 const label = resolveTopicLabel(rawRef);
 
-                if (cursorInside || !label) {
+                if (
+                  cursorInside ||
+                  !label ||
+                  hasFindOverlap(topicFrom, topicTo)
+                ) {
                   decorations.push(
                     Decoration.inline(topicFrom, topicTo, {
                       class: "topic-ref",

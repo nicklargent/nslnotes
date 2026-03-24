@@ -13,6 +13,7 @@ import { NavigationService } from "../../services/NavigationService";
 import { IndexService } from "../../services/IndexService";
 import { contextStore } from "../../stores/contextStore";
 import { indexStore } from "../../stores/indexStore";
+import { registerEditor, unregisterEditor } from "../../stores/findStore";
 import type { Editor as TiptapEditor } from "@tiptap/core";
 import type { PromoteRange } from "./promoteRange";
 import type { TopicRef } from "../../types/topics";
@@ -55,6 +56,7 @@ export function Editor(props: EditorProps) {
 
   onCleanup(() => {
     if (blurTimeout) clearTimeout(blurTimeout);
+    if (editorRef) unregisterEditor(editorRef);
   });
 
   function closeCommandMenu() {
@@ -430,6 +432,7 @@ export function Editor(props: EditorProps) {
         onHashOrAt={handleHashOrAt}
         ref={(e) => {
           editorRef = e;
+          registerEditor(e);
           setEditorReady(true);
         }}
         onSelectionChange={(hasSelection) => {

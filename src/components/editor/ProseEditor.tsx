@@ -13,6 +13,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { WIKILINK_MIME } from "../../lib/drag";
 import { InlineDecorations } from "./InlineDecorations";
 import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
+import { FindHighlightPlugin } from "./FindHighlightPlugin";
 import { ImageResizePlugin } from "./ImageResizePlugin";
 import { ImageMagnifyPlugin } from "./ImageMagnifyPlugin";
 import { ImageService, rootPathFromEntity } from "../../services/ImageService";
@@ -142,6 +143,7 @@ export function ProseEditor(props: ProseEditorProps) {
         TableCell,
         InlineDecorations,
         PromoteHighlightPlugin,
+        FindHighlightPlugin,
         ImageResizePlugin,
         ImageMagnifyPlugin,
       ],

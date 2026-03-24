@@ -5,7 +5,9 @@ import { DocView } from "../docs/DocView";
 import { TopicView } from "../topics/TopicView";
 import { SearchView } from "../search/SearchView";
 import { DraftView } from "../draft/DraftView";
+import { FindBar } from "../editor/FindBar";
 import { contextStore } from "../../stores/contextStore";
+import { findStore } from "../../stores/findStore";
 import type { ViewType } from "../../types/stores";
 import type { Task, Doc } from "../../types/entities";
 
@@ -22,7 +24,10 @@ interface CenterPanelProps {
  */
 export function CenterPanel(props: CenterPanelProps) {
   return (
-    <div class="h-full bg-white dark:bg-gray-800">
+    <div class="relative h-full bg-white dark:bg-gray-800">
+      <Show when={findStore.visible}>
+        <FindBar />
+      </Show>
       <Show
         when={contextStore.draft}
         fallback={

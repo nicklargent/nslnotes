@@ -32,6 +32,7 @@ import { indexStore, setIndexStore } from "./stores/indexStore";
 import { contextStore, setContextStore } from "./stores/contextStore";
 import { uiStore, setUIStore } from "./stores/uiStore";
 import { debouncedSave } from "./components/layout/Layout";
+import { findStore, openFind, closeFind } from "./stores/findStore";
 import type { Topic } from "./types/topics";
 import type { Doc } from "./types/entities";
 import type { BacklinkEntry } from "./types/backlinks";
@@ -118,6 +119,21 @@ function App() {
   function handleGlobalKeyDown(e: KeyboardEvent) {
     const mod = e.ctrlKey || e.metaKey;
 
+    // Cmd/Ctrl+F: Open find bar (prevent native browser find)
+    if (mod && e.key === "f") {
+      e.preventDefault();
+      openFind();
+      return;
+    }
+
+    // Escape: Close find bar if open
+    if (e.key === "Escape" && findStore.visible) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeFind();
+      return;
+    }
+
     // Cmd/Ctrl+N: Quick capture
     if (mod && e.key === "n") {
       e.preventDefault();
@@ -160,9 +176,11 @@ function App() {
   }
 
   onMount(() => {
-    document.addEventListener("keydown", handleGlobalKeyDown);
+    // Use capture phase so global shortcuts (Ctrl+F, Escape) fire before
+    // ProseMirror or other components can consume/stopPropagation the event.
+    document.addEventListener("keydown", handleGlobalKeyDown, true);
     onCleanup(() => {
-      document.removeEventListener("keydown", handleGlobalKeyDown);
+      document.removeEventListener("keydown", handleGlobalKeyDown, true);
     });
   });
 
