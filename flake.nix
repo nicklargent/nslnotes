@@ -23,6 +23,23 @@
           extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
         };
 
+        isLinux = pkgs.stdenv.isLinux;
+
+        # Linux-only Tauri system dependencies
+        linuxBuildInputs = with pkgs; lib.optionals isLinux [
+          pkg-config
+          openssl
+          glib
+          gtk3
+          libsoup_3
+          webkitgtk_4_1
+          librsvg
+          gsettings-desktop-schemas
+          glib-networking
+          gcc
+          gnumake
+        ];
+
         # Common build inputs for both shell and package
         commonBuildInputs = with pkgs; [
           # Rust toolchain
@@ -34,39 +51,10 @@
           nodejs_20
           nodePackages.npm
 
-          # Tauri system dependencies (Linux)
-          pkg-config
-          openssl
-          glib
-          gtk3
-          libsoup_3
-          webkitgtk_4_1
-          librsvg
-          gsettings-desktop-schemas
-
-          # Additional build tools
-          gcc
-          gnumake
-
           # Development utilities
           jq
           curl
-        ];
-
-        # Environment variables for Tauri on Linux
-        tauriEnvVars = {
-          # WebKit / GTK
-          GIO_MODULE_DIR = "${pkgs.glib-networking}/lib/gio/modules";
-
-          # For pkg-config to find libraries
-          PKG_CONFIG_PATH = pkgs.lib.makeSearchPath "lib/pkgconfig" [
-            pkgs.openssl.dev
-            pkgs.glib.dev
-            pkgs.gtk3.dev
-            pkgs.libsoup_3.dev
-            pkgs.webkitgtk_4_1.dev
-          ];
-        };
+        ] ++ linuxBuildInputs;
 
       in
       {
@@ -80,9 +68,6 @@
           ]);
 
           shellHook = ''
-            # Set Tauri environment variables
-            export GIO_MODULE_DIR="${pkgs.glib-networking}/lib/gio/modules"
-
             # Ensure npm binaries are in PATH
             export PATH="$PWD/node_modules/.bin:$PATH"
 
@@ -93,17 +78,25 @@
             # Rust source for rust-analyzer
             export RUST_SRC_PATH="${rustToolchain}/lib/rustlib/src/rust/library"
 
-            export XDG_DATA_DIRS="${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:$XDG_DATA_DIRS"
-            export GIO_EXTRA_MODULES="${pkgs.glib-networking}/lib/gio/modules"
-
-            # Library paths for Tauri runtime
-            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
-              pkgs.gtk3
-              pkgs.glib
-              pkgs.webkitgtk_4_1
-              pkgs.libsoup_3
-              pkgs.openssl
-            ]}:$LD_LIBRARY_PATH"
+            ${pkgs.lib.optionalString isLinux ''
+              export GIO_MODULE_DIR="${pkgs.glib-networking}/lib/gio/modules"
+              export GIO_EXTRA_MODULES="${pkgs.glib-networking}/lib/gio/modules"
+              export XDG_DATA_DIRS="${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:$XDG_DATA_DIRS"
+              export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
+                pkgs.gtk3
+                pkgs.glib
+                pkgs.webkitgtk_4_1
+                pkgs.libsoup_3
+                pkgs.openssl
+              ]}:$LD_LIBRARY_PATH"
+              export PKG_CONFIG_PATH="${pkgs.lib.makeSearchPath "lib/pkgconfig" [
+                pkgs.openssl.dev
+                pkgs.glib.dev
+                pkgs.gtk3.dev
+                pkgs.libsoup_3.dev
+                pkgs.webkitgtk_4_1.dev
+              ]}"
+            ''}
 
             echo "NslNotes development environment loaded"
             echo ""
