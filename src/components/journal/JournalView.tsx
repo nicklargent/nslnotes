@@ -110,21 +110,16 @@ export function JournalView(props: JournalViewProps) {
     return { top, bottom, all };
   });
 
-  /** All rendered dates as stable strings — SolidJS <For> compares by value. */
-  const allRenderedDates = createMemo((): string[] => {
+  /** Main-month dates (today + dates with content). */
+  const mainDates = createMemo((): string[] => {
     const todayISO = getTodayISO();
     const contentDates = datesWithContent();
     const mk = effectiveMonth();
     const [y, m] = mk.split("-").map(Number) as [number, number];
-    const { top, bottom } = bufferData();
-    const dates: string[] = [...top];
-
-    // Main entries: dates with content for this month
+    const dates: string[] = [];
     for (const iso of getDaysInMonth(y, m)) {
       if (iso === todayISO || contentDates.has(iso)) dates.push(iso);
     }
-
-    dates.push(...bottom);
     return dates;
   });
 
@@ -374,6 +369,143 @@ export function JournalView(props: JournalViewProps) {
     }
   }
 
+  /** Render a single date block (used for both buffer and main dates). */
+  function renderDateBlock(date: string, isBuffer: boolean) {
+    return (
+      <div
+        class={isBuffer ? "opacity-60" : ""}
+        onMouseEnter={() => setHoveredDate(date)}
+        onMouseLeave={() => {
+          if (hoveredDate() === date) setHoveredDate(null);
+        }}
+      >
+        <div
+          ref={observeHeader}
+          data-date={date}
+          data-buffer={isBuffer || undefined}
+          class="sticky top-0 z-10"
+        >
+          <DateHeader
+            date={date}
+            hovered={hoveredDate() === date}
+            onNewNote={(d) => props.onNewNote(d)}
+          />
+        </div>
+
+        <div
+          class="mb-6"
+          classList={{
+            "animate-flash": getDailyNote(date)?.path === highlightPath(),
+          }}
+        >
+          <DailyNote
+            date={date}
+            note={getDailyNote(date)}
+            hovered={hoveredDate() === date}
+          />
+
+          <For each={getNamedNotePaths(date)}>
+            {(path) => {
+              const note = () => indexStore.notes.get(path);
+              return (
+                <Show when={note()}>
+                  {(n) => (
+                    <div data-note-card>
+                      <NamedNoteCard
+                        note={n()}
+                        isFocused={focusedNoteSlug() === n().slug}
+                        hovered={hoveredDate() === date}
+                        autofocus={autofocusNotePath() === n().path}
+                        highlight={n().path === highlightPath()}
+                        onClick={(nn) => handleNamedNoteFocus(nn)}
+                      />
+                    </div>
+                  )}
+                </Show>
+              );
+            }}
+          </For>
+
+          <Show when={props.draftDate === date}>
+            <div data-note-card>
+              <DraftNoteCard
+                date={date}
+                onCommit={(note) => {
+                  setAutofocusNotePath(note.path);
+                  props.onDraftClear();
+                  handleNamedNoteFocus(note);
+                  setTimeout(() => setAutofocusNotePath(null), 0);
+                }}
+                onCancel={() => props.onDraftClear()}
+              />
+            </div>
+          </Show>
+        </div>
+      </div>
+    );
+  }
+
+  /** Top buffer zone with sticky nav button. */
+  function renderTopBuffer() {
+    const topDates = () => bufferData().top;
+    return (
+      <Show when={topDates().length > 0 || nextMonthNav()}>
+        <div>
+          <Show when={nextMonthNav()}>
+            {(mk) => (
+              <div class="sticky top-0 z-20 bg-white dark:bg-gray-800">
+                <MonthNavButton
+                  label={`\u2190 ${formatMonthKey(mk())}`}
+                  onClick={() => {
+                    const targetMk = mk();
+                    const anchor = contextStore.journalAnchorDate;
+                    if (anchor && getMonthKey(anchor) === targetMk)
+                      setPendingScrollDate(anchor);
+                    else navigateToMonth(targetMk);
+                  }}
+                />
+              </div>
+            )}
+          </Show>
+          <For each={topDates()}>{(date) => renderDateBlock(date, true)}</For>
+        </div>
+      </Show>
+    );
+  }
+
+  /** Bottom buffer zone with sticky nav button. */
+  function renderBottomBuffer() {
+    const bottomDates = () => bufferData().bottom;
+    return (
+      <Show when={bottomDates().length > 0 || prevMonthNav()}>
+        <div>
+          <For each={bottomDates()}>
+            {(date) => renderDateBlock(date, true)}
+          </For>
+          <Show when={prevMonthNav()}>
+            {(mk) => (
+              <div class="sticky bottom-0 z-20 bg-white dark:bg-gray-800">
+                <MonthNavButton
+                  label={`${formatMonthKey(mk())} \u2192`}
+                  onClick={() => {
+                    const targetMk = mk();
+                    let oldest: string | undefined;
+                    for (const d of visibleDateSet) {
+                      if (!oldest || d < oldest) oldest = d;
+                    }
+                    if (oldest && getMonthKey(oldest) === targetMk)
+                      setPendingScrollDate(oldest);
+                    else navigateToMonth(targetMk);
+                  }}
+                />
+              </div>
+            )}
+          </Show>
+        </div>
+      </Show>
+    );
+  }
+
   return (
     <div class="flex h-full flex-col">
       {/* MonthBar pinned at top */}
@@ -389,119 +521,9 @@ export function JournalView(props: JournalViewProps) {
         onClick={(e) => handleBackgroundClick(e)}
       >
         <div class="px-[8%] pb-32 pt-4">
-          {/* Top nav button: load next (more recent) month */}
-          <Show when={nextMonthNav()}>
-            {(mk) => (
-              <MonthNavButton
-                label={`\u2190 ${formatMonthKey(mk())}`}
-                onClick={() => {
-                  const targetMk = mk();
-                  const anchor = contextStore.journalAnchorDate;
-                  if (anchor && getMonthKey(anchor) === targetMk)
-                    setPendingScrollDate(anchor);
-                  else navigateToMonth(targetMk);
-                }}
-              />
-            )}
-          </Show>
-
-          <For each={allRenderedDates()}>
-            {(date) => {
-              const isBuffer = () => bufferData().all.has(date);
-              return (
-                <div
-                  class={isBuffer() ? "opacity-60" : ""}
-                  onMouseEnter={() => setHoveredDate(date)}
-                  onMouseLeave={() => {
-                    if (hoveredDate() === date) setHoveredDate(null);
-                  }}
-                >
-                  <div
-                    ref={observeHeader}
-                    data-date={date}
-                    data-buffer={isBuffer() || undefined}
-                    class="sticky top-0 z-10"
-                  >
-                    <DateHeader
-                      date={date}
-                      hovered={hoveredDate() === date}
-                      onNewNote={(d) => props.onNewNote(d)}
-                    />
-                  </div>
-
-                  <div
-                    class="mb-6"
-                    classList={{
-                      "animate-flash":
-                        getDailyNote(date)?.path === highlightPath(),
-                    }}
-                  >
-                    <DailyNote
-                      date={date}
-                      note={getDailyNote(date)}
-                      hovered={hoveredDate() === date}
-                    />
-
-                    <For each={getNamedNotePaths(date)}>
-                      {(path) => {
-                        const note = () => indexStore.notes.get(path);
-                        return (
-                          <Show when={note()}>
-                            {(n) => (
-                              <div data-note-card>
-                                <NamedNoteCard
-                                  note={n()}
-                                  isFocused={focusedNoteSlug() === n().slug}
-                                  hovered={hoveredDate() === date}
-                                  autofocus={autofocusNotePath() === n().path}
-                                  highlight={n().path === highlightPath()}
-                                  onClick={(nn) => handleNamedNoteFocus(nn)}
-                                />
-                              </div>
-                            )}
-                          </Show>
-                        );
-                      }}
-                    </For>
-
-                    <Show when={props.draftDate === date}>
-                      <div data-note-card>
-                        <DraftNoteCard
-                          date={date}
-                          onCommit={(note) => {
-                            setAutofocusNotePath(note.path);
-                            props.onDraftClear();
-                            handleNamedNoteFocus(note);
-                            setTimeout(() => setAutofocusNotePath(null), 0);
-                          }}
-                          onCancel={() => props.onDraftClear()}
-                        />
-                      </div>
-                    </Show>
-                  </div>
-                </div>
-              );
-            }}
-          </For>
-
-          {/* Bottom nav button: load previous (older) month */}
-          <Show when={prevMonthNav()}>
-            {(mk) => (
-              <MonthNavButton
-                label={`${formatMonthKey(mk())} \u2192`}
-                onClick={() => {
-                  const targetMk = mk();
-                  let oldest: string | undefined;
-                  for (const d of visibleDateSet) {
-                    if (!oldest || d < oldest) oldest = d;
-                  }
-                  if (oldest && getMonthKey(oldest) === targetMk)
-                    setPendingScrollDate(oldest);
-                  else navigateToMonth(targetMk);
-                }}
-              />
-            )}
-          </Show>
+          {renderTopBuffer()}
+          <For each={mainDates()}>{(date) => renderDateBlock(date, false)}</For>
+          {renderBottomBuffer()}
         </div>
       </div>
     </div>
