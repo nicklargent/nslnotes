@@ -102,5 +102,6 @@ export function parseDoc(path: string, content: string): Doc | null {
     modifiedAt: new Date(),
     title: fm.title,
     created: fm.created,
+    pinned: fm.pinned === true,
   };
 }

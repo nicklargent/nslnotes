@@ -46,6 +46,7 @@ export interface DocFrontmatter {
   title: string;
   created: string;
   topics?: TopicRef[];
+  pinned?: boolean;
 }
 
 /**
@@ -386,6 +387,10 @@ export function validateDoc(
 
   if (topicsResult.valid && topicsResult.topics.length > 0) {
     result.topics = topicsResult.topics;
+  }
+
+  if (frontmatter["pinned"] === true) {
+    result.pinned = true;
   }
 
   return { valid: true, data: result };

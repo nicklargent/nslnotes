@@ -49,6 +49,14 @@ export function LeftSidebar(props: LeftSidebarProps) {
     }
   }
 
+  const [expandedSection, setExpandedSection] = createSignal<
+    "topics" | "people" | "docs" | null
+  >(null);
+
+  function toggleSection(section: "topics" | "people" | "docs") {
+    setExpandedSection((cur) => (cur === section ? null : section));
+  }
+
   const [calendarOpen, setCalendarOpen] = createSignal(false);
   const [anchorRect, setAnchorRect] = createSignal<DOMRect | null>(null);
   let calendarBtnRef: HTMLButtonElement | undefined;
@@ -146,25 +154,43 @@ export function LeftSidebar(props: LeftSidebarProps) {
       </div>
 
       {/* Scrollable sections */}
-      <div class="flex-1 overflow-y-auto">
-        <TopicsList
-          topics={props.topics.filter((t) => t.kind !== "person")}
-          onTopicClick={(ref) => props.onTopicClick(ref)}
-          onEditLabel={handleEditLabel}
-        />
-        <TopicsList
-          title="People"
-          fallbackText="No people yet"
-          topics={props.topics.filter((t) => t.kind === "person")}
-          onTopicClick={(ref) => props.onTopicClick(ref)}
-          onEditLabel={handleEditLabel}
-        />
-        <DocsList
-          docs={props.docs}
-          activeDocPath={props.activeDocPath}
-          onDocClick={(doc) => props.onDocClick(doc)}
-          onCreateDoc={() => props.onCreateDoc()}
-        />
+      <div
+        class={`min-h-0 flex-1${expandedSection() !== null ? " flex flex-col" : " overflow-y-auto"}`}
+      >
+        <Show
+          when={expandedSection() === null || expandedSection() === "topics"}
+        >
+          <TopicsList
+            topics={props.topics.filter((t) => t.kind !== "person")}
+            expanded={expandedSection() === "topics"}
+            onToggleExpand={() => toggleSection("topics")}
+            onTopicClick={(ref) => props.onTopicClick(ref)}
+            onEditLabel={handleEditLabel}
+          />
+        </Show>
+        <Show
+          when={expandedSection() === null || expandedSection() === "people"}
+        >
+          <TopicsList
+            title="People"
+            fallbackText="No people yet"
+            topics={props.topics.filter((t) => t.kind === "person")}
+            expanded={expandedSection() === "people"}
+            onToggleExpand={() => toggleSection("people")}
+            onTopicClick={(ref) => props.onTopicClick(ref)}
+            onEditLabel={handleEditLabel}
+          />
+        </Show>
+        <Show when={expandedSection() === null || expandedSection() === "docs"}>
+          <DocsList
+            docs={props.docs}
+            activeDocPath={props.activeDocPath}
+            expanded={expandedSection() === "docs"}
+            onToggleExpand={() => toggleSection("docs")}
+            onDocClick={(doc) => props.onDocClick(doc)}
+            onCreateDoc={() => props.onCreateDoc()}
+          />
+        </Show>
       </div>
 
       {/* Font size & dark mode controls */}

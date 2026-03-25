@@ -128,6 +128,45 @@ export function DocView(props: DocViewProps) {
             <span class="text-xs text-gray-400 dark:text-gray-500">
               Created: {liveDoc().created}
             </span>
+            <button
+              class={`flex items-center gap-1 rounded px-3 py-1 text-xs font-medium ${
+                liveDoc().pinned
+                  ? "bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                  : "bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-400"
+              }`}
+              onClick={() =>
+                void EntityService.updateFrontmatter(props.doc.path, {
+                  pinned: liveDoc().pinned ? null : true,
+                })
+              }
+              title={liveDoc().pinned ? "Unpin doc" : "Pin doc"}
+            >
+              <Show
+                when={liveDoc().pinned}
+                fallback={
+                  <svg
+                    class="h-3 w-3"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M12 2l2.09 6.26L21 9.27l-5 3.64L17.18 20 12 16.77 6.82 20 8 12.91l-5-3.64 6.91-1.01z" />
+                  </svg>
+                }
+              >
+                <svg
+                  class="h-3 w-3"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M12 2l2.09 6.26L21 9.27l-5 3.64L17.18 20 12 16.77 6.82 20 8 12.91l-5-3.64 6.91-1.01z" />
+                </svg>
+              </Show>
+              {liveDoc().pinned ? "Pinned" : "Pin"}
+            </button>
             <RawModeToggle
               active={rawMode()}
               onClick={() => void toggleRawMode()}

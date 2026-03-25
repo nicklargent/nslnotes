@@ -1,4 +1,5 @@
-import { For, Show, createSignal, createMemo } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
+import { BackButton } from "./BackButton";
 import { TopicItem } from "./TopicItem";
 import type { Topic, TopicRef } from "../../types/topics";
 
@@ -6,6 +7,8 @@ interface TopicsListProps {
   title?: string;
   fallbackText?: string;
   topics: Topic[];
+  expanded: boolean;
+  onToggleExpand: () => void;
   onTopicClick: (ref: TopicRef) => void;
   onEditLabel: (topic: Topic, newLabel: string) => void;
 }
@@ -17,12 +20,10 @@ const COLLAPSED_LIMIT = 5;
  * Shows top 10 by weighted usage score, expandable to full alphabetical list.
  */
 export function TopicsList(props: TopicsListProps) {
-  const [expanded, setExpanded] = createSignal(false);
-
   const hasMore = () => props.topics.length > COLLAPSED_LIMIT;
 
   const displayedTopics = createMemo(() => {
-    if (!expanded()) {
+    if (!props.expanded) {
       return props.topics.slice(0, COLLAPSED_LIMIT);
     }
     // When expanded, show all topics sorted alphabetically
@@ -32,10 +33,17 @@ export function TopicsList(props: TopicsListProps) {
   });
 
   return (
-    <div class="border-b border-gray-100 dark:border-gray-700 px-3 py-2">
-      <h2 class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-        {props.title ?? "Topics"}
-      </h2>
+    <div
+      class={`border-b border-gray-100 dark:border-gray-700 px-3 py-2${props.expanded ? " flex min-h-0 flex-1 flex-col" : ""}`}
+    >
+      <div class="mb-1 flex items-center justify-between">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          {props.title ?? "Topics"}
+        </h2>
+        <Show when={props.expanded}>
+          <BackButton onClick={() => props.onToggleExpand()} />
+        </Show>
+      </div>
       <Show
         when={props.topics.length > 0}
         fallback={
@@ -44,7 +52,9 @@ export function TopicsList(props: TopicsListProps) {
           </p>
         }
       >
-        <div class="flex flex-col gap-0.5">
+        <div
+          class={`flex flex-col gap-0.5${props.expanded ? " min-h-0 flex-1 overflow-y-auto" : ""}`}
+        >
           <For each={displayedTopics()}>
             {(topic) => (
               <TopicItem
@@ -55,14 +65,12 @@ export function TopicsList(props: TopicsListProps) {
             )}
           </For>
         </div>
-        <Show when={hasMore()}>
+        <Show when={hasMore() && !props.expanded}>
           <button
             class="mt-1 text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 cursor-pointer"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => props.onToggleExpand()}
           >
-            {expanded()
-              ? "Show less"
-              : `Show more (${props.topics.length - COLLAPSED_LIMIT})`}
+            Show all ({props.topics.length - COLLAPSED_LIMIT})
           </button>
         </Show>
       </Show>

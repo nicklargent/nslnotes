@@ -55,6 +55,8 @@ export interface Doc extends BaseEntity {
   title: string;
   /** ISO date when doc was created */
   created: string;
+  /** Whether doc is pinned to the top of the sidebar */
+  pinned: boolean;
 }
 
 /**
