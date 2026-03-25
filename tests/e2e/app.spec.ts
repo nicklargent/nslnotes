@@ -1,42 +1,38 @@
 import { test, expect } from "@playwright/test";
-
-/**
- * Basic E2E smoke tests for NslNotes (T7.9).
- * These verify core user flows work end-to-end.
- */
+import { setupApp, teardownApp } from "./helpers/app-setup";
+import { sidebar, centerPanel, rightPanel } from "./helpers/selectors";
 
 test.describe("App launch", () => {
-  test("shows setup screen or journal on load", async ({ page }) => {
-    await page.goto("/");
-    // Should show either the setup screen or the main layout
-    const body = page.locator("body");
-    await expect(body).toBeVisible();
-  });
-});
+  let testRoot: string;
 
-test.describe("Navigation", () => {
-  test("three-column layout is visible when app is ready", async ({
-    page,
-  }) => {
-    await page.goto("/");
-    // Look for the grid layout
-    const grid = page.locator(".grid");
-    const count = await grid.count();
-    expect(count).toBeGreaterThanOrEqual(0);
+  test.beforeEach(async ({ page }) => {
+    ({ testRoot } = await setupApp(page));
   });
-});
 
-test.describe("Keyboard shortcuts", () => {
-  test("? key opens shortcuts modal outside editor", async ({ page }) => {
-    await page.goto("/");
-    // Wait for app to load
-    await page.waitForTimeout(500);
-    // Press ? outside editor context
-    await page.keyboard.press("Shift+/");
-    // Look for the shortcuts modal
-    const modal = page.getByText("Keyboard Shortcuts");
-    // Modal might not appear if we're in setup screen
-    const count = await modal.count();
-    expect(count).toBeGreaterThanOrEqual(0);
+  test.afterEach(() => {
+    teardownApp(testRoot);
+  });
+
+  test("shows three-column layout with content", async ({ page }) => {
+    await expect(sidebar(page)).toBeVisible();
+    await expect(centerPanel(page)).toBeVisible();
+    await expect(rightPanel(page)).toBeVisible();
+  });
+
+  test("sidebar shows docs from fixtures", async ({ page }) => {
+    await expect(sidebar(page).locator("button", { hasText: "Project Plan" })).toBeVisible({
+      timeout: 5000,
+    });
+  });
+
+  test("right panel shows tasks", async ({ page }) => {
+    await expect(rightPanel(page).locator("button", { hasText: "Fix Login Bug" })).toBeVisible({
+      timeout: 5000,
+    });
+  });
+
+  test("journal view is shown by default", async ({ page }) => {
+    // Today's date should appear in the journal
+    await expect(centerPanel(page).getByText("Today", { exact: true }).first()).toBeVisible({ timeout: 5000 });
   });
 });

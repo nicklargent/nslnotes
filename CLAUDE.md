@@ -29,3 +29,9 @@
 - Services never accessed directly by components — use stores/hooks
 - Files are source of truth, index rebuilt from disk
 - All entity CRUD goes through EntityService
+
+## UI Interactions & E2E Tests
+- `docs/UI-INTERACTIONS.md` — catalog of all UI interactions
+- `tests/e2e/` — Playwright E2E test suite (run with `PLAYWRIGHT_CHROMIUM_PATH=/run/current-system/sw/bin/chromium npx playwright test`)
+- When adding or changing a UI interaction, update `docs/UI-INTERACTIONS.md` and add/update corresponding E2E tests in `tests/e2e/`
+- Shared test infrastructure: `tests/e2e/fixtures/` (markdown builders, test data), `tests/e2e/helpers/` (app setup, selectors, editor helpers, assertions)
