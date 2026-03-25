@@ -388,7 +388,7 @@ export function JournalView(props: JournalViewProps) {
         class="flex-1 overflow-y-auto"
         onClick={(e) => handleBackgroundClick(e)}
       >
-        <div class="mx-auto max-w-2xl px-4 pb-32 pt-4">
+        <div class="px-[8%] pb-32 pt-4">
           {/* Top nav button: load next (more recent) month */}
           <Show when={nextMonthNav()}>
             {(mk) => (

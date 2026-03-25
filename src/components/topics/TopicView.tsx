@@ -119,7 +119,7 @@ export function TopicView() {
 
   return (
     <div class="h-full overflow-y-auto">
-      <div class="mx-auto max-w-2xl px-6 py-6">
+      <div class="px-[8%] py-6">
         <Show
           when={topic()}
           fallback={

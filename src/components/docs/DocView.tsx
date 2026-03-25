@@ -101,7 +101,7 @@ export function DocView(props: DocViewProps) {
 
   return (
     <div class="h-full overflow-y-auto">
-      <div class="mx-auto max-w-2xl px-6 py-6">
+      <div class="px-[8%] py-6">
         {/* Header */}
         <div class="mb-4">
           <EditableText
