@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { setupApp, teardownApp } from "./helpers/app-setup";
+import { blurActiveElement } from "./helpers/editor";
 import {
   sidebar,
   deleteButton,
@@ -8,23 +9,6 @@ import {
   confirmCancelButton,
   shortcutsModal,
 } from "./helpers/selectors";
-
-/**
- * Open the shortcuts modal (workaround for Vite HMR double-registration).
- */
-async function openShortcutsModal(page: import("@playwright/test").Page): Promise<void> {
-  await page.evaluate(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "?" && e.isTrusted === false) {
-        e.stopImmediatePropagation();
-      }
-    };
-    document.addEventListener("keydown", handler, { capture: true, once: true });
-    document.body.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "?", code: "Slash", bubbles: true, cancelable: true }),
-    );
-  });
-}
 
 test.describe("Confirm delete modal", () => {
   let testRoot: string;
@@ -91,21 +75,24 @@ test.describe("Keyboard shortcuts modal", () => {
   });
 
   test("shows grouped shortcuts with kbd elements", async ({ page }) => {
-    await openShortcutsModal(page);
+    await blurActiveElement(page);
+    await page.keyboard.press("?");
     await expect(shortcutsModal(page)).toBeVisible({ timeout: 2000 });
     await expect(shortcutsModal(page).locator("kbd").first()).toBeVisible();
-    await expect(shortcutsModal(page).getByText("Navigation")).toBeVisible();
+    await expect(shortcutsModal(page).getByText("Global")).toBeVisible();
   });
 
   test("Esc button closes the modal", async ({ page }) => {
-    await openShortcutsModal(page);
+    await blurActiveElement(page);
+    await page.keyboard.press("?");
     await expect(shortcutsModal(page)).toBeVisible({ timeout: 2000 });
     await shortcutsModal(page).locator("button", { hasText: "Esc" }).click();
     await expect(shortcutsModal(page)).not.toBeVisible({ timeout: 2000 });
   });
 
   test("clicking backdrop closes the modal", async ({ page }) => {
-    await openShortcutsModal(page);
+    await blurActiveElement(page);
+    await page.keyboard.press("?");
     await expect(shortcutsModal(page)).toBeVisible({ timeout: 2000 });
     await shortcutsModal(page).click({ position: { x: 5, y: 5 } });
     await expect(shortcutsModal(page)).not.toBeVisible({ timeout: 2000 });

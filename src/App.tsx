@@ -38,6 +38,12 @@ import type { Doc } from "./types/entities";
 import type { BacklinkEntry } from "./types/backlinks";
 
 /**
+ * Module-level AbortController for global keyboard shortcut listener.
+ * Ensures only one listener is active even when Vite HMR re-mounts the component.
+ */
+let globalShortcutAbort: AbortController | null = null;
+
+/**
  * Application state
  */
 type AppState = "loading" | "setup" | "ready";
@@ -126,12 +132,20 @@ function App() {
       return;
     }
 
-    // Escape: Close find bar if open
-    if (e.key === "Escape" && findStore.visible) {
-      e.preventDefault();
-      e.stopPropagation();
-      closeFind();
-      return;
+    // Escape: Close topmost overlay
+    if (e.key === "Escape") {
+      if (showShortcuts()) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowShortcuts(false);
+        return;
+      }
+      if (findStore.visible) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeFind();
+        return;
+      }
     }
 
     // Cmd/Ctrl+N: Quick capture
@@ -162,7 +176,7 @@ function App() {
       return;
     }
 
-    // ? for help (T7.6)
+    // ? for help (T7.6) — only when no text-editable element has focus.
     if (
       e.key === "?" &&
       !mod &&
@@ -171,6 +185,7 @@ function App() {
       !(e.target as HTMLElement)?.closest?.(".tiptap")
     ) {
       e.preventDefault();
+      e.stopPropagation();
       setShowShortcuts((s) => !s);
     }
   }
@@ -178,9 +193,17 @@ function App() {
   onMount(() => {
     // Use capture phase so global shortcuts (Ctrl+F, Escape) fire before
     // ProseMirror or other components can consume/stopPropagation the event.
-    document.addEventListener("keydown", handleGlobalKeyDown, true);
+    // Abort any previous listener first — during Vite HMR the old cleanup may
+    // not run before the new mount, causing double-registration.
+    globalShortcutAbort?.abort();
+    globalShortcutAbort = new AbortController();
+    document.addEventListener("keydown", handleGlobalKeyDown, {
+      capture: true,
+      signal: globalShortcutAbort.signal,
+    });
     onCleanup(() => {
-      document.removeEventListener("keydown", handleGlobalKeyDown, true);
+      globalShortcutAbort?.abort();
+      globalShortcutAbort = null;
     });
   });
 

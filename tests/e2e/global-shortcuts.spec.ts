@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { setupApp, teardownApp } from "./helpers/app-setup";
+import { blurActiveElement } from "./helpers/editor";
 import {
   findBarInput,
   quickCaptureModal,
@@ -8,26 +9,6 @@ import {
   searchInput,
   sidebar,
 } from "./helpers/selectors";
-
-/**
- * Open the shortcuts modal. In dev mode, the ? key handler is double-registered
- * by Vite HMR, causing toggle to fire twice (cancelling out). Work around by
- * dispatching a synthetic keydown from the capture-phase handler directly.
- */
-async function openShortcutsModal(page: import("@playwright/test").Page): Promise<void> {
-  await page.evaluate(() => {
-    // Dispatch a one-shot keydown that only fires once
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "?" && e.isTrusted === false) {
-        e.stopImmediatePropagation();
-      }
-    };
-    document.addEventListener("keydown", handler, { capture: true, once: true });
-    document.body.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "?", code: "Slash", bubbles: true, cancelable: true }),
-    );
-  });
-}
 
 test.describe("Global keyboard shortcuts", () => {
   let testRoot: string;
@@ -66,14 +47,16 @@ test.describe("Global keyboard shortcuts", () => {
   });
 
   test("? opens keyboard shortcuts modal", async ({ page }) => {
-    await openShortcutsModal(page);
+    // Blur the editor so ? isn't captured as text input
+    await blurActiveElement(page);
+    await page.keyboard.press("?");
     await expect(shortcutsModal(page)).toBeVisible({ timeout: 2000 });
   });
 
   test("Escape button closes shortcuts modal", async ({ page }) => {
-    await openShortcutsModal(page);
+    await blurActiveElement(page);
+    await page.keyboard.press("?");
     await expect(shortcutsModal(page)).toBeVisible({ timeout: 2000 });
-    // Click the Esc button in the modal header (keyboard Escape is affected by HMR in dev)
     await shortcutsModal(page).locator("button", { hasText: "Esc" }).click();
     await expect(shortcutsModal(page)).not.toBeVisible({ timeout: 2000 });
   });

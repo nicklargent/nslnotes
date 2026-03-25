@@ -434,9 +434,9 @@ Source: `src/components/draft/DraftView.tsx`
 ### Keyboard Shortcuts Modal (`KeyboardShortcutsModal.tsx`)
 - [ ] Fixed overlay with `black/40` backdrop
 - [ ] Centered, max-width lg
-- [ ] Shortcuts grouped by category: Navigation, Editor, Command Menu
+- [ ] Shortcuts grouped by category: Global, Editor
 - [ ] `Escape` closes modal (preventDefault)
-- [ ] `?` closes modal (preventDefault)
+- [ ] `?` toggles modal (handled by global shortcut in capture phase)
 - [ ] Click on backdrop closes modal
 - [ ] Keyboard keys shown as `kbd` elements
 

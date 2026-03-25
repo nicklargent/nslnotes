@@ -1,4 +1,4 @@
-import { For, onMount, onCleanup } from "solid-js";
+import { For } from "solid-js";
 
 interface KeyboardShortcutsModalProps {
   onClose: () => void;
@@ -11,15 +11,13 @@ interface ShortcutGroup {
 
 const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
-    title: "Navigation",
+    title: "Global",
     shortcuts: [
-      {
-        keys: "Click Today",
-        description: "Go to home state (today's journal)",
-      },
-      { keys: "Ctrl/\u2318 + N", description: "Quick capture to today's note" },
-      { keys: "Click topic/doc", description: "Navigate to topic or document" },
-      { keys: "Click task", description: "Open task detail view" },
+      { keys: "Ctrl/\u2318 + N", description: "Quick capture" },
+      { keys: "Ctrl/\u2318 + K", description: "Search" },
+      { keys: "Ctrl/\u2318 + F", description: "Find in page" },
+      { keys: "Ctrl/\u2318 + =", description: "Increase font size" },
+      { keys: "Ctrl/\u2318 + -", description: "Decrease font size" },
       { keys: "?", description: "Show this help" },
     ],
   },
@@ -36,15 +34,6 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "@", description: "Person autocomplete" },
     ],
   },
-  {
-    title: "Command Menu",
-    shortcuts: [
-      { keys: "Up / Down", description: "Navigate items" },
-      { keys: "Enter", description: "Select item" },
-      { keys: "Escape", description: "Close menu" },
-      { keys: "Type...", description: "Filter commands" },
-    ],
-  },
 ];
 
 /**
@@ -52,20 +41,6 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
  * Accessible via ? key.
  */
 export function KeyboardShortcutsModal(props: KeyboardShortcutsModalProps) {
-  function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape" || e.key === "?") {
-      e.preventDefault();
-      props.onClose();
-    }
-  }
-
-  onMount(() => {
-    document.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => {
-      document.removeEventListener("keydown", handleKeyDown);
-    });
-  });
-
   return (
     <div
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"

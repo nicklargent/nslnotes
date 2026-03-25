@@ -57,6 +57,14 @@ export async function triggerSlashCommand(
 }
 
 /**
+ * Blur the active element (typically the TipTap editor) so that a global
+ * shortcut key like "?" is not captured as text input.
+ */
+export async function blurActiveElement(page: Page): Promise<void> {
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+}
+
+/**
  * Wait for the editor save debounce to complete.
  */
 export async function waitForSave(page: Page, ms = 500): Promise<void> {
