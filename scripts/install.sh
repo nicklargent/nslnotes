@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/src-tauri/target/release/nslnotes-tauri"
+BINARY="$PROJECT_DIR/target/release/nslnotes-tauri"
 
 if [ ! -f "$BINARY" ]; then
   echo "Error: Release binary not found at $BINARY"

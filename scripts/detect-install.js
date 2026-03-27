@@ -5,11 +5,17 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Block only inside Nix build sandbox (not dev shells, which are fine)
-if (process.env.NIX_BUILD_TOP) {
-  console.log("Nix build sandbox detected.");
-  console.log("Use `nix profile install .` instead.");
-  process.exit(0);
+// On NixOS, the install script won't work — use `nix profile install .` instead
+import { readFileSync } from "node:fs";
+try {
+  const osRelease = readFileSync("/etc/os-release", "utf-8");
+  if (osRelease.includes('ID=nixos')) {
+    console.log("NixOS detected.");
+    console.log("Use `nix profile install .` instead.");
+    process.exit(0);
+  }
+} catch {
+  // Not NixOS or no /etc/os-release — continue
 }
 
 const os = platform();
