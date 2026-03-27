@@ -1,0 +1,12 @@
+[package]
+name = "nslnotes-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+notify = "6"
+notify-debouncer-mini = "0.4"
+base64 = "0.22"
+dirs = "5"

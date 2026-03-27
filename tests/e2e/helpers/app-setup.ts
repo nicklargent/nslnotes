@@ -14,8 +14,8 @@ export interface SetupResult {
 }
 
 /**
- * Set up a test: create a temp dir with fixture files, inject into localStorage,
- * navigate to /, and wait for the app to be ready.
+ * Set up a test: create a temp dir with fixture files, configure settings
+ * via API, navigate to /, and wait for the app to be ready.
  */
 export async function setupApp(
   page: Page,

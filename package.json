@@ -17,6 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "web:build": "npm run build && cargo build --release -p nslnotes-web",
+    "web:serve": "cargo run -p nslnotes-web",
     "prepare": "husky"
   },
   "lint-staged": {

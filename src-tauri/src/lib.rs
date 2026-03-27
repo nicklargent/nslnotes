@@ -3,36 +3,30 @@ mod watcher;
 
 use commands::{
     copy_file, delete_directory, delete_file, ensure_directory, file_exists, get_file_size,
-    get_settings_path, list_directory, load_settings, read_file, save_settings, verify_directory,
-    write_binary, write_file, AppSettings,
+    list_directory, load_settings, read_file, save_settings, verify_directory,
+    write_binary, write_file,
 };
+use nslnotes_core::settings::AppSettings;
+use nslnotes_core::watcher::WatcherState;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
-use watcher::{get_watcher_status, start_watching, stop_watching, WatcherState};
+use watcher::{get_watcher_status, start_watching, stop_watching};
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
 /// Load settings synchronously (for setup/teardown hooks)
-fn load_settings_sync(app: &tauri::AppHandle) -> Option<AppSettings> {
-    let path = get_settings_path(app).ok()?;
-    if !path.exists() {
-        return Some(AppSettings::default());
-    }
-    let content = std::fs::read_to_string(&path).ok()?;
-    serde_json::from_str(&content).ok()
+fn load_settings_sync() -> Option<AppSettings> {
+    let path = nslnotes_core::settings::default_path();
+    nslnotes_core::settings::load_from_path(&path).ok()
 }
 
 /// Save settings synchronously
-fn save_settings_sync(app: &tauri::AppHandle, settings: &AppSettings) {
-    if let Ok(path) = get_settings_path(app) {
-        if let Ok(json) = serde_json::to_string_pretty(settings) {
-            let _ = std::fs::write(path, json);
-        }
-    }
+fn save_settings_sync(settings: &AppSettings) {
+    let path = nslnotes_core::settings::default_path();
+    let _ = nslnotes_core::settings::save_to_path(&path, settings);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -62,7 +56,7 @@ pub fn run() {
         ])
         .setup(|app| {
             // Restore window size/maximized state from settings
-            if let Some(settings) = load_settings_sync(&app.handle()) {
+            if let Some(settings) = load_settings_sync() {
                 if let Some(window) = app.get_webview_window("main") {
                     let w = settings.window_width.unwrap_or(1200.0);
                     let h = settings.window_height.unwrap_or(800.0);
@@ -76,12 +70,9 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // Save window state before closing
-                let app = window.app_handle();
-                if let Some(mut settings) = load_settings_sync(app) {
+                if let Some(mut settings) = load_settings_sync() {
                     if let Ok(maximized) = window.is_maximized() {
                         settings.window_maximized = Some(maximized);
-                        // Save the un-maximized size so restore doesn't open maximized-sized
                         if !maximized {
                             if let Ok(size) = window.inner_size() {
                                 if let Ok(scale) = window.scale_factor() {
@@ -93,7 +84,7 @@ pub fn run() {
                             }
                         }
                     }
-                    save_settings_sync(app, &settings);
+                    save_settings_sync(&settings);
                 }
             }
         })

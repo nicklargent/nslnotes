@@ -38,21 +38,17 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 /**
- * LocalStorage key for web fallback
+ * LocalStorage key — used as override in dev/test, checked before HTTP API.
  */
 const STORAGE_KEY = "nslnotes_settings";
 
 /**
  * SettingsService handles persisting and loading application settings.
- * Uses Tauri's app config directory in native mode, localStorage in web mode.
+ * Uses Tauri's app config directory in native mode.
+ * In web mode, checks localStorage first (for dev/test overrides),
+ * then falls back to HTTP API for production web server.
  */
 export const SettingsService = {
-  /**
-   * Load application settings.
-   * Returns default settings if none exist.
-   *
-   * @returns Application settings
-   */
   loadSettings: async (): Promise<AppSettings> => {
     if (runtime.isNative()) {
       try {
@@ -67,28 +63,31 @@ export const SettingsService = {
       }
     }
 
-    // Web fallback: use localStorage
+    // Web mode: check localStorage override first (used by tests)
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<AppSettings>;
-        return {
-          ...DEFAULT_SETTINGS,
-          ...parsed,
-        };
+        return { ...DEFAULT_SETTINGS, ...parsed };
+      }
+    } catch {
+      // localStorage not available, fall through
+    }
+
+    // Web mode: fall back to HTTP API
+    try {
+      const res = await fetch("/api/settings");
+      if (res.ok) {
+        const parsed = (await res.json()) as Partial<AppSettings>;
+        return { ...DEFAULT_SETTINGS, ...parsed };
       }
     } catch (error) {
-      console.error("Failed to load settings from localStorage:", error);
+      console.error("Failed to load settings from server:", error);
     }
 
     return DEFAULT_SETTINGS;
   },
 
-  /**
-   * Save application settings.
-   *
-   * @param settings - Settings to save
-   */
   saveSettings: async (settings: AppSettings): Promise<void> => {
     if (runtime.isNative()) {
       try {
@@ -100,11 +99,25 @@ export const SettingsService = {
       return;
     }
 
-    // Web fallback: use localStorage
+    // Web mode: save to localStorage (for dev/test consistency)
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    } catch {
+      // localStorage not available, continue to API
+    }
+
+    // Web mode: also persist to server
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (!res.ok) {
+        throw new Error("Server returned error");
+      }
     } catch (error) {
-      console.error("Failed to save settings to localStorage:", error);
+      console.error("Failed to save settings to server:", error);
       throw new Error(`Failed to save settings: ${error}`);
     }
   },

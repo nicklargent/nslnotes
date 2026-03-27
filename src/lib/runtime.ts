@@ -20,18 +20,18 @@ export interface FileChangeEvent {
 export type FileWatchCallback = (event: FileChangeEvent) => void;
 
 /**
- * Polling state for web fallback
+ * SSE watcher state for web mode
  */
-interface PollingState {
-  intervalId: number | null;
-  lastModified: Map<string, number>;
+interface SseWatcherState {
+  eventSource: EventSource | null;
   callbacks: Set<FileWatchCallback>;
+  watchPath: string | null;
 }
 
-const pollingState: PollingState = {
-  intervalId: null,
-  lastModified: new Map(),
+const sseWatcherState: SseWatcherState = {
+  eventSource: null,
   callbacks: new Set(),
+  watchPath: null,
 };
 
 /**
@@ -267,6 +267,33 @@ export const runtime = {
           }
         });
       }
+    } else {
+      // Web mode: start watcher via HTTP, connect SSE
+      const res = await fetch("/api/watch/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: dir }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to start watching: ${dir}`);
+      }
+
+      sseWatcherState.watchPath = dir;
+
+      if (sseWatcherState.eventSource === null) {
+        const es = new EventSource("/api/watch/events");
+        es.onmessage = (msg) => {
+          try {
+            const event = JSON.parse(msg.data) as FileChangeEvent;
+            for (const callback of sseWatcherState.callbacks) {
+              callback(event);
+            }
+          } catch {
+            // Ignore malformed events
+          }
+        };
+        sseWatcherState.eventSource = es;
+      }
     }
   },
 
@@ -284,11 +311,15 @@ export const runtime = {
         nativeWatcherState.unlistenFn = null;
       }
     } else {
-      // Stop polling
-      if (pollingState.intervalId !== null) {
-        window.clearInterval(pollingState.intervalId);
-        pollingState.intervalId = null;
+      // Close SSE connection
+      if (sseWatcherState.eventSource !== null) {
+        sseWatcherState.eventSource.close();
+        sseWatcherState.eventSource = null;
       }
+      sseWatcherState.watchPath = null;
+
+      // Tell server to stop watching
+      await fetch("/api/watch/stop", { method: "POST" }).catch(() => {});
     }
   },
 
@@ -305,10 +336,10 @@ export const runtime = {
       };
     }
 
-    // Web fallback
-    pollingState.callbacks.add(callback);
+    // Web mode: SSE callbacks
+    sseWatcherState.callbacks.add(callback);
     return () => {
-      pollingState.callbacks.delete(callback);
+      sseWatcherState.callbacks.delete(callback);
     };
   },
 
@@ -320,7 +351,7 @@ export const runtime = {
   watchFiles: (
     dir: string,
     callback: FileWatchCallback,
-    pollIntervalMs: number = 1000
+    _pollIntervalMs: number = 1000
   ): (() => void) => {
     if (runtime.isNative()) {
       // Start watching (async, but we don't await here for API compatibility)
@@ -338,28 +369,15 @@ export const runtime = {
       };
     }
 
-    // Web fallback: use polling
-    pollingState.callbacks.add(callback);
+    // Web mode: use SSE
+    runtime.startWatching(dir).catch(console.error);
 
-    // Start polling if not already running
-    if (pollingState.intervalId === null) {
-      pollingState.intervalId = window.setInterval(() => {
-        // Polling logic would check file modification times
-        // This is a placeholder - actual implementation depends on backend API
-      }, pollIntervalMs);
-    }
+    sseWatcherState.callbacks.add(callback);
 
-    // Return unsubscribe function
     return () => {
-      pollingState.callbacks.delete(callback);
-
-      // Stop polling if no more callbacks
-      if (
-        pollingState.callbacks.size === 0 &&
-        pollingState.intervalId !== null
-      ) {
-        window.clearInterval(pollingState.intervalId);
-        pollingState.intervalId = null;
+      sseWatcherState.callbacks.delete(callback);
+      if (sseWatcherState.callbacks.size === 0) {
+        runtime.stopWatching().catch(console.error);
       }
     };
   },

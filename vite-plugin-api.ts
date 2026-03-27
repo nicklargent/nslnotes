@@ -210,6 +210,35 @@ async function handleApi(
       }
     }
 
+    // GET/PUT /api/settings — load/save app settings
+    if (pathname === "/api/settings") {
+      const settingsPath = path.join(
+        process.env.HOME ?? ".",
+        ".config",
+        "nslnotes",
+        "settings.json",
+      );
+
+      if (req.method === "GET") {
+        if (fs.existsSync(settingsPath)) {
+          const content = fs.readFileSync(settingsPath, "utf-8");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          return res.end(content);
+        }
+        return sendJson(res, {});
+      }
+
+      if (req.method === "PUT") {
+        const body = await parseBody(req);
+        const dir = path.dirname(settingsPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(settingsPath, body, "utf-8");
+        return sendJson(res, { ok: true });
+      }
+    }
+
     sendError(res, "Not found", 404);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
