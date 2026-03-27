@@ -55,8 +55,15 @@ pub fn run() {
             get_file_size
         ])
         .setup(|app| {
+            // Log startup info
+            let settings_path = nslnotes_core::settings::default_path();
+            println!("  Settings:  {}", settings_path.display());
+
             // Restore window size/maximized state from settings
             if let Some(settings) = load_settings_sync() {
+                if let Some(root) = &settings.root_path {
+                    println!("  Notes dir: {}", root);
+                }
                 if let Some(window) = app.get_webview_window("main") {
                     let w = settings.window_width.unwrap_or(1200.0);
                     let h = settings.window_height.unwrap_or(800.0);

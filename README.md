@@ -51,32 +51,69 @@ npm run tauri dev
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
 - Tauri v2 system dependencies — see the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/)
 
-## Getting Started
+## Development
+
+### Tauri (native desktop)
 
 ```bash
-# Install dependencies
-npm install
-
-# Run as native desktop app
 npm run tauri dev
+```
 
-# Run in browser (web mode)
+Runs the SolidJS frontend via Vite on `:1420` and opens a native Tauri window. File operations go through Rust commands in `src-tauri/`. Requires the Rust toolchain and Tauri system dependencies (GTK, WebKit, etc.).
+
+### Web (browser)
+
+```bash
 npm run dev:web
 ```
+
+Runs Vite on `:3000` with an API plugin that provides file operations as HTTP endpoints — no Rust needed. Good for frontend-only work.
+
+Both modes share the same frontend code via a runtime abstraction layer (`src/lib/runtime.ts`) that routes calls to either Tauri IPC or the web API.
+
+## Production Builds
+
+### Native desktop
+
+```bash
+npm run tauri:build     # Build release binary (no installer)
+npm run tauri:install   # Install binary + desktop integration
+```
+
+Builds a release binary without creating platform installers. The install script detects your OS and places the binary plus desktop integration files (`.desktop` file on Linux, `.app` bundle on macOS, Start Menu shortcut on Windows).
+
+> **macOS note:** The app is not code-signed, so Gatekeeper will block it on first launch. Right-click the app and choose **Open**, or run `xattr -cr ~/Applications/NslNotes.app`.
+
+### NixOS
+
+```bash
+nix run                 # Build and run directly
+nix profile install .    # Install to your Nix profile
+```
+
+### Standalone web server
+
+```bash
+npm run web:build
+```
+
+Builds the frontend with Vite and compiles an Axum-based web server (`nslnotes-web` crate) with the assets embedded. Run the resulting binary directly, or use `npm run web:serve` during development to build and run in one step.
 
 ## Available Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run tauri dev` | Run as native Tauri desktop app |
-| `npm run dev:web` | Run in browser with Vite API plugin |
-| `npm run build` | Build frontend for production |
+| `npm run tauri dev` | Run as native Tauri desktop app (Vite on :1420) |
+| `npm run dev:web` | Run in browser with Vite API plugin (Vite on :3000) |
+| `npm run tauri:build` | Build release binary (no installer) |
+| `npm run tauri:install` | Install binary + desktop integration for current OS |
+| `npm run web:build` | Build frontend + compile standalone web server |
+| `npm run web:serve` | Build and run the standalone web server |
 | `npm run typecheck` | Run TypeScript type checking |
 | `npm run lint` | Lint source files |
 | `npm run lint:fix` | Lint and auto-fix |
 | `npm run format` | Format source files with Prettier |
 | `npm run test` | Run unit tests (Vitest) |
-| `npm run test:watch` | Run unit tests in watch mode |
 | `npm run test:e2e` | Run end-to-end tests (Playwright) |
 
 ## Data Directory

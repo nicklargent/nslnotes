@@ -38,15 +38,9 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 /**
- * LocalStorage key — used as override in dev/test, checked before HTTP API.
- */
-const STORAGE_KEY = "nslnotes_settings";
-
-/**
  * SettingsService handles persisting and loading application settings.
- * Uses Tauri's app config directory in native mode.
- * In web mode, checks localStorage first (for dev/test overrides),
- * then falls back to HTTP API for production web server.
+ * Native mode uses Tauri IPC, web mode uses the HTTP API.
+ * Both read/write the same settings.json file on disk.
  */
 export const SettingsService = {
   loadSettings: async (): Promise<AppSettings> => {
@@ -63,18 +57,6 @@ export const SettingsService = {
       }
     }
 
-    // Web mode: check localStorage override first (used by tests)
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as Partial<AppSettings>;
-        return { ...DEFAULT_SETTINGS, ...parsed };
-      }
-    } catch {
-      // localStorage not available, fall through
-    }
-
-    // Web mode: fall back to HTTP API
     try {
       const res = await fetch("/api/settings");
       if (res.ok) {
@@ -99,14 +81,6 @@ export const SettingsService = {
       return;
     }
 
-    // Web mode: save to localStorage (for dev/test consistency)
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch {
-      // localStorage not available, continue to API
-    }
-
-    // Web mode: also persist to server
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",

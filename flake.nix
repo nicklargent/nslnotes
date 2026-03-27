@@ -38,6 +38,7 @@
           glib-networking
           gcc
           gnumake
+          xdg-utils
         ];
 
         # Common build inputs for both shell and package
@@ -55,6 +56,12 @@
           jq
           curl
         ] ++ linuxBuildInputs;
+
+        # Prefetch npm dependencies for offline build
+        npmDeps = pkgs.fetchNpmDeps {
+          src = ./.;
+          hash = "sha256-sF1hZ+toDDfu8ES7Xl9QofiMPGWFj5rZyrrK24a4WVE=";
+        };
 
       in
       {
@@ -110,23 +117,72 @@
           '';
         };
 
-        # Package definition (for future builds)
-        packages.default = pkgs.stdenv.mkDerivation {
+        # Package definition
+        packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "nslnotes";
           version = "0.1.0";
           src = ./.;
 
-          nativeBuildInputs = commonBuildInputs;
+          cargoHash = "sha256-oUdxLng040rhX9aTXHqKU1JvFs43LgoPCYZClVVry54=";
 
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            nodejs_20
+            nodePackages.npm
+            npmHooks.npmConfigHook
+            cargo-tauri
+          ] ++ lib.optionals isLinux [
+            wrapGAppsHook3
+            gobject-introspection
+          ];
+
+          buildInputs = with pkgs; [
+            openssl
+          ] ++ lib.optionals isLinux [
+            glib
+            gtk3
+            libsoup_3
+            webkitgtk_4_1
+            librsvg
+            gsettings-desktop-schemas
+            glib-networking
+          ];
+
+          inherit npmDeps;
+
+          # Override build phase to use `cargo tauri build` which properly
+          # embeds frontend assets into the binary
           buildPhase = ''
-            npm ci
+            runHook preBuild
             npm run build
-            cargo tauri build
+            cargo tauri build --no-bundle
+            runHook postBuild
           '';
 
+          # Skip default cargo test (needs runtime deps)
+          doCheck = false;
+
+          # Override install phase since we're not using cargoInstallHook
           installPhase = ''
+            runHook preInstall
             mkdir -p $out/bin
-            cp src-tauri/target/release/nslnotes $out/bin/
+            cp target/release/nslnotes-tauri $out/bin/nslnotes
+
+            mkdir -p $out/share/applications
+            cat > $out/share/applications/NslNotes.desktop <<'DESKTOP'
+[Desktop Entry]
+Name=NslNotes
+Comment=Local-first, plain-text knowledge tool
+Exec=nslnotes
+Icon=nslnotes
+Terminal=false
+Type=Application
+Categories=Office;Utility;
+DESKTOP
+
+            mkdir -p $out/share/icons/hicolor/128x128/apps
+            cp src-tauri/icons/128x128.png $out/share/icons/hicolor/128x128/apps/nslnotes.png
+            runHook postInstall
           '';
         };
       }
