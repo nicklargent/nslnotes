@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Check if running in Nix environment
-if (process.env.IN_NIX_SHELL || process.env.NIX_BUILD_TOP) {
-  console.log("Nix environment detected.");
-  console.log("Use `nix build` or `nix profile install .` instead.");
+// Block only inside Nix build sandbox (not dev shells, which are fine)
+if (process.env.NIX_BUILD_TOP) {
+  console.log("Nix build sandbox detected.");
+  console.log("Use `nix profile install .` instead.");
   process.exit(0);
 }
 
