@@ -12,7 +12,7 @@ export function RawModeToggle(props: RawModeToggleProps) {
     <button
       class={`rounded p-0.5 ${props.active ? "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"}`}
       title={props.active ? "Switch to editor" : "View source"}
-      onClick={props.onClick}
+      onClick={() => props.onClick()}
     >
       <svg
         class="h-4 w-4"

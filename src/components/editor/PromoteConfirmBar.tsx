@@ -22,6 +22,8 @@ interface PromoteConfirmBarProps {
  */
 export function PromoteConfirmBar(props: PromoteConfirmBarProps) {
   const [position, setPosition] = createSignal({ top: 0, left: 0 });
+  // range is set once at mount and never changes; initial slug is intentional
+  // eslint-disable-next-line solid/reactivity
   const [slug, setSlug] = createSignal(generateSlug(props.range.title));
   const [selectedTopics, setSelectedTopics] = createSignal<Set<TopicRef>>(
     new Set()

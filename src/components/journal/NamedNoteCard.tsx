@@ -63,10 +63,11 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
   function handleUpdate(newContent: string) {
     lastLocalContent = newContent;
     setContent(newContent);
+    const notePath = props.note.path;
 
     window.clearTimeout(saveTimeout);
     saveTimeout = window.setTimeout(() => {
-      void saveNamedNote(props.note.path, newContent);
+      void saveNamedNote(notePath, newContent);
     }, 300);
   }
 

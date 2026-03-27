@@ -174,7 +174,9 @@ export function ProseEditor(props: ProseEditorProps) {
         },
         handlePaste: (_view, event) => {
           const items = event.clipboardData?.items;
-          if (!items || !props.entityPath) return false;
+          const entityPath = props.entityPath;
+          const root = rootPath();
+          if (!items || !entityPath) return false;
 
           for (const item of Array.from(items)) {
             if (IMAGE_MIME_TYPES.has(item.type)) {
@@ -185,7 +187,7 @@ export function ProseEditor(props: ProseEditorProps) {
               void readFileAsBase64(file)
                 .then((base64) =>
                   ImageService.ingestFromClipboard(
-                    props.entityPath!,
+                    entityPath,
                     base64,
                     item.type
                   )
@@ -194,8 +196,8 @@ export function ProseEditor(props: ProseEditorProps) {
                   if (!md || !editor) return;
                   const resolved = resolveImageMarkdownSrc(
                     md,
-                    props.entityPath,
-                    rootPath()
+                    entityPath,
+                    root
                   );
                   editor
                     .chain()
@@ -318,7 +320,9 @@ export function ProseEditor(props: ProseEditorProps) {
 
           // Handle image file drops
           const files = event.dataTransfer?.files;
-          if (!files || files.length === 0 || !props.entityPath) return false;
+          const entityPath = props.entityPath;
+          const root = rootPath();
+          if (!files || files.length === 0 || !entityPath) return false;
 
           for (const file of Array.from(files)) {
             if (!IMAGE_MIME_TYPES.has(file.type)) continue;
@@ -332,7 +336,7 @@ export function ProseEditor(props: ProseEditorProps) {
             void readFileAsBase64(file)
               .then((base64) =>
                 ImageService.ingestFromDrop(
-                  props.entityPath!,
+                  entityPath,
                   file.name,
                   base64,
                   file.type
@@ -340,11 +344,7 @@ export function ProseEditor(props: ProseEditorProps) {
               )
               .then((md) => {
                 if (!md || !editor) return;
-                const resolved = resolveImageMarkdownSrc(
-                  md,
-                  props.entityPath,
-                  rootPath()
-                );
+                const resolved = resolveImageMarkdownSrc(md, entityPath, root);
                 if (dropCoords) {
                   const pos = dropCoords.pos;
                   editor
@@ -605,18 +605,14 @@ export function ProseEditor(props: ProseEditorProps) {
     // The event is global, so we hit-test against this editor's container
     // to only handle drops that land within this specific editor instance.
     let tauriUnlisten: (() => void) | null = null;
-    if (runtime.isNative() && props.entityPath) {
+    const entityPathForTauri = props.entityPath;
+    const rootForTauri = rootPath();
+    if (runtime.isNative() && entityPathForTauri) {
       import("@tauri-apps/api/event").then(({ listen }) => {
         listen<{ paths: string[]; position: { x: number; y: number } }>(
           "tauri://drag-drop",
           (event) => {
-            if (
-              !editor ||
-              editor.isDestroyed ||
-              !props.entityPath ||
-              !containerRef
-            )
-              return;
+            if (!editor || editor.isDestroyed || !containerRef) return;
             const { paths, position } = event.payload;
 
             // Hit-test: only handle if the drop landed within this editor
@@ -641,13 +637,13 @@ export function ProseEditor(props: ProseEditorProps) {
                 top: position.y,
               });
 
-              void ImageService.ingestFromFilePath(props.entityPath, filePath)
+              void ImageService.ingestFromFilePath(entityPathForTauri, filePath)
                 .then((md) => {
                   if (!md || !editor || editor.isDestroyed) return;
                   const resolved = resolveImageMarkdownSrc(
                     md,
-                    props.entityPath,
-                    rootPath()
+                    entityPathForTauri,
+                    rootForTauri
                   );
                   if (dropCoords) {
                     editor

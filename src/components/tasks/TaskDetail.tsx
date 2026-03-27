@@ -48,11 +48,12 @@ export function TaskDetail(props: TaskDetailProps) {
   function handleUpdate(newContent: string) {
     setContent(newContent);
     setEditorStore("isDirty", true);
+    const taskPath = props.task.path;
 
     // Debounced auto-save (T5.12)
     window.clearTimeout(saveTimeout);
     saveTimeout = window.setTimeout(() => {
-      void saveTask(props.task.path, newContent);
+      void saveTask(taskPath, newContent);
     }, 300);
   }
 
