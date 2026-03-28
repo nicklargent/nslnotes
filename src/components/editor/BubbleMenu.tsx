@@ -62,7 +62,13 @@ export function BubbleMenu(props: BubbleMenuProps) {
     });
   });
 
-  type ToggleFormat = "bold" | "italic" | "strike" | "code" | "heading";
+  type ToggleFormat =
+    | "bold"
+    | "italic"
+    | "underline"
+    | "strike"
+    | "code"
+    | "heading";
 
   function toggle(format: ToggleFormat, attrs?: Record<string, unknown>) {
     const chain = props.editor.chain().focus();
@@ -72,6 +78,9 @@ export function BubbleMenu(props: BubbleMenuProps) {
         break;
       case "italic":
         chain.toggleItalic().run();
+        break;
+      case "underline":
+        chain.toggleUnderline().run();
         break;
       case "strike":
         chain.toggleStrike().run();
@@ -126,6 +135,13 @@ export function BubbleMenu(props: BubbleMenuProps) {
           title="Italic"
         >
           <span class="italic">I</span>
+        </button>
+        <button
+          class={btnClass(isActive("underline"))}
+          onClick={() => toggle("underline")}
+          title="Underline"
+        >
+          <span class="underline">U</span>
         </button>
         <button
           class={btnClass(isActive("strike"))}

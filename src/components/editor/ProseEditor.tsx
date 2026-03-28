@@ -16,6 +16,7 @@ import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
 import { FindHighlightPlugin } from "./FindHighlightPlugin";
 import { ImageResizePlugin } from "./ImageResizePlugin";
 import { ImageMagnifyPlugin } from "./ImageMagnifyPlugin";
+import Underline from "@tiptap/extension-underline";
 import { ImageService, rootPathFromEntity } from "../../services/ImageService";
 import { showToast } from "../Toast";
 import { IMAGE_MIME_TYPES } from "../../types/images";
@@ -80,6 +81,7 @@ export function ProseEditor(props: ProseEditorProps) {
       extensions: [
         StarterKit.configure({
           heading: { levels: [1, 2, 3] },
+          dropcursor: { color: "var(--color-link)", width: 2 },
         }),
         Placeholder.configure({
           placeholder: props.placeholder ?? "Start writing...",
@@ -137,6 +139,7 @@ export function ProseEditor(props: ProseEditorProps) {
           inline: false,
           allowBase64: false,
         }),
+        Underline,
         Table.configure({ resizable: true, handleWidth: 5, cellMinWidth: 80 }),
         TableRow,
         TableHeader,
@@ -1080,6 +1083,9 @@ export function markdownFromHtml(
             }
             break;
           }
+          case "u":
+            result += `<u>${convert(el, listDepth)}</u>`;
+            break;
           case "s":
           case "del":
             result += `~~${convert(el, listDepth)}~~`;
