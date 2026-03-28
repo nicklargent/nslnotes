@@ -9,6 +9,7 @@ import {
 import { IndexService } from "../../services/IndexService";
 import { NavigationService } from "../../services/NavigationService";
 import { contextStore, setContextStore } from "../../stores/contextStore";
+import { registerContainer, unregisterContainer } from "../../stores/findStore";
 import { ImageGrid } from "./ImageGrid";
 import type { SearchFilter, SearchResult } from "../../types/search";
 
@@ -37,6 +38,7 @@ const TYPE_BADGES: Record<string, { label: string; class: string }> = {
 
 export function SearchView() {
   let inputRef: HTMLInputElement | undefined;
+  let containerRef: HTMLDivElement | undefined;
   const [query, setQuery] = createSignal(contextStore.searchState?.query ?? "");
   const [filter, setFilter] = createSignal<SearchFilter>(
     contextStore.searchState?.filter ?? "all"
@@ -71,7 +73,10 @@ export function SearchView() {
     }, 200);
   });
 
-  onCleanup(() => clearTimeout(debounceTimer));
+  onCleanup(() => {
+    clearTimeout(debounceTimer);
+    if (containerRef) unregisterContainer(containerRef);
+  });
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape") {
@@ -94,7 +99,13 @@ export function SearchView() {
   }
 
   return (
-    <div class="flex h-full flex-col">
+    <div
+      class="flex h-full flex-col"
+      ref={(el) => {
+        containerRef = el;
+        registerContainer(el);
+      }}
+    >
       {/* Search input */}
       <div class="border-b border-gray-200 p-4 dark:border-gray-700">
         <input

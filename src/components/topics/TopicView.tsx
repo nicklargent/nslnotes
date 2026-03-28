@@ -1,7 +1,8 @@
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, For, Show, onCleanup } from "solid-js";
 import { indexStore } from "../../stores/indexStore";
 import { contextStore } from "../../stores/contextStore";
 import { NavigationService } from "../../services/NavigationService";
+import { registerContainer, unregisterContainer } from "../../stores/findStore";
 import type { Note, Doc, Task } from "../../types/entities";
 import type { TopicRef } from "../../types/topics";
 
@@ -37,7 +38,7 @@ function ContextLines(props: { content: string; topicRef: TopicRef }) {
       <div class="mt-0.5 ml-4">
         <For each={lines()}>
           {(line) => (
-            <p class="text-xs text-gray-400 dark:text-gray-500 truncate">
+            <p class="text-sm text-gray-600 dark:text-gray-300 truncate">
               {line}
             </p>
           )}
@@ -107,18 +108,20 @@ export function TopicView() {
     return tasks;
   });
 
-  /** Doc with topic in frontmatter (shown prominently at top). */
-  const pinnedDoc = createMemo((): Doc | null => {
-    const ref = topicRef();
-    if (!ref) return null;
-    for (const doc of indexStore.docs.values()) {
-      if (doc.topics.includes(ref)) return doc;
-    }
-    return null;
+  let containerRef: HTMLDivElement | undefined;
+
+  onCleanup(() => {
+    if (containerRef) unregisterContainer(containerRef);
   });
 
   return (
-    <div class="h-full overflow-y-auto">
+    <div
+      class="h-full overflow-y-auto"
+      ref={(el) => {
+        containerRef = el;
+        registerContainer(el);
+      }}
+    >
       <div class="px-[8%] py-6">
         <Show
           when={topic()}
@@ -146,30 +149,6 @@ export function TopicView() {
                 </Show>
               </div>
 
-              {/* Pinned doc (FR-NAV-014) */}
-              <Show when={pinnedDoc()}>
-                {(doc) => (
-                  <div class="mb-6">
-                    <button
-                      class="w-full rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/30 p-4 text-left hover:border-blue-300"
-                      onClick={() => NavigationService.navigateTo(doc())}
-                    >
-                      <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300">
-                        {doc().title}
-                      </h3>
-                      <p class="mt-1 text-xs leading-relaxed text-blue-600 dark:text-blue-400">
-                        {doc()
-                          .content.split("\n")
-                          .filter((l) => l.trim())
-                          .slice(0, 3)
-                          .join(" ")
-                          .slice(0, 200)}
-                      </p>
-                    </button>
-                  </div>
-                )}
-              </Show>
-
               {/* Open tasks */}
               <Show when={relatedTasks().length > 0}>
                 <div class="mb-6">
@@ -181,11 +160,12 @@ export function TopicView() {
                       {(task) => (
                         <div>
                           <button
-                            class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            class="w-full rounded px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
                             onClick={() => NavigationService.navigateTo(task)}
                           >
-                            <span class="mr-1 text-blue-500">&bull;</span>
-                            {task.title}
+                            <span class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                              {task.title}
+                            </span>
                             <Show when={task.due}>
                               <span class="ml-2 text-xs text-gray-400 dark:text-gray-500">
                                 Due: {task.due}
@@ -193,43 +173,6 @@ export function TopicView() {
                             </Show>
                             <ContextLines
                               content={task.content}
-                              topicRef={topicRef()!}
-                            />
-                          </button>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </div>
-              </Show>
-
-              {/* Notes */}
-              <Show when={referencingNotes().length > 0}>
-                <div class="mb-6">
-                  <h2 class="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                    Notes ({referencingNotes().length})
-                  </h2>
-                  <div class="space-y-1">
-                    <For each={referencingNotes()}>
-                      {(note) => (
-                        <div>
-                          <button
-                            class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                            onClick={() => NavigationService.navigateTo(note)}
-                          >
-                            <span class="text-xs text-gray-400 dark:text-gray-500">
-                              {note.date}
-                            </span>
-                            <Show when={note.title}>
-                              <span class="ml-2">{note.title}</span>
-                            </Show>
-                            <Show when={!note.title}>
-                              <span class="ml-2 italic text-gray-400 dark:text-gray-500">
-                                Daily note
-                              </span>
-                            </Show>
-                            <ContextLines
-                              content={note.content}
                               topicRef={topicRef()!}
                             />
                           </button>
@@ -251,12 +194,53 @@ export function TopicView() {
                       {(doc) => (
                         <div>
                           <button
-                            class="w-full rounded px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            class="w-full rounded px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
                             onClick={() => NavigationService.navigateTo(doc)}
                           >
-                            {doc.title}
+                            <span class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                              {doc.title}
+                            </span>
                             <ContextLines
                               content={doc.content}
+                              topicRef={topicRef()!}
+                            />
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
+
+              {/* Notes */}
+              <Show when={referencingNotes().length > 0}>
+                <div class="mb-6">
+                  <h2 class="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    Notes ({referencingNotes().length})
+                  </h2>
+                  <div class="space-y-1">
+                    <For each={referencingNotes()}>
+                      {(note) => (
+                        <div>
+                          <button
+                            class="w-full rounded px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
+                            onClick={() => NavigationService.navigateTo(note)}
+                          >
+                            <span class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                              <span class="text-xs font-normal text-gray-400 dark:text-gray-500">
+                                {note.date}
+                              </span>
+                              <Show when={note.title}>
+                                <span class="ml-2">{note.title}</span>
+                              </Show>
+                              <Show when={!note.title}>
+                                <span class="ml-2 italic text-gray-400 dark:text-gray-500">
+                                  Daily note
+                                </span>
+                              </Show>
+                            </span>
+                            <ContextLines
+                              content={note.content}
                               topicRef={topicRef()!}
                             />
                           </button>
