@@ -8,6 +8,8 @@ import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
+import { TaskList } from "@tiptap/extension-task-list";
+import { TaskItem } from "@tiptap/extension-task-item";
 import { DOMSerializer } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { WIKILINK_MIME } from "../../lib/drag";
@@ -140,6 +142,8 @@ export function ProseEditor(props: ProseEditorProps) {
           allowBase64: false,
         }),
         Underline,
+        TaskList,
+        TaskItem.configure({ nested: true }),
         Table.configure({ resizable: true, handleWidth: 5, cellMinWidth: 80 }),
         TableRow,
         TableHeader,
@@ -833,6 +837,8 @@ function htmlFromMarkdown(
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")
     .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    // Horizontal rule
+    .replace(/^---$/gm, "<hr>")
     // Strikethrough
     .replace(/~~(.+?)~~/g, "<s>$1</s>")
     // Bold and italic
@@ -917,17 +923,44 @@ function htmlFromMarkdown(
   const lines = html.split("\n");
   const result: string[] = [];
   let currentListDepth = -1;
+  // Track list type at each depth: "ul" | "ol" | "task"
+  const listTypeStack: ("ul" | "ol" | "task")[] = [];
   let inTable = false;
   let tableLines: string[] = [];
 
   function closeListsTo(depth: number) {
     while (currentListDepth > depth) {
-      result.push("</li></ul>");
+      const type = listTypeStack.pop();
+      const closeTag =
+        type === "task"
+          ? "</li></ul>"
+          : type === "ol"
+            ? "</li></ol>"
+            : "</li></ul>";
+      result.push(closeTag);
       currentListDepth--;
     }
     if (currentListDepth >= 0 && depth >= 0) {
       result.push("</li>");
     }
+  }
+
+  function openList(type: "ul" | "ol" | "task") {
+    if (type === "task") {
+      result.push('<ul data-type="taskList">');
+    } else if (type === "ol") {
+      result.push("<ol>");
+    } else {
+      result.push("<ul>");
+    }
+    listTypeStack.push(type);
+    currentListDepth++;
+  }
+
+  function currentListType(): "ul" | "ol" | "task" | null {
+    return listTypeStack.length > 0
+      ? listTypeStack[listTypeStack.length - 1]!
+      : null;
   }
 
   for (const line of lines) {
@@ -943,34 +976,63 @@ function htmlFromMarkdown(
       // Block-level image — do not wrap in <p>
       closeListsTo(-1);
       result.push(trimmed);
-    } else if (trimmed.startsWith("<h") || trimmed.startsWith("<pre>")) {
+    } else if (
+      trimmed.startsWith("<h") ||
+      trimmed.startsWith("<pre>") ||
+      trimmed === "<hr>"
+    ) {
       closeListsTo(-1);
       result.push(trimmed);
     } else if (/^(\s*)([-*])\s(.*)$/.test(line)) {
       const match = /^(\s*)([-*])\s(.*)$/.exec(line)!;
       const rawIndent = match[1] ?? "";
-      const content = match[3] ?? "";
+      let content = match[3] ?? "";
       // Expand tabs: each tab = 1 nesting level, each 2 spaces = 1 nesting level
       const tabCount = (rawIndent.match(/\t/g) ?? []).length;
       const spaceCount = (rawIndent.match(/ /g) ?? []).length;
       const level = tabCount + Math.floor(spaceCount / 2);
 
+      // Detect task list items: - [ ] or - [x]/- [X]
+      const taskMatch = /^\[([ xX])\]\s(.*)$/.exec(content);
+      const isTask = taskMatch !== null;
+      const checked = taskMatch ? taskMatch[1] !== " " : false;
+      if (taskMatch) {
+        content = taskMatch[2] ?? "";
+      }
+
+      // Determine what list type this item needs
+      const neededType: "ul" | "task" = isTask ? "task" : "ul";
+
       if (level > currentListDepth) {
         const levelsToOpen = level - currentListDepth;
         for (let j = 0; j < levelsToOpen; j++) {
-          result.push("<ul>");
-          currentListDepth++;
+          openList(j === levelsToOpen - 1 ? neededType : "ul");
         }
       } else if (level < currentListDepth) {
         closeListsTo(level);
       } else if (currentListDepth >= 0) {
-        result.push("</li>");
+        // Same level — if list type changed, close and reopen
+        if (currentListType() !== neededType) {
+          closeListsTo(level - 1);
+          openList(neededType);
+        } else {
+          result.push("</li>");
+        }
+      } else {
+        // Starting a new list from depth -1
+        openList(neededType);
       }
-      result.push(`<li><p>${content}</p>`);
+
+      if (isTask) {
+        result.push(
+          `<li data-type="taskItem" data-checked="${checked}"><p>${content}</p>`
+        );
+      } else {
+        result.push(`<li><p>${content}</p>`);
+      }
     } else if (/^\d+\. /.test(trimmed)) {
       if (currentListDepth < 0) {
-        result.push("<ol>");
-        currentListDepth = 0;
+        openList("ol");
       } else {
         result.push("</li>");
       }
@@ -1129,8 +1191,15 @@ export function markdownFromHtml(
           case "table":
             result += convertTable(el);
             break;
+          case "hr":
+            result += "---\n";
+            break;
           case "br":
             result += "\n";
+            break;
+          case "label":
+          case "input":
+            // Skip checkbox elements from TaskItem rendering
             break;
           default:
             result += convert(el, listDepth);
@@ -1147,12 +1216,22 @@ export function markdownFromHtml(
     listDepth: number
   ): string {
     let result = "";
+    const isTaskList = el.getAttribute("data-type") === "taskList";
     if (tag === "ul") {
       for (const li of Array.from(el.children)) {
         const indent = "  ".repeat(listDepth);
         const liContent = liText(li, listDepth);
         const nested = liNested(li, listDepth + 1);
-        result += `${indent}- ${liContent.trim()}\n${nested}`;
+        if (
+          isTaskList ||
+          (li as HTMLElement).getAttribute("data-type") === "taskItem"
+        ) {
+          const checked =
+            (li as HTMLElement).getAttribute("data-checked") === "true";
+          result += `${indent}- [${checked ? "x" : " "}] ${liContent.trim()}\n${nested}`;
+        } else {
+          result += `${indent}- ${liContent.trim()}\n${nested}`;
+        }
       }
     } else {
       Array.from(el.children).forEach((li, i) => {
@@ -1171,6 +1250,8 @@ export function markdownFromHtml(
       if (child.nodeType === Node.ELEMENT_NODE) {
         const tag = (child as HTMLElement).tagName.toLowerCase();
         if (tag === "ul" || tag === "ol") continue;
+        // Skip the checkbox label rendered by TaskItem
+        if (tag === "label") continue;
       }
       result += convert(child as Node, listDepth);
     }

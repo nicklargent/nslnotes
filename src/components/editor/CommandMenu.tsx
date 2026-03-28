@@ -62,6 +62,11 @@ export const COMMANDS: CommandMenuItem[] = [
     label: "Table",
     description: "Insert a table",
   },
+  {
+    id: "task-list",
+    label: "Task List",
+    description: "Checklist with checkboxes",
+  },
 ];
 
 export function filterCommands(filter: string): CommandMenuItem[] {

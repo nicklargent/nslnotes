@@ -200,7 +200,7 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Click outside closes menu
 - [ ] Menu closes on: cursor moves before `/`, space/newline inserted, no matches
 - [ ] Filter reset sets selection back to 0
-- [ ] Available commands: Extract, H1, H2, H3, Bullet list, Ordered list, Code block, Bold, Italic, Divider, Table
+- [ ] Available commands: Extract, H1, H2, H3, Bullet list, Ordered list, Code block, Bold, Italic, Divider, Table, Task List
 
 ### Topic Autocomplete (`TopicAutocomplete.tsx`)
 - [ ] `#` at word boundary opens topic autocomplete
@@ -241,6 +241,14 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Selected cells highlighted with tinted background (`.selectedCell` class)
 - [ ] Column resize: drag cell border to resize column width
 - [ ] Resize handle appears as colored bar on hover over cell border
+
+### Task List (Markdown Checkboxes)
+- [ ] `/tasklist` slash command toggles task list on current block
+- [ ] `- [ ]` in markdown renders as unchecked checkbox
+- [ ] `- [x]` in markdown renders as checked checkbox with strikethrough text
+- [ ] Clicking checkbox toggles checked state
+- [ ] Nested task items supported
+- [ ] Coexists with custom TODO system (TODO/DOING/WAITING/LATER/DONE)
 
 ### TODO Checkbox (`TodoCheckbox.tsx`)
 - [ ] Click cycles state: TODO → DOING → DONE → TODO

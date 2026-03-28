@@ -78,6 +78,32 @@
   margin: 0.125rem 0;
 }
 
+.prose-editor .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+
+.prose-editor .tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.prose-editor .tiptap ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.prose-editor .tiptap ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.prose-editor .tiptap ul[data-type="taskList"] li[data-checked="true"] > div p {
+  text-decoration: line-through;
+  color: var(--color-editor-placeholder);
+}
+
 .prose-editor .tiptap code {
   background: var(--color-code-bg);
   border-radius: 0.25rem;
