@@ -26,17 +26,34 @@ export function TableToolbar(props: TableToolbarProps) {
 
   function updatePosition() {
     const { view } = props.editor;
-    // Find the table DOM element
     const { $from } = props.editor.state.selection;
+
+    // Find the current cell to position toolbar near it
+    let cellRect: DOMRect | null = null;
+    for (let d = $from.depth; d > 0; d--) {
+      const nodeName = $from.node(d).type.name;
+      if (nodeName === "tableCell" || nodeName === "tableHeader") {
+        const cellStart = $from.before(d);
+        const dom = view.nodeDOM(cellStart);
+        if (dom instanceof HTMLElement) {
+          cellRect = dom.getBoundingClientRect();
+        }
+        break;
+      }
+    }
+
+    // Find the table for horizontal centering
     for (let d = $from.depth; d > 0; d--) {
       if ($from.node(d).type.name === "table") {
         const tableStart = $from.before(d);
         const dom = view.nodeDOM(tableStart);
         if (dom instanceof HTMLElement) {
-          const rect = dom.getBoundingClientRect();
+          const tableRect = dom.getBoundingClientRect();
+          // Position above the current cell's row, centered on table
+          const top = cellRect ? cellRect.top - 8 : tableRect.top - 8;
           setPosition({
-            top: rect.top - 8,
-            left: rect.left + rect.width / 2,
+            top,
+            left: tableRect.left + tableRect.width / 2,
           });
         }
         return;
@@ -46,6 +63,19 @@ export function TableToolbar(props: TableToolbarProps) {
 
   onMount(() => {
     updatePosition();
+
+    // Reposition on selection changes (moving between cells)
+    const handleTransaction = () => updatePosition();
+    props.editor.on("selectionUpdate", handleTransaction);
+
+    // Reposition on scroll so toolbar follows the active cell
+    const scrollContainer =
+      menuRef?.closest(".overflow-y-auto") ??
+      document.querySelector(".overflow-y-auto");
+    const handleScroll = () => updatePosition();
+    scrollContainer?.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
 
     function handleClickOutside(e: MouseEvent) {
       if (menuRef && !menuRef.contains(e.target as Node)) {
@@ -62,6 +92,8 @@ export function TableToolbar(props: TableToolbarProps) {
     document.addEventListener("keydown", handleKeyDown, true);
 
     onCleanup(() => {
+      props.editor.off("selectionUpdate", handleTransaction);
+      scrollContainer?.removeEventListener("scroll", handleScroll);
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown, true);
     });
