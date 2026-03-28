@@ -50,8 +50,8 @@ type AppState = "loading" | "setup" | "ready";
 
 function App() {
   const [appState, setAppState] = createSignal<AppState>("loading");
-  // eslint-disable-next-line solid/reactivity
-  const [, setRootPath] = createSignal<string | null>(null);
+
+  const [rootPath, setRootPath] = createSignal<string | null>(null);
   const [showShortcuts, setShowShortcuts] = createSignal(false);
   const [showQuickCapture, setShowQuickCapture] = createSignal(false);
   let unwatchFn: (() => void) | null = null;
@@ -226,6 +226,32 @@ function App() {
     showToast("Notes folder configured successfully", "success");
   }
 
+  async function switchFolderToPath(selected: string) {
+    // Tear down current state
+    unwatchFn?.();
+    unwatchFn = null;
+    await FileService.stopWatching();
+    clearIndexCache();
+    setIndexStore("notes", new Map());
+    setIndexStore("tasks", new Map());
+    setIndexStore("docs", new Map());
+    setIndexStore("topics", new Map());
+    setIndexStore("topicsYaml", new Map());
+    setIndexStore("imageFiles", new Map());
+    setIndexStore("entityToImages", new Map());
+    setIndexStore("imageToEntities", new Map());
+    setIndexStore("backlinkIndex", new Map());
+    setIndexStore("lastIndexed", null);
+
+    // Initialize with new folder
+    await SettingsService.setRootPath(selected);
+    setRootPath(selected);
+    await IndexService.buildIndex(selected);
+    startFileWatcher(selected);
+    NavigationService.goHome();
+    showToast("Switched notes folder", "success");
+  }
+
   async function switchFolder() {
     try {
       const { open } = await import("@tauri-apps/plugin-dialog");
@@ -244,30 +270,18 @@ function App() {
       }
 
       await FileService.ensureDirectory(selected);
+      await switchFolderToPath(selected);
+    } catch (err) {
+      showToast(
+        `Failed to switch folder: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "error"
+      );
+    }
+  }
 
-      // Tear down current state
-      unwatchFn?.();
-      unwatchFn = null;
-      await FileService.stopWatching();
-      clearIndexCache();
-      setIndexStore("notes", new Map());
-      setIndexStore("tasks", new Map());
-      setIndexStore("docs", new Map());
-      setIndexStore("topics", new Map());
-      setIndexStore("topicsYaml", new Map());
-      setIndexStore("imageFiles", new Map());
-      setIndexStore("entityToImages", new Map());
-      setIndexStore("imageToEntities", new Map());
-      setIndexStore("backlinkIndex", new Map());
-      setIndexStore("lastIndexed", null);
-
-      // Initialize with new folder
-      await SettingsService.setRootPath(selected);
-      setRootPath(selected);
-      await IndexService.buildIndex(selected);
-      startFileWatcher(selected);
-      NavigationService.goHome();
-      showToast("Switched notes folder", "success");
+  async function switchFolderWeb(path: string) {
+    try {
+      await switchFolderToPath(path);
     } catch (err) {
       showToast(
         `Failed to switch folder: ${err instanceof Error ? err.message : "Unknown error"}`,
@@ -385,6 +399,8 @@ function App() {
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
               onCreateDoc={() => setContextStore("draft", { type: "doc" })}
               onSwitchFolder={switchFolder}
+              onSwitchFolderWeb={switchFolderWeb}
+              currentRootPath={rootPath()}
               datesWithNotes={datesWithNotes()}
               onDateSelect={(date) => NavigationService.navigateToDate(date)}
             />
