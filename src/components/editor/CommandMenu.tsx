@@ -57,6 +57,11 @@ export const COMMANDS: CommandMenuItem[] = [
     label: "Divider",
     description: "Horizontal rule",
   },
+  {
+    id: "table",
+    label: "Table",
+    description: "Insert a table",
+  },
 ];
 
 export function filterCommands(filter: string): CommandMenuItem[] {

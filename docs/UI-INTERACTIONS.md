@@ -200,7 +200,7 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Click outside closes menu
 - [ ] Menu closes on: cursor moves before `/`, space/newline inserted, no matches
 - [ ] Filter reset sets selection back to 0
-- [ ] Available commands: Extract, H1, H2, H3, Bullet list, Ordered list, Code block, Bold, Italic, Divider
+- [ ] Available commands: Extract, H1, H2, H3, Bullet list, Ordered list, Code block, Bold, Italic, Divider, Table
 
 ### Topic Autocomplete (`TopicAutocomplete.tsx`)
 - [ ] `#` at word boundary opens topic autocomplete
@@ -222,6 +222,25 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] `Shift+Tab` outdents list item
 - [ ] `Alt+Up` reorders list item up (if supported by extension)
 - [ ] `Alt+Down` reorders list item down (if supported by extension)
+
+### Tables
+- [ ] `/table` slash command inserts a 3x3 table with header row
+- [ ] `Tab` in table navigates to next cell
+- [ ] `Shift+Tab` in table navigates to previous cell
+- [ ] `Ctrl+Shift+Enter` / `Cmd+Shift+Enter` in table inserts paragraph after table and moves cursor there
+- [ ] Table toolbar appears above table when cursor is in a cell without text selection
+- [ ] Table toolbar: "+Col←" adds column before current
+- [ ] Table toolbar: "+Col→" adds column after current
+- [ ] Table toolbar: "−Col" deletes current column
+- [ ] Table toolbar: "+Row↑" adds row above current
+- [ ] Table toolbar: "+Row↓" adds row below current
+- [ ] Table toolbar: "−Row" deletes current row
+- [ ] Table toolbar: "¶↑" inserts paragraph before table
+- [ ] Table toolbar: "¶↓" inserts paragraph after table
+- [ ] Table toolbar: "Delete" removes entire table
+- [ ] Selected cells highlighted with tinted background (`.selectedCell` class)
+- [ ] Column resize: drag cell border to resize column width
+- [ ] Resize handle appears as colored bar on hover over cell border
 
 ### TODO Checkbox (`TodoCheckbox.tsx`)
 - [ ] Click cycles state: TODO → DOING → DONE → TODO
@@ -536,7 +555,7 @@ Source: `src/components/metadata/`
 | Topics/Docs lists | `src/components/sidebar/TopicsList.tsx`, `TopicItem.tsx`, `DocsList.tsx` |
 | Journal | `src/components/journal/JournalView.tsx`, `MonthBar.tsx`, `DateHeader.tsx`, `DailyNote.tsx`, `NamedNoteCard.tsx` |
 | Editor core | `src/components/editor/ProseEditor.tsx`, `Editor.tsx` |
-| Editor UI | `BubbleMenu.tsx`, `CommandMenu.tsx`, `TopicAutocomplete.tsx`, `FindBar.tsx`, `TodoCheckbox.tsx`, `RawEditor.tsx`, `RawModeToggle.tsx` |
+| Editor UI | `BubbleMenu.tsx`, `CommandMenu.tsx`, `TopicAutocomplete.tsx`, `TableToolbar.tsx`, `FindBar.tsx`, `TodoCheckbox.tsx`, `RawEditor.tsx`, `RawModeToggle.tsx` |
 | Promote | `src/components/editor/PromoteConfirmBar.tsx` |
 | Docs | `src/components/docs/DocView.tsx` |
 | Tasks | `src/components/tasks/TaskItem.tsx`, `TaskDetail.tsx`, `TaskGroup.tsx`, `ClosedTaskItem.tsx` |

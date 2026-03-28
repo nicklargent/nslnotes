@@ -137,7 +137,7 @@ export function ProseEditor(props: ProseEditorProps) {
           inline: false,
           allowBase64: false,
         }),
-        Table.configure({ resizable: false }),
+        Table.configure({ resizable: true, handleWidth: 5, cellMinWidth: 80 }),
         TableRow,
         TableHeader,
         TableCell,
@@ -373,6 +373,41 @@ export function ProseEditor(props: ProseEditorProps) {
           return false;
         },
         handleKeyDown: (view, event) => {
+          // Tab/Shift+Tab in tables: navigate cells
+          if (event.key === "Tab" && editor?.isActive("table")) {
+            event.preventDefault();
+            if (event.shiftKey) {
+              editor.chain().focus().goToPreviousCell().run();
+            } else {
+              editor.chain().focus().goToNextCell().run();
+            }
+            return true;
+          }
+
+          // Ctrl/Cmd+Shift+Enter: escape table by inserting paragraph after it
+          if (
+            event.key === "Enter" &&
+            event.shiftKey &&
+            (event.ctrlKey || event.metaKey) &&
+            editor?.isActive("table")
+          ) {
+            event.preventDefault();
+            const { state } = view;
+            const { $from } = state.selection;
+            // Walk up to find the table node
+            for (let d = $from.depth; d > 0; d--) {
+              if ($from.node(d).type.name === "table") {
+                const insertPos = $from.after(d);
+                const paragraph = state.schema.nodes["paragraph"]!.create();
+                const tr = state.tr.insert(insertPos, paragraph);
+                tr.setSelection(TextSelection.create(tr.doc, insertPos + 1));
+                view.dispatch(tr);
+                return true;
+              }
+            }
+            return false;
+          }
+
           // Tab to indent list items, or wrap paragraph in bullet list
           if (event.key === "Tab" && !event.shiftKey) {
             event.preventDefault();

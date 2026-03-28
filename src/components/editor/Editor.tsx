@@ -3,6 +3,7 @@ import { DOMSerializer } from "@tiptap/pm/model";
 import { ProseEditor, markdownFromHtml } from "./ProseEditor";
 import { CommandMenu, filterCommands } from "./CommandMenu";
 import { BubbleMenu } from "./BubbleMenu";
+import { TableToolbar } from "./TableToolbar";
 import { TopicAutocomplete } from "./TopicAutocomplete";
 import { PromoteConfirmBar } from "./PromoteConfirmBar";
 import { detectPromoteRange } from "./promoteRange";
@@ -48,10 +49,12 @@ export function Editor(props: EditorProps) {
   const [slashPos, setSlashPos] = createSignal<number | null>(null);
   const [commandFilter, setCommandFilter] = createSignal("");
   const [showBubbleMenu, setShowBubbleMenu] = createSignal(false);
+  const [showTableToolbar, setShowTableToolbar] = createSignal(false);
   let editorRef: TiptapEditor | undefined;
   const [editorReady, setEditorReady] = createSignal(false);
   let blurTimeout: ReturnType<typeof setTimeout> | undefined;
   let bubbleMenuRef: HTMLDivElement | undefined;
+  let tableToolbarRef: HTMLDivElement | undefined;
   let confirmBarRef: HTMLDivElement | undefined;
 
   onCleanup(() => {
@@ -417,6 +420,13 @@ export function Editor(props: EditorProps) {
       case "divider":
         editorRef.chain().focus().setHorizontalRule().run();
         break;
+      case "table":
+        editorRef
+          .chain()
+          .focus()
+          .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+          .run();
+        break;
     }
   }
 
@@ -443,15 +453,32 @@ export function Editor(props: EditorProps) {
             !promoteRange()
           ) {
             setShowBubbleMenu(true);
+            setShowTableToolbar(false);
           } else {
             setShowBubbleMenu(false);
+            // Show table toolbar when cursor is in a table with no selection
+            if (
+              !hasSelection &&
+              editorRef?.isActive("table") &&
+              !commandMenuPos() &&
+              !autocomplete() &&
+              !promoteRange()
+            ) {
+              setShowTableToolbar(true);
+            } else {
+              setShowTableToolbar(false);
+            }
           }
         }}
         onEditorBlur={(event) => {
           const relatedTarget = event?.relatedTarget as HTMLElement | null;
           if (relatedTarget && bubbleMenuRef?.contains(relatedTarget)) return;
+          if (relatedTarget && tableToolbarRef?.contains(relatedTarget)) return;
           if (relatedTarget && confirmBarRef?.contains(relatedTarget)) return;
-          blurTimeout = setTimeout(() => setShowBubbleMenu(false), 200);
+          blurTimeout = setTimeout(() => {
+            setShowBubbleMenu(false);
+            setShowTableToolbar(false);
+          }, 200);
         }}
         onEditorFocus={() => {
           if (blurTimeout) clearTimeout(blurTimeout);
@@ -466,6 +493,14 @@ export function Editor(props: EditorProps) {
           onClose={() => setShowBubbleMenu(false)}
           onExtract={startPromote}
           ref={(el) => (bubbleMenuRef = el)}
+        />
+      </Show>
+
+      <Show when={showTableToolbar() && editorReady() && !promoteRange()}>
+        <TableToolbar
+          editor={editorRef!}
+          onClose={() => setShowTableToolbar(false)}
+          ref={(el) => (tableToolbarRef = el)}
         />
       </Show>
 

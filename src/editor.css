@@ -115,10 +115,37 @@
   margin: 1rem 0;
 }
 
+/* Table column resize */
+.prose-editor .tiptap .tableWrapper {
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.prose-editor .tiptap .tableWrapper table {
+  margin: 0;
+}
+
 .prose-editor .tiptap table {
   border-collapse: collapse;
   width: 100%;
   margin: 0.5rem 0;
+  table-layout: fixed;
+  overflow: hidden;
+}
+
+.prose-editor .tiptap .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  z-index: 20;
+  background-color: var(--color-link);
+  pointer-events: none;
+}
+
+.prose-editor .tiptap.resize-cursor {
+  cursor: col-resize;
 }
 
 .prose-editor .tiptap th,
@@ -127,6 +154,7 @@
   padding: 0.35rem 0.6rem;
   text-align: left;
   vertical-align: top;
+  position: relative;
 }
 
 .prose-editor .tiptap th {
@@ -141,6 +169,10 @@
 .prose-editor .tiptap th p,
 .prose-editor .tiptap td p {
   margin: 0;
+}
+
+.prose-editor .tiptap .selectedCell {
+  background-color: color-mix(in srgb, var(--color-link), transparent 90%);
 }
 
 .prose-editor .tiptap strong {
