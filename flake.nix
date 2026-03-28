@@ -123,7 +123,7 @@
           version = "0.1.0";
           src = ./.;
 
-          cargoHash = "sha256-oUdxLng040rhX9aTXHqKU1JvFs43LgoPCYZClVVry54=";
+          cargoHash = "sha256-kDNXRKjV4hE8kdidLjcj1hZb9dZqAyKkXixAq81xU1s=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
@@ -182,6 +182,59 @@ DESKTOP
 
             mkdir -p $out/share/icons/hicolor/128x128/apps
             cp src-tauri/icons/128x128.png $out/share/icons/hicolor/128x128/apps/nslnotes.png
+            runHook postInstall
+          '';
+        };
+
+        # Web server package
+        packages.web = pkgs.rustPlatform.buildRustPackage {
+          pname = "nslnotes-web";
+          version = "0.1.0";
+          src = ./.;
+
+          cargoHash = "sha256-kDNXRKjV4hE8kdidLjcj1hZb9dZqAyKkXixAq81xU1s=";
+
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            nodejs_20
+            nodePackages.npm
+            npmHooks.npmConfigHook
+          ];
+
+          buildInputs = with pkgs; [
+            openssl
+          ];
+
+          inherit npmDeps;
+
+          buildPhase = ''
+            runHook preBuild
+            npm run build
+            cargo build --release -p nslnotes-web
+            runHook postBuild
+          '';
+
+          doCheck = false;
+
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            cp target/release/nslnotes-web $out/bin/nslnotes-web
+
+            mkdir -p $out/lib/systemd/user
+            cat > $out/lib/systemd/user/nslnotes-web.service <<EOF
+[Unit]
+Description=NslNotes Web Server
+After=network.target
+
+[Service]
+ExecStart=$out/bin/nslnotes-web
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
             runHook postInstall
           '';
         };

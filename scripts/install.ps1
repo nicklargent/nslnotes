@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $ProjectDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$Binary = Join-Path $ProjectDir "src-tauri\target\release\nslnotes-tauri.exe"
+$Binary = Join-Path $ProjectDir "target\release\nslnotes-tauri.exe"
 
 if (-not (Test-Path $Binary)) {
     Write-Error "Release binary not found at $Binary`nRun 'npm run tauri:build' first."

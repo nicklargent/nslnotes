@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 #[command(name = "nslnotes-web", about = "NslNotes web server")]
 struct Args {
     /// Port to listen on
-    #[arg(short, long, default_value_t = 3000)]
+    #[arg(short, long, env = "NSLNOTES_WEB_PORT", default_value_t = 3000)]
     port: u16,
 
     /// Notes directory path (overrides settings)
@@ -25,8 +25,49 @@ fn default_settings_path() -> String {
     nslnotes_core::settings::default_path().to_string_lossy().to_string()
 }
 
+fn env_file_path() -> PathBuf {
+    let config_dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("nslnotes");
+    config_dir.join("web.env")
+}
+
+/// Create default env file if it doesn't exist
+fn ensure_env_file() {
+    let path = env_file_path();
+    if !path.exists() {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(
+            &path,
+            "# NslNotes web server configuration\n# Uncomment to change the port:\n# NSLNOTES_WEB_PORT=3000\n",
+        );
+    }
+}
+
+/// Load env vars from the env file
+fn load_env_file() {
+    let path = env_file_path();
+    if let Ok(contents) = std::fs::read_to_string(&path) {
+        for line in contents.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((key, value)) = line.split_once('=') {
+                if std::env::var(key.trim()).is_err() {
+                    std::env::set_var(key.trim(), value.trim());
+                }
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    ensure_env_file();
+    load_env_file();
     let args = Args::parse();
 
     let settings_path = PathBuf::from(&args.settings_path);

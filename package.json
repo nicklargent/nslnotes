@@ -20,6 +20,7 @@
     "tauri:build": "tauri build --no-bundle",
     "tauri:install": "node scripts/detect-install.js",
     "web:build": "npm run build && cargo build --release -p nslnotes-web",
+    "web:install": "npm run web:build && node scripts/detect-install-web.js",
     "web:serve": "cargo run -p nslnotes-web",
     "prepare": "husky"
   },

@@ -84,20 +84,26 @@ Builds a release binary without creating platform installers. The install script
 
 > **macOS note:** The app is not code-signed, so Gatekeeper will block it on first launch. Right-click the app and choose **Open**, or run `xattr -cr ~/Applications/NslNotes.app`.
 
-### NixOS
-
-```bash
-nix run                 # Build and run directly
-nix profile install .    # Install to your Nix profile
-```
-
 ### Standalone web server
 
 ```bash
-npm run web:build
+npm run web:build       # Build the web server binary
+npm run web:install     # Build, install binary, and start as a service
 ```
 
-Builds the frontend with Vite and compiles an Axum-based web server (`nslnotes-web` crate) with the assets embedded. Run the resulting binary directly, or use `npm run web:serve` during development to build and run in one step.
+Builds the frontend with Vite and compiles an Axum-based web server (`nslnotes-web` crate) with the assets embedded. The install script places the binary and registers a user service (systemd on Linux, launchd on macOS, scheduled task on Windows) that runs on login and serves on `http://localhost:3000`. Use `npm run web:serve` during development to build and run in one step.
+
+### NixOS
+
+```bash
+nix run                   # Build and run desktop app directly
+nix run .#web              # Build and run web server directly
+nix profile install .      # Install desktop app to your Nix profile
+nix profile install .#web  # Install web server binary
+
+# After installing the web server, enable and start the service:
+systemctl --user enable --now nslnotes-web
+```
 
 ## Available Scripts
 
@@ -108,6 +114,7 @@ Builds the frontend with Vite and compiles an Axum-based web server (`nslnotes-w
 | `npm run tauri:build` | Build release binary (no installer) |
 | `npm run tauri:install` | Install binary + desktop integration for current OS |
 | `npm run web:build` | Build frontend + compile standalone web server |
+| `npm run web:install` | Build, install binary, and start as a user service |
 | `npm run web:serve` | Build and run the standalone web server |
 | `npm run typecheck` | Run TypeScript type checking |
 | `npm run lint` | Lint source files |
