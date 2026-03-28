@@ -21,6 +21,8 @@ export interface AppSettings {
   windowMaximized: boolean | null;
   /** Whether dark mode is enabled */
   darkMode: boolean | null;
+  /** Port for web server mode */
+  webPort: number | null;
 }
 
 /**
@@ -35,6 +37,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   windowHeight: null,
   windowMaximized: null,
   darkMode: null,
+  webPort: null,
 };
 
 /**

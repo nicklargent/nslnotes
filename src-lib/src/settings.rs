@@ -2,8 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Returns the canonical settings file path: `~/.config/nslnotes/settings.json`
+/// Returns the settings file path.
+/// Checks `NSLNOTES_SETTINGS` env var first, falls back to `~/.config/nslnotes/settings.json`.
 pub fn default_path() -> PathBuf {
+    if let Ok(p) = std::env::var("NSLNOTES_SETTINGS") {
+        return PathBuf::from(p);
+    }
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("nslnotes")
@@ -29,6 +33,8 @@ pub struct AppSettings {
     pub window_maximized: Option<bool>,
     #[serde(rename = "darkMode", default)]
     pub dark_mode: Option<bool>,
+    #[serde(rename = "webPort", default)]
+    pub web_port: Option<u16>,
 }
 
 /// Load application settings from a file path

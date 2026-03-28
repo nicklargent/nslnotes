@@ -123,6 +123,31 @@ systemctl --user enable --now nslnotes-web
 | `npm run test` | Run unit tests (Vitest) |
 | `npm run test:e2e` | Run end-to-end tests (Playwright) |
 
+## Configuration
+
+Settings are stored in `~/.config/nslnotes/settings.json`. To use a custom settings file (useful for testing or multiple instances), set the `NSLNOTES_SETTINGS` environment variable:
+
+```bash
+# Use a custom settings file in any mode
+NSLNOTES_SETTINGS=~/test-settings.json npm run tauri dev
+NSLNOTES_SETTINGS=~/test-settings.json npm run dev:web
+NSLNOTES_SETTINGS=~/test-settings.json npm run web:serve
+```
+
+The web server port can be configured in `settings.json` (default `3000`). CLI `--port` overrides it:
+
+```jsonc
+{
+  "rootPath": "/home/user/nslnotes",
+  "webPort": 8080
+}
+```
+
+```bash
+# Port priority: --port flag > settings.json webPort > 3000
+npm run web:serve -- --port 9090
+```
+
 ## Data Directory
 
 NslNotes reads and writes plain markdown files from a user-selected directory:

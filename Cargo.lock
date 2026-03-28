@@ -2474,7 +2474,6 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "clap",
- "dirs 6.0.0",
  "mime_guess",
  "nslnotes-core",
  "rust-embed",

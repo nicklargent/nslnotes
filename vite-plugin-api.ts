@@ -212,12 +212,13 @@ async function handleApi(
 
     // GET/PUT /api/settings — load/save app settings
     if (pathname === "/api/settings") {
-      const settingsPath = path.join(
-        process.env.HOME ?? ".",
-        ".config",
-        "nslnotes",
-        "settings.json",
-      );
+      const settingsPath = process.env.NSLNOTES_SETTINGS ??
+        path.join(
+          process.env.HOME ?? ".",
+          ".config",
+          "nslnotes",
+          "settings.json",
+        );
 
       if (req.method === "GET") {
         if (fs.existsSync(settingsPath)) {
