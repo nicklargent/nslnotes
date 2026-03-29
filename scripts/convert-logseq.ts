@@ -278,6 +278,7 @@ function convertOutlinerMarkdown(content: string): string {
   const result: string[] = [];
   let inCodeBlock = false;
   let codeBlockContinuationPrefix = ""; // the full continuation indent to strip from code lines
+  let codeBlockOutputIndent = ""; // indent to prepend to emitted code block lines
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -286,9 +287,9 @@ function convertOutlinerMarkdown(content: string): string {
     if (inCodeBlock) {
       // Check for closing fence: matches the same continuation prefix, or bullet at same level
       if (isClosingFence(line, codeBlockContinuationPrefix)) {
-        result.push("```");
-        // Ensure blank line after closing fence if next line is non-blank
-        if (i + 1 < lines.length && lines[i + 1].trim() !== "") {
+        result.push(codeBlockOutputIndent + "```");
+        // Ensure blank line after closing fence if next line is non-blank (top-level only)
+        if (!codeBlockOutputIndent && i + 1 < lines.length && lines[i + 1].trim() !== "") {
           result.push("");
         }
         inCodeBlock = false;
@@ -296,11 +297,11 @@ function convertOutlinerMarkdown(content: string): string {
       }
       // Strip the continuation indent from code content
       if (line.startsWith(codeBlockContinuationPrefix)) {
-        result.push(line.slice(codeBlockContinuationPrefix.length));
+        result.push(codeBlockOutputIndent + line.slice(codeBlockContinuationPrefix.length));
       } else if (line.trim() === "") {
         result.push("");
       } else {
-        result.push(line);
+        result.push(codeBlockOutputIndent + line);
       }
       continue;
     }
@@ -312,8 +313,16 @@ function convertOutlinerMarkdown(content: string): string {
       const bulletIndent = codeOpenBullet[1];
       // Continuation prefix: bulletIndent + "  " (2 spaces past the "- " marker)
       codeBlockContinuationPrefix = bulletIndent + "  ";
-      ensureBlankBefore(result);
-      result.push(codeOpenBullet[2]);
+      // If inside a list (has indent), keep code block indented to preserve list flow
+      // Convert tab indent to spaces: each tab = one list level = 2 spaces for content
+      if (bulletIndent) {
+        const tabCount = (bulletIndent.match(/\t/g) ?? []).length;
+        codeBlockOutputIndent = "  ".repeat(tabCount);
+      } else {
+        codeBlockOutputIndent = "";
+        ensureBlankBefore(result);
+      }
+      result.push(codeBlockOutputIndent + codeOpenBullet[2]);
       inCodeBlock = true;
       continue;
     }
@@ -328,8 +337,11 @@ function convertOutlinerMarkdown(content: string): string {
     const codeOpenContinuation = line.match(/^(\s+)(```.*)$/);
     if (codeOpenContinuation) {
       codeBlockContinuationPrefix = codeOpenContinuation[1];
+      // Preserve indent for list context
+      const tabCount = (codeOpenContinuation[1].match(/\t/g) ?? []).length;
+      codeBlockOutputIndent = tabCount ? "  ".repeat(tabCount) : "";
       ensureBlankBefore(result);
-      result.push(codeOpenContinuation[2]);
+      result.push(codeBlockOutputIndent + codeOpenContinuation[2]);
       inCodeBlock = true;
       continue;
     }
@@ -446,6 +458,18 @@ function normalizeIndentation(content: string): string {
         if (/^\t+- /.test(lines[j]) || /^\t+\d+\. /.test(lines[j])) {
           group.push(j);
           j++;
+        } else if (/^\s+```/.test(lines[j]) && lines[j].trim().startsWith("```")) {
+          // Indented code block — include all lines through the closing fence
+          group.push(j);
+          j++;
+          while (j < lines.length && lines[j].trim() !== "```") {
+            group.push(j);
+            j++;
+          }
+          if (j < lines.length) {
+            group.push(j); // closing fence
+            j++;
+          }
         } else if (
           j > i &&
           lines[j].trim() !== "" &&
@@ -455,8 +479,8 @@ function normalizeIndentation(content: string): string {
           // Continuation line (indented, non-empty, not a heading)
           group.push(j);
           j++;
-        } else if (lines[j].trim() === "" && j + 1 < lines.length && (/^\t+- /.test(lines[j + 1]) || /^\t+\d+\. /.test(lines[j + 1]))) {
-          // Blank line between bullet sub-groups — include it
+        } else if (lines[j].trim() === "" && j + 1 < lines.length && (/^\t+- /.test(lines[j + 1]) || /^\t+\d+\. /.test(lines[j + 1]) || /^\s+```/.test(lines[j + 1]) || (/^\t/.test(lines[j + 1]) && !/^#{1,6}\s/.test(lines[j + 1])))) {
+          // Blank line before next bullet, code block, or continuation line — include it
           group.push(j);
           j++;
         } else {

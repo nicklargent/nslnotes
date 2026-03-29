@@ -868,7 +868,7 @@ function htmlFromMarkdown(
   // Replace with placeholders, then restore after all other replacements.
   const codeBlocks: string[] = [];
   let html = md.replace(
-    /```(\w*)\n([\s\S]*?)```/g,
+    /[ \t]*```(\w*)\n([\s\S]*?)[ \t]*```/g,
     (_match, lang: string, content: string) => {
       const idx = codeBlocks.length;
       const cls = lang ? ` class="language-${lang}"` : "";
@@ -1033,8 +1033,13 @@ function htmlFromMarkdown(
     // Code block placeholder — restore as <pre> block
     const cbMatch = /^\uFFFFCODEBLOCK(\d+)\uFFFF$/.exec(trimmed);
     if (cbMatch) {
-      closeListsTo(-1);
-      result.push(codeBlocks[parseInt(cbMatch[1]!, 10)] ?? "");
+      if (currentListDepth >= 0) {
+        // Inside a list — emit code block within the current <li>
+        result.push(codeBlocks[parseInt(cbMatch[1]!, 10)] ?? "");
+      } else {
+        closeListsTo(-1);
+        result.push(codeBlocks[parseInt(cbMatch[1]!, 10)] ?? "");
+      }
       continue;
     }
     if (trimmed.startsWith("<img ")) {
@@ -1110,6 +1115,10 @@ function htmlFromMarkdown(
         tableLines = [];
       }
       tableLines.push(trimmed);
+    } else if (trimmed === "" && currentListDepth >= 0 && /^\s/.test(line)) {
+      // Blank continuation line inside a list item — paragraph separator
+      // Emit a closing/opening <p> to create visual paragraph break within the <li>
+      result.push("<p></p>");
     } else if (trimmed === "") {
       const wasList = currentListDepth >= 0;
       closeListsTo(-1);
