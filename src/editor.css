@@ -155,12 +155,48 @@
   border-right: 1px solid var(--color-line-numbers-border);
 }
 
-/* Language selector */
-.prose-editor .tiptap .code-lang-select {
+/* Code block toolbar */
+.prose-editor .tiptap .code-toolbar {
   position: absolute;
   top: 0.25rem;
   right: 0.5rem;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Copy button */
+.prose-editor .tiptap .code-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  color: var(--color-lang-select);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.prose-editor .tiptap .code-block-wrapper:hover .code-copy-btn {
+  opacity: 1;
+}
+
+.prose-editor .tiptap .code-copy-btn:hover {
+  color: var(--color-lang-select-hover);
+  border-color: var(--color-lang-select-hover-border);
+  background: var(--color-lang-select-hover-bg);
+}
+
+/* Language selector */
+.prose-editor .tiptap .code-lang-select {
   padding: 0.0625rem 0.25rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.6875rem;
