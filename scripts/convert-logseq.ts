@@ -19,16 +19,20 @@ const SKIP_PAGES = new Set([
   "Tasks Dashboard.md",
   "task.md",
   "Queries.md",
+  "TODO draft cvi adr about new COAT direction and change in requirement about interstate.___.md",
 ]);
 
 const SKIP_WIKILINKS = new Set([
   "todo", "now", "later", "done", "doing", "waiting",
   "priority categories", "templates", "tasks dashboard", "contents",
-  "progress check",
 ]);
+
+/** Names that look like people but are actually topics */
+const KNOWN_TOPICS = new Set(["progress check"]);
 
 /** Heuristic: 1-3 capitalized words with only letters = person */
 function classifyReference(name: string): "@" | "#" {
+  if (KNOWN_TOPICS.has(name.toLowerCase())) return "#";
   return /^[A-Z][a-zA-Z']+(\s+[A-Z][a-zA-Z']+){0,2}$/.test(name) ? "@" : "#";
 }
 
@@ -164,6 +168,7 @@ function stripInlineProperties(content: string): string {
       const trimmed = line.trim();
       // Remove lines that are purely logseq properties
       if (/^id::\s+[0-9a-f-]+$/.test(trimmed)) return false;
+      if (/^collapsed::\s/.test(trimmed)) return false;
       if (/^logseq\.[a-z.-]+::\s/.test(trimmed)) return false;
       if (/^template::\s/.test(trimmed)) return false;
       if (/^template-including-parent::\s/.test(trimmed)) return false;
@@ -459,12 +464,14 @@ function normalizeIndentation(content: string): string {
         }
       }
 
-      // Find minimum tab depth among bullet lines in the group
+      // Find minimum tab depth among actual bullet lines (not continuation/separator lines)
       let minTabs = Infinity;
       for (const idx of group) {
-        const tabMatch = lines[idx].match(/^(\t+)/);
-        if (tabMatch) {
-          minTabs = Math.min(minTabs, tabMatch[1].length);
+        if (/^\t+- /.test(lines[idx]) || /^\t+\d+\. /.test(lines[idx])) {
+          const tabMatch = lines[idx].match(/^(\t+)/);
+          if (tabMatch) {
+            minTabs = Math.min(minTabs, tabMatch[1].length);
+          }
         }
       }
 
@@ -768,25 +775,9 @@ function main(): void {
         const rawTitle = file.slice(0, -3);
         const slug = uniqueSlug(rawTitle, docsDir);
 
-        // Check if first line is a heading — if so, use that as title
-        const firstContentLine = content
-          .split("\n")
-          .find((l) => l.trim() !== "");
-        let title = rawTitle;
-        let docContent = content;
+        const title = rawTitle;
 
-        if (firstContentLine) {
-          const headingMatch = firstContentLine.match(
-            /^#\s+(?:TODO|DOING|DONE|NOW|LATER|WAITING\s+)?(.+)$/,
-          );
-          if (headingMatch) {
-            title = headingMatch[1].trim();
-            // Remove the heading line from content
-            docContent = content.replace(firstContentLine + "\n", "");
-          }
-        }
-
-        const { body, tags, assets } = transformContent(docContent, slug, pageEntityMap, topicRegistry);
+        const { body, tags, assets } = transformContent(content, slug, pageEntityMap, topicRegistry);
 
         if (body.trim() === "") {
           stats.skipped++;
