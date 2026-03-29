@@ -112,20 +112,82 @@
   color: var(--color-code-text);
 }
 
-.prose-editor .tiptap pre {
-  background: var(--color-pre-bg);
-  border-radius: 0.375rem;
-  padding: 0.75rem 1rem;
+/* Code block wrapper — handles border-radius and margin */
+.prose-editor .tiptap .code-block-wrapper {
+  position: relative;
   margin: 0.5rem 0;
+  border-radius: 0.375rem;
+}
+
+.prose-editor .tiptap .code-block-wrapper pre {
+  display: flex;
+  background: var(--color-pre-bg);
+  padding: 0.75rem 0;
+  margin: 0;
   overflow-x: auto;
   overflow-wrap: normal;
+}
+
+.prose-editor .tiptap pre code,
+.prose-editor .tiptap pre .line-numbers {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre;
 }
 
 .prose-editor .tiptap pre code {
   background: none;
   color: var(--color-pre-text);
-  padding: 0;
-  font-size: 0.8125rem;
+  padding: 0 1rem 0 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.prose-editor .tiptap pre .line-numbers {
+  flex-shrink: 0;
+  width: 2.5rem;
+  padding-right: 0.75rem;
+  text-align: right;
+  color: var(--color-line-numbers);
+  user-select: none;
+  pointer-events: none;
+  border-right: 1px solid var(--color-line-numbers-border);
+}
+
+/* Language selector */
+.prose-editor .tiptap .code-lang-select {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.5rem;
+  z-index: 1;
+  padding: 0.0625rem 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.6875rem;
+  color: var(--color-lang-select);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.prose-editor .tiptap .code-lang-select:hover,
+.prose-editor .tiptap .code-lang-select:focus {
+  color: var(--color-lang-select-hover);
+  border-color: var(--color-lang-select-hover-border);
+  background: var(--color-lang-select-hover-bg);
+  outline: none;
+}
+
+.prose-editor .tiptap .code-lang-select option {
+  background: var(--color-lang-select-option-bg);
+  color: var(--color-lang-select-option-text);
 }
 
 .prose-editor .tiptap blockquote {

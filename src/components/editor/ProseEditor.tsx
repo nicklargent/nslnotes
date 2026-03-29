@@ -1,6 +1,20 @@
 import { onMount, onCleanup, createEffect } from "solid-js";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
+import { common, createLowlight } from "lowlight";
+import nginx from "highlight.js/lib/languages/nginx";
+import dockerfile from "highlight.js/lib/languages/dockerfile";
+import protobuf from "highlight.js/lib/languages/protobuf";
+import { CodeBlockWithLines } from "./CodeBlockView";
+
+const lowlightInstance = (() => {
+  const ll = createLowlight(common);
+  ll.register("nginx", nginx);
+  ll.register("dockerfile", dockerfile);
+  ll.register("protobuf", protobuf);
+  return ll;
+})();
+
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
@@ -84,6 +98,11 @@ export function ProseEditor(props: ProseEditorProps) {
         StarterKit.configure({
           heading: { levels: [1, 2, 3] },
           dropcursor: { color: "var(--color-link)", width: 2 },
+          codeBlock: false,
+        }),
+        CodeBlockWithLines.configure({
+          lowlight: lowlightInstance,
+          defaultLanguage: "plaintext",
         }),
         Placeholder.configure({
           placeholder: props.placeholder ?? "Start writing...",
@@ -413,6 +432,31 @@ export function ProseEditor(props: ProseEditorProps) {
               }
             }
             return false;
+          }
+
+          // Tab/Shift+Tab inside code blocks: insert/remove indentation
+          if (event.key === "Tab" && editor?.isActive("codeBlock")) {
+            event.preventDefault();
+            event.stopPropagation();
+            const { state } = editor;
+            const { from } = state.selection;
+
+            if (event.shiftKey) {
+              const $pos = state.doc.resolve(from);
+              const blockStart = from - $pos.parentOffset;
+              const fullText = $pos.parent.textContent;
+              const offset = $pos.parentOffset;
+              const lineStart = fullText.lastIndexOf("\n", offset - 1) + 1;
+              if (fullText.slice(lineStart).startsWith("  ")) {
+                const docLineStart = blockStart + lineStart;
+                editor.view.dispatch(
+                  state.tr.delete(docLineStart, docLineStart + 2)
+                );
+              }
+            } else {
+              editor.view.dispatch(state.tr.insertText("  ", from));
+            }
+            return true;
           }
 
           // Tab to indent list items, or wrap paragraph in bullet list
@@ -825,12 +869,33 @@ function htmlFromMarkdown(
   const codeBlocks: string[] = [];
   let html = md.replace(
     /```(\w*)\n([\s\S]*?)```/g,
-    (_match, _lang: string, content: string) => {
+    (_match, lang: string, content: string) => {
       const idx = codeBlocks.length;
-      codeBlocks.push(`<pre><code>${escapeHtml(content.trim())}</code></pre>`);
+      const cls = lang ? ` class="language-${lang}"` : "";
+      codeBlocks.push(
+        `<pre><code${cls}>${escapeHtml(content.trim())}</code></pre>`
+      );
       return `\uFFFFCODEBLOCK${idx}\uFFFF`;
     }
   );
+
+  // Preserve <u>...</u> underline tags (used as markdown syntax for underline)
+  const underlineTags: string[] = [];
+  html = html.replace(/<u>([\s\S]*?)<\/u>/g, (_match, inner: string) => {
+    const idx = underlineTags.length;
+    underlineTags.push(inner);
+    return `\uFFFFUNDERLINE${idx}\uFFFF`;
+  });
+
+  // Escape literal angle brackets in user content BEFORE inline replacements.
+  // Code blocks and underline tags are already extracted as placeholders.
+  // This prevents strings like "<2026-03-26 Thu>" from being parsed as HTML tags.
+  html = html.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Restore underline tags
+  html = html.replace(/\uFFFFUNDERLINE(\d+)\uFFFF/g, (_match, idx: string) => {
+    return `<u>${underlineTags[parseInt(idx, 10)]}</u>`;
+  });
 
   html = html
     // Headers
@@ -1046,11 +1111,16 @@ function htmlFromMarkdown(
       }
       tableLines.push(trimmed);
     } else if (trimmed === "") {
+      const wasList = currentListDepth >= 0;
       closeListsTo(-1);
       if (inTable) {
         result.push(tableLinesToHtml(tableLines));
         inTable = false;
         tableLines = [];
+      }
+      // Emit empty paragraph to separate list groups so TipTap doesn't merge them
+      if (wasList) {
+        result.push("<p></p>");
       }
     } else if (currentListDepth >= 0 && /^\s/.test(line)) {
       // Continuation line inside a list item — append to current <li>
@@ -1178,9 +1248,13 @@ export function markdownFromHtml(
               result += `\`${el.textContent}\``;
             }
             break;
-          case "pre":
-            result += `\`\`\`\n${el.textContent}\n\`\`\`\n`;
+          case "pre": {
+            const codeEl = el.querySelector("code");
+            const langClass = codeEl?.className.match(/language-(\w+)/);
+            const lang = langClass ? langClass[1] : "";
+            result += `\`\`\`${lang}\n${el.textContent}\n\`\`\`\n`;
             break;
+          }
           case "ul":
           case "ol":
             result += processList(el, tag, listDepth);

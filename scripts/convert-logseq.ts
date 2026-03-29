@@ -336,13 +336,14 @@ function convertOutlinerMarkdown(content: string): string {
       continue;
     }
 
-    // --- Strip continuation indent from non-bullet text lines ---
+    // --- Keep continuation lines indented so they stay attached to their bullet ---
     // Logseq continuation lines are indented 2 spaces past the bullet marker.
-    // For top-level "- text\n  continuation", the continuation has "  " prefix.
-    // These should become plain text at column 0.
+    // We preserve this indent so the editor's list parser treats them as
+    // continuation content of the preceding list item.
+    // Only strip the indent for lines that aren't following a bullet context
+    // (i.e., standalone paragraphs that were Logseq top-level bullets).
     if (!line.startsWith("\t") && !line.startsWith("-") && !line.startsWith("|")) {
-      const stripped = line.replace(/^  /, "");
-      result.push(stripped);
+      result.push(line);
       continue;
     }
 
@@ -449,7 +450,7 @@ function normalizeIndentation(content: string): string {
           // Continuation line (indented, non-empty, not a heading)
           group.push(j);
           j++;
-        } else if (lines[j].trim() === "" && j + 1 < lines.length && /^\t+- /.test(lines[j + 1]) || /^\t+\d+\. /.test(lines[j + 1])) {
+        } else if (lines[j].trim() === "" && j + 1 < lines.length && (/^\t+- /.test(lines[j + 1]) || /^\t+\d+\. /.test(lines[j + 1]))) {
           // Blank line between bullet sub-groups — include it
           group.push(j);
           j++;
@@ -467,8 +468,13 @@ function normalizeIndentation(content: string): string {
         }
       }
 
-      if (minTabs === Infinity || minTabs === 0) {
-        // No adjustment needed
+      // Only normalize if this group follows a heading (orphaned children
+      // from heading extraction). Regular nested bullets under a parent
+      // bullet should keep their indentation.
+      const afterHeading = i > 0 && /^#{1,6}\s/.test(result[result.length - 1] ?? "");
+
+      if (minTabs === Infinity || minTabs === 0 || !afterHeading) {
+        // No adjustment needed — keep original indentation
         for (const idx of group) {
           result.push(lines[idx]);
         }
@@ -498,8 +504,8 @@ function normalizeIndentation(content: string): string {
 function cleanWhitespace(content: string): string {
   let lines = content.split("\n");
 
-  // Remove lines that are just a bullet with optional whitespace
-  lines = lines.filter((line) => !/^\s*-\s*$/.test(line));
+  // Convert empty bullets to blank lines (they serve as visual separators in Logseq)
+  lines = lines.map((line) => (/^\s*-\s*$/.test(line) ? "" : line));
 
   // Collapse 3+ consecutive blank lines to 2
   const result: string[] = [];
