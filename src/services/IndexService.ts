@@ -46,7 +46,8 @@ export const IndexService = {
    * @returns Timing info for performance monitoring
    */
   buildIndex: async (
-    rootPath: string
+    rootPath: string,
+    onProgress?: (completed: number, total: number) => void
   ): Promise<{
     durationMs: number;
     counts: { notes: number; tasks: number; docs: number };
@@ -71,6 +72,9 @@ export const IndexService = {
         lastIndexed: new Date(),
       });
       buildBacklinks();
+      const cachedTotal =
+        cached.notes.size + cached.tasks.size + cached.docs.size;
+      onProgress?.(cachedTotal, cachedTotal);
       // Rebuild in background to pick up any changes since cache
       void IndexService._rebuildFresh(rootPath);
       const durationMs = performance.now() - startTime;
@@ -95,21 +99,34 @@ export const IndexService = {
       FileService.listMarkdownFiles(docsDir).catch(() => []),
     ]);
 
-    // Parse all files in parallel
-    const notePromises = noteFiles.map(async (entry) => {
-      const content = await FileService.read(entry.path);
-      return parseNote(entry.path, content);
-    });
+    // Parse all files in parallel, reporting progress as each completes
+    const totalFiles = noteFiles.length + taskFiles.length + docFiles.length;
+    let completedFiles = 0;
+    onProgress?.(0, totalFiles);
 
-    const taskPromises = taskFiles.map(async (entry) => {
-      const content = await FileService.read(entry.path);
-      return parseTask(entry.path, content);
-    });
+    function tracked<T>(promise: Promise<T>): Promise<T> {
+      return promise.then((result) => {
+        completedFiles++;
+        onProgress?.(completedFiles, totalFiles);
+        return result;
+      });
+    }
 
-    const docPromises = docFiles.map(async (entry) => {
-      const content = await FileService.read(entry.path);
-      return parseDoc(entry.path, content);
-    });
+    const notePromises = noteFiles.map((entry) =>
+      tracked(
+        FileService.read(entry.path).then((c) => parseNote(entry.path, c))
+      )
+    );
+
+    const taskPromises = taskFiles.map((entry) =>
+      tracked(
+        FileService.read(entry.path).then((c) => parseTask(entry.path, c))
+      )
+    );
+
+    const docPromises = docFiles.map((entry) =>
+      tracked(FileService.read(entry.path).then((c) => parseDoc(entry.path, c)))
+    );
 
     const [noteResults, taskResults, docResults] = await Promise.all([
       Promise.all(notePromises),

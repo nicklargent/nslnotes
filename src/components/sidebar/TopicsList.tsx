@@ -53,7 +53,7 @@ export function TopicsList(props: TopicsListProps) {
         }
       >
         <div
-          class={`flex flex-col gap-0.5${props.expanded ? " min-h-0 flex-1 overflow-y-auto" : ""}`}
+          class={`flex flex-col gap-0.5${props.expanded ? " min-h-0 flex-1 overflow-y-auto [&>*]:shrink-0" : ""}`}
         >
           <For each={displayedTopics()}>
             {(topic) => (

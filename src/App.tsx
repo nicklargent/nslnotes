@@ -9,11 +9,7 @@ import {
 import { SetupScreen } from "./components/SetupScreen";
 import { AppErrorBoundary } from "./components/ErrorBoundary";
 import { ToastContainer, showToast } from "./components/Toast";
-import {
-  SidebarSkeleton,
-  JournalSkeleton,
-  TaskListSkeleton,
-} from "./components/LoadingSkeleton";
+import { SplashScreen, type LoadProgress } from "./components/SplashScreen";
 import { KeyboardShortcutsModal } from "./components/modals/KeyboardShortcutsModal";
 import { QuickCapture } from "./components/QuickCapture";
 import { ImagePreview } from "./components/shared/ImagePreview";
@@ -54,6 +50,10 @@ function App() {
   const [rootPath, setRootPath] = createSignal<string | null>(null);
   const [showShortcuts, setShowShortcuts] = createSignal(false);
   const [showQuickCapture, setShowQuickCapture] = createSignal(false);
+  const [loadProgress, setLoadProgress] = createSignal<LoadProgress>({
+    percent: 0,
+    status: "Loading settings...",
+  });
   let unwatchFn: (() => void) | null = null;
 
   // Apply font size to document root reactively
@@ -83,14 +83,28 @@ function App() {
         setUIStore("darkMode", settings.darkMode);
       }
 
+      setLoadProgress({ percent: 10, status: "Checking configuration..." });
       const configured = await SettingsService.isConfigured();
 
       if (configured) {
         const path = await SettingsService.getRootPath();
         setRootPath(path);
         if (path) {
+          setLoadProgress({ percent: 15, status: "Building index..." });
+          let lastPct = 15;
+          const onProgress = (completed: number, total: number) => {
+            // Map file parsing progress into 15–90% range
+            const pct =
+              total > 0 ? Math.round(15 + (completed / total) * 75) : 15;
+            if (pct === lastPct) return;
+            lastPct = pct;
+            setLoadProgress({
+              percent: pct,
+              status: `Indexing files... ${completed} / ${total}`,
+            });
+          };
           try {
-            await IndexService.buildIndex(path);
+            await IndexService.buildIndex(path, onProgress);
           } catch (indexErr) {
             // Index build failed (likely stale cache) — clear cache and retry
             console.warn(
@@ -98,11 +112,13 @@ function App() {
               indexErr
             );
             clearIndexCache();
-            await IndexService.buildIndex(path);
+            await IndexService.buildIndex(path, onProgress);
           }
+          setLoadProgress({ percent: 95, status: "Starting file watcher..." });
           startFileWatcher(path);
         }
         NavigationService.initHistory();
+        setLoadProgress({ percent: 100, status: "Ready" });
         setAppState("ready");
       } else {
         setAppState("setup");
@@ -374,11 +390,7 @@ function App() {
   return (
     <AppErrorBoundary>
       <Show when={appState() === "loading"}>
-        <Layout
-          left={<SidebarSkeleton />}
-          center={<JournalSkeleton />}
-          right={<TaskListSkeleton />}
-        />
+        <SplashScreen progress={loadProgress()} />
       </Show>
 
       <Show when={appState() === "setup"}>
