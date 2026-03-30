@@ -20,6 +20,7 @@ body {
 
 /* Editor color tokens */
 :root {
+  color-scheme: light;
   --color-editor-placeholder: #d1d5db;
   --color-code-bg: #f3f4f6;
   --color-code-text: #ef4444;
@@ -57,6 +58,7 @@ body {
 }
 
 .dark {
+  color-scheme: dark;
   --color-editor-placeholder: #6b7280;
   --color-code-bg: #374151;
   --color-code-text: #f87171;
