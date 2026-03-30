@@ -1,5 +1,5 @@
 import { Show } from "solid-js";
-import { setWikilinkDragData } from "../../lib/drag";
+import { makePointerDragHandler, setWikilinkDragData } from "../../lib/drag";
 import type { Doc } from "../../types/entities";
 
 interface DocItemProps {
@@ -27,6 +27,7 @@ export function DocItem(props: DocItemProps) {
       onDragStart={(e: DragEvent) =>
         setWikilinkDragData(e, "doc", props.doc.slug)
       }
+      onPointerDown={makePointerDragHandler(() => `[[doc:${props.doc.slug}]]`)}
     >
       <Show when={props.doc.pinned}>
         <svg

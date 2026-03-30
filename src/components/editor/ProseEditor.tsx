@@ -26,7 +26,13 @@ import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { DOMSerializer } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
-import { WIKILINK_MIME } from "../../lib/drag";
+import {
+  clearPointerWikilinkDrag,
+  clearWikilinkDragActive,
+  getPointerWikilink,
+  isWikilinkDragActive,
+  WIKILINK_MIME,
+} from "../../lib/drag";
 import { InlineDecorations } from "./InlineDecorations";
 import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
 import { FindHighlightPlugin } from "./FindHighlightPlugin";
@@ -330,8 +336,18 @@ export function ProseEditor(props: ProseEditorProps) {
         handleDrop: (view, event, _slice, moved) => {
           if (moved) return false;
 
-          // Handle wikilink drops
-          const wikilink = event.dataTransfer?.getData(WIKILINK_MIME);
+          // Handle wikilink drops.
+          // In Tauri the pointer path delivers wikilinks via pointerup, not
+          // the HTML5 drop event. In web mode, try getData with MIME fallbacks.
+          const pointerWikilink = getPointerWikilink();
+          clearPointerWikilinkDrag();
+          const wikilink =
+            event.dataTransfer?.getData(WIKILINK_MIME) ||
+            (isWikilinkDragActive()
+              ? event.dataTransfer?.getData("text/plain")
+              : "") ||
+            pointerWikilink ||
+            "";
           if (wikilink) {
             event.preventDefault();
             const coords = view.posAtCoords({
@@ -638,10 +654,8 @@ export function ProseEditor(props: ProseEditorProps) {
     function handleDragOver(e: DragEvent) {
       const dt = e.dataTransfer;
       if (!dt) return;
-      // Check custom MIME (works on Chromium/Linux) or fall back to
-      // text/plain + copy effect (WebKit/macOS doesn't expose custom
-      // MIME types in dataTransfer.types during dragover)
       const hasWikilink =
+        isWikilinkDragActive() ||
         dt.types.includes(WIKILINK_MIME) ||
         (dt.types.includes("text/plain") && dt.effectAllowed === "copy");
       if (hasWikilink) {
@@ -651,11 +665,48 @@ export function ProseEditor(props: ProseEditorProps) {
       }
     }
     function handleDragEnd() {
+      clearWikilinkDragActive();
       containerRef!.classList.remove("wikilink-drop-target");
     }
     containerRef.addEventListener("dragover", handleDragOver);
     containerRef.addEventListener("dragleave", handleDragEnd);
     containerRef.addEventListener("drop", handleDragEnd);
+
+    // Pointer-events path for Tauri: HTML5 DnD is cancelled in dragstart so
+    // pointer events remain fully active. makePointerDragHandler sets
+    // _pointerWikilink on pointerdown; mouseenter shows the highlight;
+    // pointerup delivers the wikilink at the drop position.
+    function handleMouseEnter() {
+      if (getPointerWikilink() !== null) {
+        containerRef!.classList.add("wikilink-drop-target");
+      }
+    }
+    function handleMouseLeave() {
+      if (getPointerWikilink() !== null) {
+        containerRef!.classList.remove("wikilink-drop-target");
+      }
+    }
+    function handlePointerUp(e: PointerEvent) {
+      const wikilink = getPointerWikilink();
+      if (!wikilink || !editor || editor.isDestroyed) return;
+      e.preventDefault();
+      clearPointerWikilinkDrag();
+      const coords = editor.view.posAtCoords({
+        left: e.clientX,
+        top: e.clientY,
+      });
+      if (!coords) return;
+      const insertPos = coords.pos;
+      const tr = editor.view.state.tr.insertText(wikilink + " ", insertPos);
+      const cursorPos = insertPos + wikilink.length + 1;
+      tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+      editor.view.dispatch(tr);
+      containerRef!.classList.remove("wikilink-drop-target");
+      setTimeout(() => editor?.view.focus(), 0);
+    }
+    containerRef.addEventListener("mouseenter", handleMouseEnter);
+    containerRef.addEventListener("mouseleave", handleMouseLeave);
+    containerRef.addEventListener("pointerup", handlePointerUp);
 
     // Fix: when clicking into an unfocused editor whose selection was reset
     // (e.g. by setContent), ProseMirror sometimes fails to resolve the click
@@ -802,6 +853,9 @@ export function ProseEditor(props: ProseEditorProps) {
       containerRef!.removeEventListener("dragover", handleDragOver);
       containerRef!.removeEventListener("dragleave", handleDragEnd);
       containerRef!.removeEventListener("drop", handleDragEnd);
+      containerRef!.removeEventListener("mouseenter", handleMouseEnter);
+      containerRef!.removeEventListener("mouseleave", handleMouseLeave);
+      containerRef!.removeEventListener("pointerup", handlePointerUp);
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlurWindow);

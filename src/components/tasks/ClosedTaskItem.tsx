@@ -1,4 +1,4 @@
-import { setWikilinkDragData } from "../../lib/drag";
+import { makePointerDragHandler, setWikilinkDragData } from "../../lib/drag";
 import { EntityService } from "../../services/EntityService";
 import type { Task } from "../../types/entities";
 
@@ -25,6 +25,9 @@ export function ClosedTaskItem(props: ClosedTaskItemProps) {
       onDragStart={(e: DragEvent) =>
         setWikilinkDragData(e, "task", props.task.slug)
       }
+      onPointerDown={makePointerDragHandler(
+        () => `[[task:${props.task.slug}]]`
+      )}
     >
       {/* Status indicator */}
       <span
