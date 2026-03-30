@@ -86,6 +86,7 @@ export function ProseEditor(props: ProseEditorProps) {
   let editor: Editor | undefined;
   let skipNextUpdate = false;
   let lastUserInteraction = 0;
+  let lastEntityPath: string | undefined;
   const rootPath = () =>
     props.entityPath ? rootPathFromEntity(props.entityPath) : undefined;
 
@@ -256,7 +257,7 @@ export function ProseEditor(props: ProseEditorProps) {
               ) {
                 event.preventDefault();
                 const href = mlMatch[2]!;
-                window.open(href, "_blank");
+                runtime.openUrl(href);
                 return true;
               }
             }
@@ -603,7 +604,7 @@ export function ProseEditor(props: ProseEditorProps) {
         e.stopPropagation();
         const href = resolved.getAttribute("data-link-href");
         if (href) {
-          window.open(href, "_blank");
+          runtime.openUrl(href);
         }
         return;
       }
@@ -797,6 +798,7 @@ export function ProseEditor(props: ProseEditorProps) {
     });
 
     props.ref?.(editor);
+    lastEntityPath = props.entityPath;
   });
 
   // Reactively focus when autofocus becomes true (may happen after mount)
@@ -808,18 +810,24 @@ export function ProseEditor(props: ProseEditorProps) {
 
   createEffect(() => {
     const newContent = props.content;
+    const entityPath = props.entityPath;
     if (!editor || editor.isDestroyed) return;
-    if (Date.now() - lastUserInteraction < 500) return;
-    if (editor.isFocused) return;
+    // Always update when entity changes; only guard against external
+    // updates (e.g. file watcher) for the same entity.
+    if (entityPath === lastEntityPath) {
+      if (Date.now() - lastUserInteraction < 500) return;
+      if (editor.isFocused) return;
+    }
+    lastEntityPath = entityPath;
     const currentMd = markdownFromHtml(
       editor.getHTML(),
-      props.entityPath,
+      entityPath,
       rootPath()
     );
     if (currentMd !== newContent) {
       skipNextUpdate = true;
       editor.commands.setContent(
-        htmlFromMarkdown(newContent, props.entityPath, rootPath())
+        htmlFromMarkdown(newContent, entityPath, rootPath())
       );
     }
   });

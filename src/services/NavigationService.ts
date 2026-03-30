@@ -63,6 +63,18 @@ export const NavigationService = {
       if (!entry) return;
       NavigationService.restoreState(entry);
     });
+
+    // Tauri's webview doesn't map mouse back/forward buttons (3/4) to
+    // browser history navigation, so handle them manually.
+    window.addEventListener("mouseup", (event: MouseEvent) => {
+      if (event.button === 3) {
+        event.preventDefault();
+        history.back();
+      } else if (event.button === 4) {
+        event.preventDefault();
+        history.forward();
+      }
+    });
   },
 
   /**

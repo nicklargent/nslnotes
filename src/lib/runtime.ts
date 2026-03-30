@@ -381,6 +381,22 @@ export const runtime = {
       }
     };
   },
+
+  /**
+   * Open a URL in the user's default browser.
+   * Uses Tauri opener plugin in native mode, window.open in web mode.
+   */
+  openUrl: (url: string): void => {
+    if (runtime.isNative()) {
+      import("@tauri-apps/plugin-opener")
+        .then(({ openUrl }) => {
+          openUrl(url).catch(console.error);
+        })
+        .catch(console.error);
+    } else {
+      window.open(url, "_blank");
+    }
+  },
 };
 
 export default runtime;
