@@ -2,7 +2,11 @@ import { FileService } from "./FileService";
 import { TopicService } from "./TopicService";
 import { indexStore, setIndexStore } from "../stores/indexStore";
 import { parseNote, parseTask, parseDoc } from "../lib/entityParser";
-import { parseTopicRefs, parseWikilinks } from "../lib/markdown";
+import {
+  parseTopicRefs,
+  parseWikilinks,
+  parseTodosAndCheckboxes,
+} from "../lib/markdown";
 import { computeRelevance } from "../lib/relevance";
 import {
   isOverdue,
@@ -16,7 +20,11 @@ import type { Note, Task, Doc, Entity } from "../types/entities";
 import type { TopicRef, Topic, EntityReference } from "../types/topics";
 import type { GroupedTasks, GroupedClosedTasks } from "../types/task-groups";
 import type { WikiLink } from "../types/inline";
-import type { SearchFilter, SearchResult } from "../types/search";
+import type {
+  SearchFilter,
+  SearchResult,
+  TodoSearchResult,
+} from "../types/search";
 import type { ImageRef, ImageFile } from "../types/images";
 import type { BacklinkEntry } from "../types/backlinks";
 
@@ -786,6 +794,61 @@ export const IndexService = {
 
       return false;
     });
+  },
+
+  /**
+   * Search for open TODOs across all entities.
+   * Includes LogSeq-style TODOs (excluding DONE) and unchecked markdown checkboxes.
+   * With empty/short query, returns all open TODOs.
+   */
+  searchTodos: (query: string): TodoSearchResult[] => {
+    const results: TodoSearchResult[] = [];
+    const lowerQuery = query.length >= 2 ? query.toLowerCase() : "";
+
+    const allEntities: Entity[] = [
+      ...indexStore.notes.values(),
+      ...indexStore.tasks.values(),
+      ...indexStore.docs.values(),
+    ];
+
+    for (const entity of allEntities) {
+      const { todos, checkboxes } = parseTodosAndCheckboxes(entity.content);
+
+      for (const todo of todos) {
+        if (todo.state === "DONE") continue;
+        if (lowerQuery && !todo.text.toLowerCase().includes(lowerQuery))
+          continue;
+        results.push({
+          entity,
+          text: todo.text,
+          line: todo.line,
+          lineNumber: todo.lineNumber,
+          kind: todo.state,
+        });
+      }
+
+      for (const cb of checkboxes) {
+        if (lowerQuery && !cb.text.toLowerCase().includes(lowerQuery)) continue;
+        results.push({
+          entity,
+          text: cb.text,
+          line: cb.line,
+          lineNumber: cb.lineNumber,
+          kind: "checkbox",
+        });
+      }
+    }
+
+    // Sort by entity date desc, then line number asc
+    results.sort((a, b) => {
+      const dateA = getEntitySortDate(a.entity);
+      const dateB = getEntitySortDate(b.entity);
+      const dateCmp = dateB.localeCompare(dateA);
+      if (dateCmp !== 0) return dateCmp;
+      return a.lineNumber - b.lineNumber;
+    });
+
+    return results;
   },
 
   /**

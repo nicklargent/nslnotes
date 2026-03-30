@@ -46,15 +46,45 @@ function getCodeBlockLines(lines: string[]): Set<number> {
 }
 
 /**
+ * Regex for unchecked markdown checkboxes: "- [ ] text"
+ */
+const CHECKBOX_PATTERN = /^(\s*)- \[ \]\s+(.*)/;
+
+/**
  * Parse TODO items from markdown content.
  *
  * @param content - Markdown body content
  * @returns Array of parsed todo items
  */
 export function parseTodos(content: string): TodoItem[] {
+  return parseTodosAndCheckboxes(content).todos;
+}
+
+/**
+ * Parse unchecked markdown checkboxes from content.
+ *
+ * @param content - Markdown body content
+ * @returns Array of parsed checkbox items
+ */
+export function parseCheckboxes(content: string): TodoItem[] {
+  return parseTodosAndCheckboxes(content).checkboxes;
+}
+
+/**
+ * Parse both TODO items and unchecked checkboxes in a single pass.
+ * Splits lines and computes code blocks once for both patterns.
+ *
+ * @param content - Markdown body content
+ * @returns Object with todos and checkboxes arrays
+ */
+export function parseTodosAndCheckboxes(content: string): {
+  todos: TodoItem[];
+  checkboxes: TodoItem[];
+} {
   const lines = content.split("\n");
   const codeLines = getCodeBlockLines(lines);
   const todos: TodoItem[] = [];
+  const checkboxes: TodoItem[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     if (codeLines.has(i)) continue;
@@ -62,23 +92,31 @@ export function parseTodos(content: string): TodoItem[] {
     const line = lines[i];
     if (line === undefined) continue;
 
-    const match = TODO_PATTERN.exec(line);
-    if (match) {
-      const indent = match[1] ?? "";
-      const state = match[2] as TodoState;
-      const text = match[3] ?? "";
-
+    const todoMatch = TODO_PATTERN.exec(line);
+    if (todoMatch) {
       todos.push({
         line,
         lineNumber: i,
-        state,
-        text,
-        indent: indent.length,
+        state: todoMatch[2] as TodoState,
+        text: todoMatch[3] ?? "",
+        indent: (todoMatch[1] ?? "").length,
+      });
+      continue;
+    }
+
+    const cbMatch = CHECKBOX_PATTERN.exec(line);
+    if (cbMatch) {
+      checkboxes.push({
+        line,
+        lineNumber: i,
+        state: "TODO" as TodoState,
+        text: cbMatch[2] ?? "",
+        indent: (cbMatch[1] ?? "").length,
       });
     }
   }
 
-  return todos;
+  return { todos, checkboxes };
 }
 
 /**

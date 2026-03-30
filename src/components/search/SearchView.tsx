@@ -5,12 +5,16 @@ import {
   onCleanup,
   For,
   Show,
+  Switch,
+  Match,
 } from "solid-js";
 import { IndexService } from "../../services/IndexService";
 import { NavigationService } from "../../services/NavigationService";
 import { contextStore, setContextStore } from "../../stores/contextStore";
 import { registerContainer, unregisterContainer } from "../../stores/findStore";
 import { ImageGrid } from "./ImageGrid";
+import { TodoList } from "./TodoList";
+import { TYPE_BADGES, getEntityTitle, getEntityDate } from "./shared";
 import type { SearchFilter, SearchResult } from "../../types/search";
 
 const FILTERS: { label: string; value: SearchFilter }[] = [
@@ -19,22 +23,8 @@ const FILTERS: { label: string; value: SearchFilter }[] = [
   { label: "Tasks", value: "tasks" },
   { label: "Docs", value: "docs" },
   { label: "Images", value: "images" },
+  { label: "TODOs", value: "todos" },
 ];
-
-const TYPE_BADGES: Record<string, { label: string; class: string }> = {
-  note: {
-    label: "Note",
-    class: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  },
-  task: {
-    label: "Task",
-    class: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-  },
-  doc: {
-    label: "Doc",
-    class: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  },
-};
 
 export function SearchView() {
   let inputRef: HTMLInputElement | undefined;
@@ -56,10 +46,11 @@ export function SearchView() {
     const f = filter();
     clearTimeout(debounceTimer);
     debounceTimer = window.setTimeout(() => {
-      if (f === "images") {
-        // Images tab uses ImageGrid component directly
+      if (f === "images" || f === "todos") {
+        // These tabs use their own components directly
         setResults([]);
         setContextStore("searchState", { query: q, filter: f, results: [] });
+        NavigationService.replaceCurrentState();
         return;
       }
       const searchResults = q.length >= 2 ? IndexService.search(q, f) : [];
@@ -70,6 +61,7 @@ export function SearchView() {
         filter: f,
         results: searchResults,
       });
+      NavigationService.replaceCurrentState();
     }, 200);
   });
 
@@ -82,20 +74,6 @@ export function SearchView() {
     if (e.key === "Escape") {
       NavigationService.goHome();
     }
-  }
-
-  function getEntityTitle(result: SearchResult): string {
-    const entity = result.entity;
-    if (entity.type === "note") return entity.title ?? entity.date;
-    return entity.title;
-  }
-
-  function getEntityDate(result: SearchResult): string {
-    const entity = result.entity;
-    if (entity.type === "note") return entity.date;
-    if (entity.type === "task") return entity.created;
-    if (entity.type === "doc") return entity.created;
-    return "";
   }
 
   return (
@@ -140,8 +118,7 @@ export function SearchView() {
 
       {/* Results */}
       <div class="flex-1 overflow-y-auto">
-        <Show
-          when={filter() === "images"}
+        <Switch
           fallback={
             <Show
               when={results().length > 0}
@@ -174,10 +151,10 @@ export function SearchView() {
                             result.entity.type}
                         </span>
                         <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {getEntityTitle(result)}
+                          {getEntityTitle(result.entity)}
                         </span>
                         <span class="ml-auto shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                          {getEntityDate(result)}
+                          {getEntityDate(result.entity)}
                         </span>
                       </div>
                       <Show when={result.matchedLines.length > 0}>
@@ -192,8 +169,13 @@ export function SearchView() {
             </Show>
           }
         >
-          <ImageGrid query={query()} />
-        </Show>
+          <Match when={filter() === "images"}>
+            <ImageGrid query={query()} />
+          </Match>
+          <Match when={filter() === "todos"}>
+            <TodoList query={query()} />
+          </Match>
+        </Switch>
       </div>
     </div>
   );

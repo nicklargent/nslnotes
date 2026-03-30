@@ -139,7 +139,7 @@ export const NavigationService = {
     NavigationService.updateRelevance();
 
     // Update the current history entry in-place (no new entry)
-    history.replaceState(snapshotEntry(), "");
+    NavigationService.replaceCurrentState();
   },
 
   /**
@@ -250,6 +250,15 @@ export const NavigationService = {
    */
   clearRelevance: (): void => {
     setContextStore("relevanceWeights", new Map());
+  },
+
+  /**
+   * Replace the current history entry with the current context state.
+   * Use when in-view state changes (e.g. search filter/query) that should
+   * be restored on back navigation without creating a new history entry.
+   */
+  replaceCurrentState: (): void => {
+    history.replaceState(snapshotEntry(), "");
   },
 
   /**
