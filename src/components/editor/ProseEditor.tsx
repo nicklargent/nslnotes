@@ -73,6 +73,9 @@ interface ProseEditorProps {
   onSelectionChange?: ((hasSelection: boolean) => void) | undefined;
   onEditorBlur?: ((event: FocusEvent) => void) | undefined;
   onEditorFocus?: (() => void) | undefined;
+  onDoubleBracket?:
+    | ((pos: { top: number; left: number }, cursorPos: number) => void)
+    | undefined;
   onWikilinkClick?: ((type: string, target: string) => void) | undefined;
   onTopicClick?: ((ref: string) => void) | undefined;
 }
@@ -536,6 +539,26 @@ export function ProseEditor(props: ProseEditorProps) {
                 view.state.selection.from
               );
             }, 0);
+          }
+
+          // [[ triggers wikilink autocomplete
+          if (event.key === "[" && props.onDoubleBracket) {
+            const { view } = editor!;
+            const { $from } = view.state.selection;
+            const textBefore = $from.parent.textBetween(
+              0,
+              $from.parentOffset,
+              ""
+            );
+            if (textBefore.endsWith("[")) {
+              const coords = view.coordsAtPos(view.state.selection.from);
+              setTimeout(() => {
+                props.onDoubleBracket!(
+                  { top: coords.top, left: coords.left },
+                  view.state.selection.from
+                );
+              }, 0);
+            }
           }
 
           if (event.key === "/" && props.onSlashKey) {

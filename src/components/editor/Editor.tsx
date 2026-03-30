@@ -5,6 +5,7 @@ import { CommandMenu, filterCommands } from "./CommandMenu";
 import { BubbleMenu } from "./BubbleMenu";
 import { TableToolbar } from "./TableToolbar";
 import { TopicAutocomplete } from "./TopicAutocomplete";
+import { WikilinkAutocomplete } from "./WikilinkAutocomplete";
 import { PromoteConfirmBar } from "./PromoteConfirmBar";
 import { detectPromoteRange } from "./promoteRange";
 import { promoteHighlightKey } from "./PromoteHighlightPlugin";
@@ -46,6 +47,11 @@ export function Editor(props: EditorProps) {
     filter: string;
     startPos: number;
   } | null>(null);
+  const [wikilinkAC, setWikilinkAC] = createSignal<{
+    pos: { top: number; left: number };
+    filter: string;
+    startPos: number;
+  } | null>(null);
   const [slashPos, setSlashPos] = createSignal<number | null>(null);
   const [commandFilter, setCommandFilter] = createSignal("");
   const [showBubbleMenu, setShowBubbleMenu] = createSignal(false);
@@ -83,8 +89,19 @@ export function Editor(props: EditorProps) {
     cursorPos: number
   ) {
     setShowBubbleMenu(false);
+    setWikilinkAC(null); // mutual exclusion: close wikilink AC
     // Subtract 1 to include the # or @ prefix character in the replacement range
     setAutocomplete({ pos, prefix, filter: "", startPos: cursorPos - 1 });
+  }
+
+  function handleDoubleBracket(
+    pos: { top: number; left: number },
+    cursorPos: number
+  ) {
+    setShowBubbleMenu(false);
+    setAutocomplete(null); // mutual exclusion: close topic AC
+    // startPos includes both `[` characters
+    setWikilinkAC({ pos, filter: "", startPos: cursorPos - 2 });
   }
 
   function handleAutocompleteFilter(filter: string) {
@@ -113,6 +130,28 @@ export function Editor(props: EditorProps) {
         } else {
           handleAutocompleteFilter(textBetween);
           inProgressToken = textBetween;
+        }
+      }
+    }
+
+    // Update wikilink autocomplete filter if active
+    const wac = wikilinkAC();
+    if (wac && editorRef) {
+      const { state } = editorRef;
+      const cursorPos = state.selection.from;
+      if (cursorPos <= wac.startPos) {
+        setWikilinkAC(null);
+      } else {
+        // +2 skips the `[[` trigger characters to get the filter text
+        const textBetween = state.doc.textBetween(
+          wac.startPos + 2,
+          cursorPos,
+          ""
+        );
+        if (textBetween.includes("\n") || textBetween.includes("]")) {
+          setWikilinkAC(null);
+        } else {
+          setWikilinkAC({ ...wac, filter: textBetween });
         }
       }
     }
@@ -174,6 +213,29 @@ export function Editor(props: EditorProps) {
       .run();
 
     setAutocomplete(null);
+  }
+
+  function handleWikilinkSelect(wikilink: string) {
+    const wac = wikilinkAC();
+    if (!wac || !editorRef) {
+      setWikilinkAC(null);
+      return;
+    }
+
+    const { state } = editorRef;
+    const from = wac.startPos;
+    const to = state.selection.from;
+
+    editorRef
+      .chain()
+      .focus()
+      .command(({ tr }) => {
+        tr.insertText(`${wikilink} `, from, to);
+        return true;
+      })
+      .run();
+
+    setWikilinkAC(null);
   }
 
   function isDailyNote(): boolean {
@@ -443,6 +505,7 @@ export function Editor(props: EditorProps) {
         onUpdate={handleContentUpdate}
         onSlashKey={handleSlashKey}
         onHashOrAt={handleHashOrAt}
+        onDoubleBracket={handleDoubleBracket}
         ref={(e) => {
           editorRef = e;
           registerEditor(e);
@@ -453,6 +516,7 @@ export function Editor(props: EditorProps) {
             hasSelection &&
             !commandMenuPos() &&
             !autocomplete() &&
+            !wikilinkAC() &&
             !promoteRange()
           ) {
             setShowBubbleMenu(true);
@@ -465,6 +529,7 @@ export function Editor(props: EditorProps) {
               editorRef?.isActive("table") &&
               !commandMenuPos() &&
               !autocomplete() &&
+              !wikilinkAC() &&
               !promoteRange()
             ) {
               setShowTableToolbar(true);
@@ -545,6 +610,15 @@ export function Editor(props: EditorProps) {
           filter={autocomplete()!.filter}
           onSelect={handleAutocompleteSelect}
           onClose={() => setAutocomplete(null)}
+        />
+      </Show>
+
+      <Show when={wikilinkAC() !== null}>
+        <WikilinkAutocomplete
+          position={wikilinkAC()!.pos}
+          filter={wikilinkAC()!.filter}
+          onSelect={handleWikilinkSelect}
+          onClose={() => setWikilinkAC(null)}
         />
       </Show>
     </div>

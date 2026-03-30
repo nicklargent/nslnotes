@@ -217,6 +217,21 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Click outside closes autocomplete
 - [ ] Autocomplete closes on: cursor moves before trigger, space/newline inserted
 
+### Wikilink Autocomplete (`WikilinkAutocomplete.tsx`)
+- [ ] `[[` triggers wikilink autocomplete popup
+- [ ] Shows open tasks, docs, and named notes
+- [ ] Type prefix support: `[[task:` filters to tasks only, `[[doc:` to docs, `[[note:` to notes
+- [ ] Fuzzy matching: case-insensitive substring match on title and slug
+- [ ] Colored type badges (task/doc/note) before each suggestion title
+- [ ] `ArrowDown`/`ArrowUp` navigate suggestions
+- [ ] `Enter` or `Tab` selects current suggestion and inserts `[[type:slug]] `
+- [ ] `Escape` closes without selecting
+- [ ] Click outside closes autocomplete
+- [ ] Spaces allowed in filter (unlike topic autocomplete)
+- [ ] Autocomplete closes on: cursor moves before `[[`, newline or `]` inserted
+- [ ] Max 10 suggestions, wider popup (`w-72`)
+- [ ] Mutual exclusion with topic autocomplete
+
 ### Lists
 - [ ] `Tab` indents list item
 - [ ] `Shift+Tab` outdents list item
@@ -563,7 +578,7 @@ Source: `src/components/metadata/`
 | Topics/Docs lists | `src/components/sidebar/TopicsList.tsx`, `TopicItem.tsx`, `DocsList.tsx` |
 | Journal | `src/components/journal/JournalView.tsx`, `MonthBar.tsx`, `DateHeader.tsx`, `DailyNote.tsx`, `NamedNoteCard.tsx` |
 | Editor core | `src/components/editor/ProseEditor.tsx`, `Editor.tsx` |
-| Editor UI | `BubbleMenu.tsx`, `CommandMenu.tsx`, `TopicAutocomplete.tsx`, `TableToolbar.tsx`, `FindBar.tsx`, `TodoCheckbox.tsx`, `RawEditor.tsx`, `RawModeToggle.tsx` |
+| Editor UI | `BubbleMenu.tsx`, `CommandMenu.tsx`, `TopicAutocomplete.tsx`, `WikilinkAutocomplete.tsx`, `TableToolbar.tsx`, `FindBar.tsx`, `TodoCheckbox.tsx`, `RawEditor.tsx`, `RawModeToggle.tsx` |
 | Promote | `src/components/editor/PromoteConfirmBar.tsx` |
 | Docs | `src/components/docs/DocView.tsx` |
 | Tasks | `src/components/tasks/TaskItem.tsx`, `TaskDetail.tsx`, `TaskGroup.tsx`, `ClosedTaskItem.tsx` |

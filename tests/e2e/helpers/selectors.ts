@@ -157,6 +157,11 @@ export function commandMenu(page: Page): Locator {
   return page.locator(".fixed.z-50.w-56");
 }
 
+// --- Wikilink autocomplete ---
+export function wikilinkAutocomplete(page: Page): Locator {
+  return page.locator(".fixed.z-50.w-72");
+}
+
 // --- Table toolbar ---
 export function tableToolbar(page: Page): Locator {
   return page.locator(".animate-bubble-up").filter({ hasText: "+Col" });
