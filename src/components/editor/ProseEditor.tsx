@@ -636,9 +636,17 @@ export function ProseEditor(props: ProseEditorProps) {
 
     // Visual feedback for wikilink drag-and-drop
     function handleDragOver(e: DragEvent) {
-      if (e.dataTransfer?.types.includes(WIKILINK_MIME)) {
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      // Check custom MIME (works on Chromium/Linux) or fall back to
+      // text/plain + copy effect (WebKit/macOS doesn't expose custom
+      // MIME types in dataTransfer.types during dragover)
+      const hasWikilink =
+        dt.types.includes(WIKILINK_MIME) ||
+        (dt.types.includes("text/plain") && dt.effectAllowed === "copy");
+      if (hasWikilink) {
         e.preventDefault();
-        e.dataTransfer.dropEffect = "copy";
+        dt.dropEffect = "copy";
         containerRef!.classList.add("wikilink-drop-target");
       }
     }
