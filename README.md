@@ -1,6 +1,14 @@
-# NslNotes
+<p align="center">
+  <img src="src-tauri/icons/icon.png" width="64" height="64" alt="NslNotes icon" />
+</p>
 
-A local-first, plain-text knowledge tool centered on time-ordered notes, first-class tasks, and a unified topic system. Built to replace daily LogSeq and Obsidian usage with a single opinionated workflow.
+<h1 align="center">NslNotes</h1>
+
+<p align="center">A local-first, plain-text knowledge tool centered on time-ordered notes, first-class tasks, and a unified topic system. Built to replace daily LogSeq and Obsidian usage with a single opinionated workflow.</p>
+
+<p align="center">
+  <img src="demo/screenshots/journal-light.png" width="400" alt="NslNotes journal view" />
+</p>
 
 ## Overview
 

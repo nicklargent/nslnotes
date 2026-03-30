@@ -17,6 +17,9 @@ src-tauri/target/
 # IDE
 .idea/
 .vscode/
+
+# Claude Code local config
+.claude/*.local.*
 *.swp
 *.swo
 *~

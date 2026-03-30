@@ -2,7 +2,7 @@
 /**
  * Convert Logseq files to NslNotes format.
  *
- * Usage: npx tsx scripts/convert-logseq.ts
+ * Usage: npx tsx scripts/convert-logseq.ts <source-dir> <target-dir>
  */
 
 import * as fs from "fs";
@@ -10,8 +10,13 @@ import * as path from "path";
 import { stringify as stringifyYaml } from "yaml";
 
 // --- Config ---
-const SOURCE = "/home/nsl/docs/logseq-copy";
-const TARGET = "/home/nsl/docs/nslnotes2";
+const args = process.argv.slice(2);
+if (args.length !== 2) {
+  console.error("Usage: npx tsx scripts/convert-logseq.ts <source-dir> <target-dir>");
+  process.exit(1);
+}
+const SOURCE = path.resolve(args[0]);
+const TARGET = path.resolve(args[1]);
 
 const SKIP_PAGES = new Set([
   "contents.md",
