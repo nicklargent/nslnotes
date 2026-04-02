@@ -62,7 +62,7 @@ export const InlineDecorations = Extension.create({
         key: new PluginKey("todoAutoReplace"),
         appendTransaction(
           transactions: readonly Transaction[],
-          _oldState,
+          oldState,
           newState
         ) {
           // Only process if document changed
@@ -79,6 +79,15 @@ export const InlineDecorations = Extension.create({
           }> = [];
           const strikeOps: Array<{ from: number; to: number; add: boolean }> =
             [];
+
+          // Build a map of old marker characters by node position for comparison
+          const unicodeMarkerRe = /^([\u2610\u25a3\u22A1\u229F\u2611])\s/;
+          const oldMarkers = new Map<number, string>();
+          oldState.doc.descendants((node, pos) => {
+            if (!node.isTextblock) return;
+            const m = unicodeMarkerRe.exec(node.textContent);
+            if (m) oldMarkers.set(pos, m[1]!);
+          });
 
           newState.doc.descendants((node, pos) => {
             if (!node.isTextblock) return;
@@ -116,36 +125,27 @@ export const InlineDecorations = Extension.create({
               return;
             }
 
-            // Handle existing Unicode markers — manage strike on state changes
-            const unicodeMatch = /^([\u2610\u25a3\u22A1\u229F\u2611])\s/.exec(
-              text
-            );
+            // Handle existing Unicode markers — only manage strike when marker changed
+            const unicodeMatch = unicodeMarkerRe.exec(text);
             if (unicodeMatch && strikeMark && text.length > 2) {
-              const isDone = unicodeMatch[1] === "\u2611";
-              const contentFrom = pos + 1 + 2; // after marker char + space
-              const contentTo = pos + node.nodeSize - 1;
-              if (contentFrom < contentTo) {
-                // Check if any text node in this block has strike
-                let hasStrike = false;
-                node.forEach((child) => {
-                  if (
-                    child.isText &&
-                    child.marks.some((m) => m.type === strikeMark)
-                  ) {
-                    hasStrike = true;
-                  }
-                });
-                if (isDone && !hasStrike) {
+              const currentMarker = unicodeMatch[1]!;
+              // Map this position back to oldState to find the old marker
+              const mappedPos = transactions.reduce(
+                (p, t) => t.mapping.invert().map(p),
+                pos
+              );
+              const oldMarker = oldMarkers.get(mappedPos);
+
+              // Only enforce strike changes when the marker itself changed
+              if (oldMarker !== undefined && oldMarker !== currentMarker) {
+                const isDone = currentMarker === "\u2611";
+                const contentFrom = pos + 1 + 2; // after marker char + space
+                const contentTo = pos + node.nodeSize - 1;
+                if (contentFrom < contentTo) {
                   strikeOps.push({
                     from: contentFrom,
                     to: contentTo,
-                    add: true,
-                  });
-                } else if (!isDone && hasStrike) {
-                  strikeOps.push({
-                    from: contentFrom,
-                    to: contentTo,
-                    add: false,
+                    add: isDone,
                   });
                 }
               }

@@ -33,6 +33,7 @@ import {
   isWikilinkDragActive,
   WIKILINK_MIME,
 } from "../../lib/drag";
+import Strike from "@tiptap/extension-strike";
 import { InlineDecorations } from "./InlineDecorations";
 import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
 import { FindHighlightPlugin } from "./FindHighlightPlugin";
@@ -109,7 +110,9 @@ export function ProseEditor(props: ProseEditorProps) {
           heading: { levels: [1, 2, 3] },
           dropcursor: { color: "var(--color-link)", width: 2 },
           codeBlock: false,
+          strike: false,
         }),
+        Strike.extend({ keepOnSplit: false }),
         CodeBlockWithLines.configure({
           lowlight: lowlightInstance,
           defaultLanguage: "plaintext",
