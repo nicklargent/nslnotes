@@ -1,6 +1,7 @@
 import {
   createSignal,
   createEffect,
+  createMemo,
   onMount,
   onCleanup,
   For,
@@ -14,7 +15,13 @@ import { contextStore, setContextStore } from "../../stores/contextStore";
 import { registerContainer, unregisterContainer } from "../../stores/findStore";
 import { ImageGrid } from "./ImageGrid";
 import { TodoList } from "./TodoList";
-import { TYPE_BADGES, getEntityTitle, getEntityDate } from "./shared";
+import {
+  TYPE_BADGES,
+  getEntityTitle,
+  getEntityDate,
+  groupByTimeRange,
+  TimeGroupHeader,
+} from "./shared";
 import type { SearchFilter, SearchResult } from "../../types/search";
 
 const FILTERS: { label: string; value: SearchFilter }[] = [
@@ -34,6 +41,9 @@ export function SearchView() {
     contextStore.searchState?.filter ?? "all"
   );
   const [results, setResults] = createSignal<SearchResult[]>([]);
+  const groupedResults = createMemo(() =>
+    groupByTimeRange(results(), (r) => getEntityDate(r.entity))
+  );
   let debounceTimer: number | undefined;
 
   onMount(() => {
@@ -133,39 +143,55 @@ export function SearchView() {
                 </div>
               }
             >
-              <div class="divide-y divide-gray-100 dark:divide-gray-700">
-                <For each={results()}>
-                  {(result) => (
-                    <button
-                      type="button"
-                      class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      onClick={() =>
-                        NavigationService.navigateTo(result.entity)
+              <For each={groupedResults()}>
+                {(group) => (
+                  <div>
+                    <TimeGroupHeader label={group.label} />
+                    <Show
+                      when={group.items.length > 0}
+                      fallback={
+                        <div class="px-4 py-2 text-xs text-gray-400 dark:text-gray-500">
+                          None
+                        </div>
                       }
                     >
-                      <div class="flex items-center gap-2">
-                        <span
-                          class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${TYPE_BADGES[result.entity.type]?.class ?? ""}`}
-                        >
-                          {TYPE_BADGES[result.entity.type]?.label ??
-                            result.entity.type}
-                        </span>
-                        <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {getEntityTitle(result.entity)}
-                        </span>
-                        <span class="ml-auto shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                          {getEntityDate(result.entity)}
-                        </span>
+                      <div class="divide-y divide-gray-100 dark:divide-gray-700">
+                        <For each={group.items}>
+                          {(result) => (
+                            <button
+                              type="button"
+                              class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                              onClick={() =>
+                                NavigationService.navigateTo(result.entity)
+                              }
+                            >
+                              <div class="flex items-center gap-2">
+                                <span
+                                  class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${TYPE_BADGES[result.entity.type]?.class ?? ""}`}
+                                >
+                                  {TYPE_BADGES[result.entity.type]?.label ??
+                                    result.entity.type}
+                                </span>
+                                <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {getEntityTitle(result.entity)}
+                                </span>
+                                <span class="ml-auto shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                                  {getEntityDate(result.entity)}
+                                </span>
+                              </div>
+                              <Show when={result.matchedLines.length > 0}>
+                                <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                                  {result.matchedLines[0]}
+                                </p>
+                              </Show>
+                            </button>
+                          )}
+                        </For>
                       </div>
-                      <Show when={result.matchedLines.length > 0}>
-                        <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
-                          {result.matchedLines[0]}
-                        </p>
-                      </Show>
-                    </button>
-                  )}
-                </For>
-              </div>
+                    </Show>
+                  </div>
+                )}
+              </For>
             </Show>
           }
         >
