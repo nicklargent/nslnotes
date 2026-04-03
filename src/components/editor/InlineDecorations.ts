@@ -185,6 +185,9 @@ export const InlineDecorations = Extension.create({
           newState
         ) {
           if (!transactions.some((tr) => tr.docChanged)) return null;
+          // Don't re-process our own appended transactions
+          if (transactions.some((tr) => tr.getMeta("linkMarkToRawText")))
+            return null;
 
           const linkMark = newState.schema.marks["link"];
           if (!linkMark) return null;
@@ -218,12 +221,16 @@ export const InlineDecorations = Extension.create({
           // Apply in reverse to preserve positions
           for (let i = replacements.length - 1; i >= 0; i--) {
             const r = replacements[i]!;
-            const raw = `[${r.text}](${r.href})`;
+            const alreadyMarkdown = /\[([^\]]+)\]\(/.test(r.text);
+            const raw = alreadyMarkdown ? r.text : `[${r.text}](${r.href})`;
             tr.replaceWith(r.from, r.to, newState.schema.text(raw));
             changed = true;
           }
 
-          return changed ? tr : null;
+          if (!changed) return null;
+          tr.setMeta("preventAutolink", true);
+          tr.setMeta("linkMarkToRawText", true);
+          return tr;
         },
       }),
       new Plugin({
@@ -337,9 +344,12 @@ export const InlineDecorations = Extension.create({
               MD_LINK_RE.lastIndex = 0;
               let mdLinkMatch;
               while ((mdLinkMatch = MD_LINK_RE.exec(text)) !== null) {
+                const linkText = mdLinkMatch[1]!;
+                // Skip nested/malformed matches (e.g. [[url](url)](url))
+                if (linkText.includes("](") || linkText.startsWith("["))
+                  continue;
                 const mlFrom = pos + mdLinkMatch.index;
                 const mlTo = mlFrom + mdLinkMatch[0].length;
-                const linkText = mdLinkMatch[1]!;
                 const linkUrl = mdLinkMatch[2]!;
                 const cursorInside = selFrom <= mlTo && selTo >= mlFrom;
 

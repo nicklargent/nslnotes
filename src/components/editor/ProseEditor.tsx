@@ -121,6 +121,11 @@ export function ProseEditor(props: ProseEditorProps) {
           placeholder: props.placeholder ?? "Start writing...",
         }),
         Link.extend({
+          // Disable Link's built-in paste rules — we handle links as raw
+          // markdown text and convert via linkMarkToRawText plugin.
+          addPasteRules() {
+            return [];
+          },
           renderHTML({ HTMLAttributes }) {
             // Render without href/target to prevent browser navigation.
             // Store href as data-href; mark attributes retain the real href.
@@ -287,6 +292,31 @@ export function ProseEditor(props: ProseEditorProps) {
           const entityPath = props.entityPath;
           const root = rootPath();
           if (!items || !entityPath) return false;
+
+          // Intercept URL pastes to prevent nesting inside existing markdown links
+          const plainText = event.clipboardData?.getData("text/plain")?.trim();
+          if (plainText && /^https?:\/\/\S+$/.test(plainText)) {
+            event.preventDefault();
+            const { state } = _view;
+            const { $from } = state.selection;
+            const parentText = $from.parent.textContent;
+            const offset = $from.parentOffset;
+            const mdLinkRe =
+              /(?<!\[!?)\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g;
+            let insideLink = false;
+            let m;
+            while ((m = mdLinkRe.exec(parentText)) !== null) {
+              if (offset >= m.index && offset <= m.index + m[0].length) {
+                insideLink = true;
+                break;
+              }
+            }
+            const toInsert = insideLink
+              ? plainText
+              : `[${plainText}](${plainText})`;
+            editor!.commands.insertContent(toInsert);
+            return true;
+          }
 
           for (const item of Array.from(items)) {
             if (IMAGE_MIME_TYPES.has(item.type)) {
