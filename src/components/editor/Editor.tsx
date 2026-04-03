@@ -27,6 +27,7 @@ interface EditorProps {
   autofocus?: boolean | undefined;
   entityPath?: string | undefined;
   onUpdate: (content: string) => void;
+  onFlushSave?: () => Promise<void>;
 }
 
 /**
@@ -367,6 +368,7 @@ export function Editor(props: EditorProps) {
       });
       if (result) {
         replaceRangeWithWikilink(range, `[[task:${result.slug}]]`);
+        await props.onFlushSave?.();
         NavigationService.navigateTo(result.task);
       }
     } else if (type === "doc") {
@@ -379,6 +381,7 @@ export function Editor(props: EditorProps) {
       });
       if (result) {
         replaceRangeWithWikilink(range, `[[doc:${result.slug}]]`);
+        await props.onFlushSave?.();
         NavigationService.navigateTo(result.doc);
       }
     } else {
@@ -388,8 +391,8 @@ export function Editor(props: EditorProps) {
         : undefined;
       if (!sourceNote) return;
 
-      // Delete content from editor first so the save completes before
-      // promoteToNote invalidates the index and triggers a re-render
+      // Delete content from editor first, then flush save immediately
+      // before promoteToNote invalidates the index and triggers a re-render
       editorRef
         .chain()
         .focus()
@@ -398,6 +401,7 @@ export function Editor(props: EditorProps) {
           return true;
         })
         .run();
+      await props.onFlushSave?.();
 
       const result = await EntityService.promoteToNote({
         title,

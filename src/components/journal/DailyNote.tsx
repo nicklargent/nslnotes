@@ -74,15 +74,20 @@ export function DailyNote(props: DailyNoteProps) {
     }
   }
 
-  // Flush pending saves on cleanup
-  onCleanup(() => {
+  async function flushPendingSave() {
     if (saveTimeout) {
       window.clearTimeout(saveTimeout);
+      saveTimeout = undefined;
     }
     if (pendingSave) {
-      void saveDailyNote(pendingSave.date, pendingSave.body);
+      await saveDailyNote(pendingSave.date, pendingSave.body);
       pendingSave = null;
     }
+  }
+
+  // Flush pending saves on cleanup
+  onCleanup(() => {
+    void flushPendingSave();
   });
 
   async function handleDelete() {
@@ -111,11 +116,7 @@ export function DailyNote(props: DailyNoteProps) {
       setRawMode(false);
     } else {
       // Rendered → Raw: flush pending TipTap save first
-      if (pendingSave) {
-        window.clearTimeout(saveTimeout);
-        await saveDailyNote(pendingSave.date, pendingSave.body);
-        pendingSave = null;
-      }
+      await flushPendingSave();
       setRawMode(true);
     }
   }
@@ -132,6 +133,7 @@ export function DailyNote(props: DailyNoteProps) {
                 placeholder="Start writing..."
                 entityPath={props.note?.path}
                 onUpdate={handleUpdate}
+                onFlushSave={flushPendingSave}
               />
             }
           >
