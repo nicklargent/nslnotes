@@ -552,6 +552,33 @@
   height: auto;
 }
 
+/* Gap cursor — visible caret when cursor is before/after a block node (e.g. image) */
+.prose-editor .tiptap .ProseMirror-gapcursor {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+}
+
+.prose-editor .tiptap .ProseMirror-gapcursor::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  border-top: 1px solid var(--color-text-primary);
+  animation: ProseMirror-cursor-blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes ProseMirror-cursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.prose-editor .tiptap.ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}
+
 /* Broken image placeholder */
 .prose-editor .tiptap img[src=""],
 .prose-editor .tiptap img:not([src]) {

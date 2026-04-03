@@ -57,6 +57,14 @@ export const ImageService = {
     entityPath: string,
     _rootPath: string
   ): string {
+    // Already a resolved URL — return as-is to prevent double-resolution
+    if (
+      relativePath.includes("://") ||
+      relativePath.startsWith("https://asset.localhost")
+    ) {
+      return relativePath;
+    }
+
     // relativePath is like "./2026-03-18.assets/img.png"
     // entityPath is like "/root/notes/2026-03-18.md"
     // We need the absolute path to the image file
@@ -112,7 +120,14 @@ export const ImageService = {
     if (absolutePath.startsWith(entityDir + "/")) {
       return "./" + absolutePath.slice(entityDir.length + 1);
     }
-    return src;
+
+    // absolutePath didn't match entityDir — still convert to a relative path
+    // rather than leaking a protocol URL (cross-entity paste, stale references).
+    const filename = absolutePath.substring(absolutePath.lastIndexOf("/") + 1);
+    if (absolutePath.includes(".assets/")) {
+      return `./${entitySlug(entityPath)}.assets/${filename}`;
+    }
+    return `./${filename}`;
   },
 
   /**
@@ -139,10 +154,8 @@ export const ImageService = {
     addImageToIndex(imagePath, filename, entityPath);
 
     // Return relative markdown path
-    const entitySlug = entityPath
-      .substring(entityPath.lastIndexOf("/") + 1)
-      .replace(/\.md$/, "");
-    return `![image](./${entitySlug}.assets/${filename})`;
+    const slug = entitySlug(entityPath);
+    return `![image](./${slug}.assets/${filename})`;
   },
 
   /**
@@ -169,11 +182,9 @@ export const ImageService = {
     await runtime.writeBinary(imagePath, base64);
     addImageToIndex(imagePath, storedFilename, entityPath);
 
-    const entitySlug = entityPath
-      .substring(entityPath.lastIndexOf("/") + 1)
-      .replace(/\.md$/, "");
+    const slug = entitySlug(entityPath);
     const alt = stripExtension(filename);
-    return `![${alt}](./${entitySlug}.assets/${storedFilename})`;
+    return `![${alt}](./${slug}.assets/${storedFilename})`;
   },
   /**
    * Ingest an image by copying from a filesystem path (for Tauri native drag-drop).
@@ -203,11 +214,9 @@ export const ImageService = {
     await runtime.copyFile(sourcePath, imagePath);
     addImageToIndex(imagePath, storedFilename, entityPath);
 
-    const entitySlug = entityPath
-      .substring(entityPath.lastIndexOf("/") + 1)
-      .replace(/\.md$/, "");
+    const slug = entitySlug(entityPath);
     const alt = stripExtension(originalFilename);
-    return `![${alt}](./${entitySlug}.assets/${storedFilename})`;
+    return `![${alt}](./${slug}.assets/${storedFilename})`;
   },
 
   /**
@@ -229,11 +238,7 @@ export const ImageService = {
       sourceEntityPath.lastIndexOf("/")
     );
     const targetAssetsDir = ImageService.getAssetsDir(targetEntityPath);
-    const targetSlug = targetEntityPath
-      .substring(targetEntityPath.lastIndexOf("/") + 1)
-      .replace(/\.md$/, "");
-
-    let needsTargetDir = false;
+    const targetSlug = entitySlug(targetEntityPath);
 
     while ((match = imageRegex.exec(markdown)) !== null) {
       const fullMatch = match[0];
@@ -251,7 +256,6 @@ export const ImageService = {
       const targetPath = `${targetAssetsDir}/${filename}`;
       const newRelativePath = `./${targetSlug}.assets/${filename}`;
 
-      needsTargetDir = true;
       replacements.push({
         original: fullMatch,
         replacement: `![${alt}](${newRelativePath})${width ? `{width=${width}}` : ""}`,
@@ -267,11 +271,6 @@ export const ImageService = {
     }
 
     if (replacements.length === 0) return markdown;
-
-    // Ensure target assets dir exists
-    if (needsTargetDir) {
-      await runtime.ensureDirectory(targetAssetsDir);
-    }
 
     // Apply replacements
     let result = markdown;
@@ -342,6 +341,13 @@ function addImageToIndex(
     newImageToEntities.set(imagePath, [entityPath]);
   }
   setIndexStore("imageToEntities", newImageToEntities);
+}
+
+/** Extract the slug (filename without .md) from an entity path. */
+function entitySlug(entityPath: string): string {
+  return entityPath
+    .substring(entityPath.lastIndexOf("/") + 1)
+    .replace(/\.md$/, "");
 }
 
 /** Slugify a string for use as filename prefix. */

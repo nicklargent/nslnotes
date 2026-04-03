@@ -1,5 +1,5 @@
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { NodeSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import type { EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
@@ -60,7 +60,13 @@ export const ImageResizePlugin = Extension.create({
               const target = event.target as HTMLElement;
               if (target.classList.contains("image-resize-handle"))
                 return false;
-              view.dispatch(view.state.tr.setMeta(imageResizeKey, nodePos));
+              // Set both the resize meta AND a NodeSelection on the image.
+              // The NodeSelection lets ProseMirror's keyboard navigation
+              // (arrow keys, Enter) work naturally from the image position.
+              const tr = view.state.tr
+                .setMeta(imageResizeKey, nodePos)
+                .setSelection(NodeSelection.create(view.state.doc, nodePos));
+              view.dispatch(tr);
               return true;
             }
             return false;

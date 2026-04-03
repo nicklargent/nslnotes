@@ -24,8 +24,8 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
-import { DOMSerializer } from "@tiptap/pm/model";
-import { TextSelection } from "@tiptap/pm/state";
+import { DOMSerializer, Slice } from "@tiptap/pm/model";
+import { Plugin, PluginKey, Selection, TextSelection } from "@tiptap/pm/state";
 import {
   clearPointerWikilinkDrag,
   clearWikilinkDragActive,
@@ -169,6 +169,40 @@ export function ProseEditor(props: ProseEditorProps) {
               },
             };
           },
+          // Ensure a paragraph always exists after an image so the cursor
+          // has a valid landing spot. Without this, images at the end of the
+          // doc (or adjacent to other block nodes) leave no place to click/type.
+          addProseMirrorPlugins() {
+            return [
+              new Plugin({
+                key: new PluginKey("imageTrailingParagraph"),
+                appendTransaction(_transactions, _oldState, newState) {
+                  if (!_transactions.some((t) => t.docChanged)) return null;
+                  const { doc, schema, tr } = newState;
+                  const paragraph = schema.nodes["paragraph"];
+                  if (!paragraph) return null;
+                  let changed = false;
+                  // Check each top-level node; if an image is followed by
+                  // another image or is the last child, insert a paragraph.
+                  for (let i = doc.childCount - 1; i >= 0; i--) {
+                    const child = doc.child(i);
+                    if (child.type.name !== "image") continue;
+                    const isLast = i === doc.childCount - 1;
+                    const nextIsImage =
+                      !isLast && doc.child(i + 1).type.name === "image";
+                    if (isLast || nextIsImage) {
+                      // Position right after this image node
+                      let pos = 0;
+                      for (let j = 0; j <= i; j++) pos += doc.child(j).nodeSize;
+                      tr.insert(pos, paragraph.create());
+                      changed = true;
+                    }
+                  }
+                  return changed ? tr : null;
+                },
+              }),
+            ];
+          },
         }).configure({
           inline: false,
           allowBase64: false,
@@ -201,6 +235,43 @@ export function ProseEditor(props: ProseEditorProps) {
         // Prevent ProseMirror from scrolling parent containers (e.g. the
         // journal's virtual scroller) when the selection changes on click.
         handleScrollToSelection: () => true,
+        transformCopied: (slice) => {
+          // Unresolve image src URLs in copied content so that pasted HTML
+          // contains relative paths instead of asset:// or /api/assets URLs.
+          const entityPath = props.entityPath;
+          const root = rootPath();
+          if (!entityPath || !root) return slice;
+          const json = slice.content.toJSON() as
+            | Record<string, unknown>[]
+            | null;
+          if (json && Array.isArray(json)) {
+            const unresolveNodes = (nodes: Record<string, unknown>[]): void => {
+              for (const n of nodes) {
+                if (n["type"] === "image" && n["attrs"]) {
+                  const attrs = n["attrs"] as Record<string, string>;
+                  const src = attrs["src"];
+                  if (typeof src === "string") {
+                    attrs["src"] = ImageService.unresolveImageSrc(
+                      src,
+                      entityPath,
+                      root
+                    );
+                  }
+                }
+                if (Array.isArray(n["content"])) {
+                  unresolveNodes(n["content"] as Record<string, unknown>[]);
+                }
+              }
+            };
+            unresolveNodes(json);
+            const newContent = editor!.schema.nodeFromJSON({
+              type: "doc",
+              content: json,
+            }).content;
+            return new Slice(newContent, slice.openStart, slice.openEnd);
+          }
+          return slice;
+        },
         clipboardTextSerializer: (slice) => {
           const serializer = DOMSerializer.fromSchema(editor!.schema);
           const wrapper = document.createElement("div");
@@ -238,11 +309,7 @@ export function ProseEditor(props: ProseEditorProps) {
                     entityPath,
                     root
                   );
-                  editor
-                    .chain()
-                    .focus()
-                    .setImage({ src: resolved.src, alt: resolved.alt })
-                    .run();
+                  insertImageInEditor(editor, resolved);
                 })
                 .catch(() => {
                   showToast("Failed to paste image", "error");
@@ -394,24 +461,7 @@ export function ProseEditor(props: ProseEditorProps) {
               .then((md) => {
                 if (!md || !editor) return;
                 const resolved = resolveImageMarkdownSrc(md, entityPath, root);
-                if (dropCoords) {
-                  const pos = dropCoords.pos;
-                  editor
-                    .chain()
-                    .focus()
-                    .command(({ tr }) => {
-                      tr.setSelection(TextSelection.create(tr.doc, pos));
-                      return true;
-                    })
-                    .setImage({ src: resolved.src, alt: resolved.alt })
-                    .run();
-                } else {
-                  editor
-                    .chain()
-                    .focus()
-                    .setImage({ src: resolved.src, alt: resolved.alt })
-                    .run();
-                }
+                insertImageInEditor(editor, resolved, dropCoords?.pos);
               })
               .catch(() => {
                 showToast("Failed to insert dropped image", "error");
@@ -729,13 +779,17 @@ export function ProseEditor(props: ProseEditorProps) {
       selBefore: number
     ) {
       if (!editor || editor.isDestroyed) return;
-      const { from } = editor.state.selection;
-      if (from !== selBefore) return; // ProseMirror handled it
+      const sel = editor.state.selection;
+      // If ProseMirror already updated the selection (including to a GapCursor),
+      // don't override it.
+      if (sel.from !== selBefore) return;
       const pos = editor.view.posAtCoords({ left: coords.x, top: coords.y });
-      if (pos && pos.pos !== from) {
-        const tr = editor.state.tr.setSelection(
-          TextSelection.create(editor.state.doc, pos.pos)
-        );
+      if (pos && pos.pos !== sel.from) {
+        // Use Selection.near so it can resolve to a GapCursor when next to
+        // a block node (e.g. image) rather than forcing a TextSelection.
+        const $pos = editor.state.doc.resolve(pos.pos);
+        const newSel = Selection.near($pos);
+        const tr = editor.state.tr.setSelection(newSel);
         editor.view.dispatch(tr);
       }
     }
@@ -777,14 +831,21 @@ export function ProseEditor(props: ProseEditorProps) {
     // The event is global, so we hit-test against this editor's container
     // to only handle drops that land within this specific editor instance.
     let tauriUnlisten: (() => void) | null = null;
-    const entityPathForTauri = props.entityPath;
-    const rootForTauri = rootPath();
-    if (runtime.isNative() && entityPathForTauri) {
+    if (runtime.isNative() && props.entityPath) {
       import("@tauri-apps/api/event").then(({ listen }) => {
         listen<{ paths: string[]; position: { x: number; y: number } }>(
           "tauri://drag-drop",
           (event) => {
-            if (!editor || editor.isDestroyed || !containerRef) return;
+            // Read current props/state inside the callback to avoid stale captures
+            const currentEntityPath = props.entityPath;
+            const currentRoot = rootPath();
+            if (
+              !editor ||
+              editor.isDestroyed ||
+              !containerRef ||
+              !currentEntityPath
+            )
+              return;
             const { paths, position } = event.payload;
 
             // Hit-test: only handle if the drop landed within this editor
@@ -809,33 +870,15 @@ export function ProseEditor(props: ProseEditorProps) {
                 top: position.y,
               });
 
-              void ImageService.ingestFromFilePath(entityPathForTauri, filePath)
+              void ImageService.ingestFromFilePath(currentEntityPath, filePath)
                 .then((md) => {
                   if (!md || !editor || editor.isDestroyed) return;
                   const resolved = resolveImageMarkdownSrc(
                     md,
-                    entityPathForTauri,
-                    rootForTauri
+                    currentEntityPath,
+                    currentRoot
                   );
-                  if (dropCoords) {
-                    editor
-                      .chain()
-                      .focus()
-                      .command(({ tr }) => {
-                        tr.setSelection(
-                          TextSelection.create(tr.doc, dropCoords.pos)
-                        );
-                        return true;
-                      })
-                      .setImage({ src: resolved.src, alt: resolved.alt })
-                      .run();
-                  } else {
-                    editor
-                      .chain()
-                      .focus()
-                      .setImage({ src: resolved.src, alt: resolved.alt })
-                      .run();
-                  }
+                  insertImageInEditor(editor, resolved, dropCoords?.pos);
                 })
                 .catch(() => {
                   showToast("Failed to insert dropped image", "error");
@@ -1484,6 +1527,25 @@ function resolveImageMarkdownSrc(
       ? ImageService.resolveImageUrl(rawSrc, entityPath, rootPath)
       : rawSrc;
   return { src, alt };
+}
+
+/** Insert an image into the editor, optionally at a specific drop position. */
+function insertImageInEditor(
+  ed: Editor,
+  resolved: { src: string; alt: string },
+  dropPos?: number
+) {
+  const chain = ed.chain().focus();
+  if (dropPos !== undefined) {
+    chain.command(({ tr }) => {
+      tr.setSelection(TextSelection.create(tr.doc, dropPos));
+      return true;
+    });
+  }
+  chain
+    .setImage({ src: resolved.src, alt: resolved.alt })
+    .createParagraphNear()
+    .run();
 }
 
 // List item movement helpers (ported from OutlinerEditor)
