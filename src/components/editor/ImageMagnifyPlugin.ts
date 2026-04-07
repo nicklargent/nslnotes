@@ -96,11 +96,23 @@ export const ImageMagnifyPlugin = Extension.create({
           dom.addEventListener("mouseover", handleMouseOver);
           dom.addEventListener("mouseout", handleMouseOut);
 
+          // Dismiss magnify button on scroll so it doesn't float at a stale position
+          const scrollParent =
+            (dom.closest(".overflow-y-auto") as HTMLElement) ??
+            dom.parentElement;
+          function handleScroll() {
+            removeMagnify();
+          }
+          scrollParent?.addEventListener("scroll", handleScroll, {
+            passive: true,
+          });
+
           return {
             destroy() {
               removeMagnify();
               dom.removeEventListener("mouseover", handleMouseOver);
               dom.removeEventListener("mouseout", handleMouseOut);
+              scrollParent?.removeEventListener("scroll", handleScroll);
             },
           };
         },

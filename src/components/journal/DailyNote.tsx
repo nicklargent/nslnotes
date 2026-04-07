@@ -132,6 +132,7 @@ export function DailyNote(props: DailyNoteProps) {
                 content={content()}
                 placeholder="Start writing..."
                 entityPath={props.note?.path}
+                embedded={true}
                 onUpdate={handleUpdate}
                 onFlushSave={flushPendingSave}
               />

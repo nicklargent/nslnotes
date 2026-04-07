@@ -85,6 +85,8 @@ interface ProseEditorProps {
     | undefined;
   onWikilinkClick?: ((type: string, target: string) => void) | undefined;
   onTopicClick?: ((ref: string) => void) | undefined;
+  /** When true, suppress scroll-to-selection (for embedded/journal editors). */
+  embedded?: boolean | undefined;
 }
 
 /**
@@ -237,9 +239,11 @@ export function ProseEditor(props: ProseEditorProps) {
         props.onUpdate(md);
       },
       editorProps: {
-        // Prevent ProseMirror from scrolling parent containers (e.g. the
-        // journal's virtual scroller) when the selection changes on click.
-        handleScrollToSelection: () => true,
+        // In embedded editors (e.g. journal cards inside a virtual scroller)
+        // suppress scroll-to-selection to avoid jumping the parent container.
+        ...(props.embedded
+          ? { handleScrollToSelection: () => true as const }
+          : {}),
         transformCopied: (slice) => {
           // Unresolve image src URLs in copied content so that pasted HTML
           // contains relative paths instead of asset:// or /api/assets URLs.
@@ -542,22 +546,53 @@ export function ProseEditor(props: ProseEditorProps) {
             event.preventDefault();
             event.stopPropagation();
             const { state } = editor;
-            const { from } = state.selection;
+            const { from, to } = state.selection;
+            const $from = state.doc.resolve(from);
+            const blockStart = from - $from.parentOffset;
+            const fullText = $from.parent.textContent;
 
-            if (event.shiftKey) {
-              const $pos = state.doc.resolve(from);
-              const blockStart = from - $pos.parentOffset;
-              const fullText = $pos.parent.textContent;
-              const offset = $pos.parentOffset;
-              const lineStart = fullText.lastIndexOf("\n", offset - 1) + 1;
-              if (fullText.slice(lineStart).startsWith("  ")) {
-                const docLineStart = blockStart + lineStart;
-                editor.view.dispatch(
-                  state.tr.delete(docLineStart, docLineStart + 2)
-                );
+            if (from !== to) {
+              // Multi-line: indent/unindent all lines in selection
+              const selStart = $from.parentOffset;
+              const selEnd = selStart + (to - from);
+              // Find all line start offsets within the selection
+              const lineStarts: number[] = [];
+              // Include line containing selection start
+              const firstLine = fullText.lastIndexOf("\n", selStart - 1) + 1;
+              lineStarts.push(firstLine);
+              for (let i = firstLine; i < selEnd; i++) {
+                if (fullText[i] === "\n" && i + 1 <= selEnd) {
+                  lineStarts.push(i + 1);
+                }
               }
+              // Process in reverse to preserve positions
+              let tr = state.tr;
+              for (let i = lineStarts.length - 1; i >= 0; i--) {
+                const ls = lineStarts[i]!;
+                const docLs = blockStart + ls;
+                if (event.shiftKey) {
+                  if (fullText.slice(ls).startsWith("  ")) {
+                    tr = tr.delete(docLs, docLs + 2);
+                  }
+                } else {
+                  tr = tr.insertText("  ", docLs);
+                }
+              }
+              editor.view.dispatch(tr);
             } else {
-              editor.view.dispatch(state.tr.insertText("  ", from));
+              // Single cursor: original behavior
+              if (event.shiftKey) {
+                const offset = $from.parentOffset;
+                const lineStart = fullText.lastIndexOf("\n", offset - 1) + 1;
+                if (fullText.slice(lineStart).startsWith("  ")) {
+                  const docLineStart = blockStart + lineStart;
+                  editor.view.dispatch(
+                    state.tr.delete(docLineStart, docLineStart + 2)
+                  );
+                }
+              } else {
+                editor.view.dispatch(state.tr.insertText("  ", from));
+              }
             }
             return true;
           }
@@ -965,7 +1000,10 @@ export function ProseEditor(props: ProseEditorProps) {
   // Reactively focus when autofocus becomes true (may happen after mount)
   createEffect(() => {
     if (props.autofocus && editor && !editor.isDestroyed) {
-      setTimeout(() => editor!.commands.focus("end"), 0);
+      setTimeout(() => {
+        editor!.commands.focus("end");
+        editor!.view.dispatch(editor!.state.tr.scrollIntoView());
+      }, 0);
     }
   });
 
@@ -1202,12 +1240,14 @@ function htmlFromMarkdown(
     // Code block placeholder — restore as <pre> block
     const cbMatch = /^\uFFFFCODEBLOCK(\d+)\uFFFF$/.exec(trimmed);
     if (cbMatch) {
-      if (currentListDepth >= 0) {
-        // Inside a list — emit code block within the current <li>
-        result.push(codeBlocks[parseInt(cbMatch[1]!, 10)] ?? "");
+      const cbHtml = codeBlocks[parseInt(cbMatch[1]!, 10)] ?? "";
+      if (currentListDepth >= 0 && /^\s/.test(line)) {
+        // Indented code block — emit within the current <li>
+        result.push(cbHtml);
       } else {
+        // Top-level code block — close any open lists first
         closeListsTo(-1);
-        result.push(codeBlocks[parseInt(cbMatch[1]!, 10)] ?? "");
+        result.push(cbHtml);
       }
       continue;
     }
@@ -1473,7 +1513,7 @@ export function markdownFromHtml(
       for (const li of Array.from(el.children)) {
         const indent = "  ".repeat(listDepth);
         const liContent = liText(li, listDepth);
-        const nested = liNested(li, listDepth + 1);
+        const nested = liNestedBlocks(li, listDepth + 1);
         if (
           isTaskList ||
           (li as HTMLElement).getAttribute("data-type") === "taskItem"
@@ -1489,7 +1529,7 @@ export function markdownFromHtml(
       Array.from(el.children).forEach((li, i) => {
         const indent = "  ".repeat(listDepth);
         const liContent = liText(li, listDepth);
-        const nested = liNested(li, listDepth + 1);
+        const nested = liNestedBlocks(li, listDepth + 1);
         result += `${indent}${i + 1}. ${liContent.trim()}\n${nested}`;
       });
     }
@@ -1504,17 +1544,22 @@ export function markdownFromHtml(
         if (tag === "ul" || tag === "ol") continue;
         // Skip the checkbox label rendered by TaskItem
         if (tag === "label") continue;
+        // Skip code blocks — handled separately by liNestedBlocks
+        if (tag === "pre") continue;
       }
       result += convert(child as Node, listDepth);
     }
     return result;
   }
 
-  function liNested(li: Element, listDepth: number): string {
+  function liNestedBlocks(li: Element, listDepth: number): string {
     let result = "";
     for (const child of Array.from(li.children)) {
       const tag = child.tagName.toLowerCase();
       if (tag === "ul" || tag === "ol") {
+        result += convert(child, listDepth);
+      } else if (tag === "pre") {
+        // Code blocks inside list items — emit on own lines with proper fencing
         result += convert(child, listDepth);
       }
     }

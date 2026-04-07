@@ -48,14 +48,12 @@
 
 .prose-editor .tiptap > :not(p) + p:last-child:has(> br:only-child) {
   margin: 0;
-  height: 0;
-  overflow: hidden;
+  min-height: 1rem;
 }
 
 .prose-editor .tiptap > :not(p) + p:last-child:empty {
   margin: 0;
-  height: 0;
-  overflow: hidden;
+  min-height: 1rem;
 }
 
 .prose-editor .tiptap ul {
@@ -85,13 +83,14 @@
 
 .prose-editor .tiptap ul[data-type="taskList"] li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.375rem;
 }
 
 .prose-editor .tiptap ul[data-type="taskList"] li > label {
   flex-shrink: 0;
   user-select: none;
+  margin-top: 0;
 }
 
 .prose-editor .tiptap ul[data-type="taskList"] li > div {

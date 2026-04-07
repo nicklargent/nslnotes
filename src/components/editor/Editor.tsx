@@ -28,6 +28,8 @@ interface EditorProps {
   entityPath?: string | undefined;
   onUpdate: (content: string) => void;
   onFlushSave?: () => Promise<void>;
+  /** When true, suppress scroll-to-selection (for embedded/journal editors). */
+  embedded?: boolean | undefined;
 }
 
 /**
@@ -63,6 +65,28 @@ export function Editor(props: EditorProps) {
   let bubbleMenuRef: HTMLDivElement | undefined;
   let tableToolbarRef: HTMLDivElement | undefined;
   let confirmBarRef: HTMLDivElement | undefined;
+  let mouseDown = false;
+  let pendingBubble = false;
+
+  function onEditorMouseDown() {
+    mouseDown = true;
+    pendingBubble = false;
+  }
+  function onEditorMouseUp() {
+    mouseDown = false;
+    if (pendingBubble) {
+      pendingBubble = false;
+      if (
+        !commandMenuPos() &&
+        !autocomplete() &&
+        !wikilinkAC() &&
+        !promoteRange()
+      ) {
+        setShowBubbleMenu(true);
+        setShowTableToolbar(false);
+      }
+    }
+  }
 
   onCleanup(() => {
     if (blurTimeout) clearTimeout(blurTimeout);
@@ -500,12 +524,17 @@ export function Editor(props: EditorProps) {
   }
 
   return (
-    <div class="editor-wrapper relative">
+    <div
+      class="editor-wrapper relative"
+      onMouseDown={onEditorMouseDown}
+      onMouseUp={onEditorMouseUp}
+    >
       <ProseEditor
         content={props.content}
         placeholder={props.placeholder}
         autofocus={props.autofocus}
         entityPath={props.entityPath}
+        embedded={props.embedded}
         onUpdate={handleContentUpdate}
         onSlashKey={handleSlashKey}
         onHashOrAt={handleHashOrAt}
@@ -516,20 +545,25 @@ export function Editor(props: EditorProps) {
           setEditorReady(true);
         }}
         onSelectionChange={(hasSelection) => {
-          if (
-            hasSelection &&
-            !commandMenuPos() &&
-            !autocomplete() &&
-            !wikilinkAC() &&
-            !promoteRange()
-          ) {
-            setShowBubbleMenu(true);
-            setShowTableToolbar(false);
+          if (hasSelection) {
+            // Defer bubble menu until mouseup so it doesn't obscure
+            // content while the user is still dragging a selection.
+            if (mouseDown) {
+              pendingBubble = true;
+            } else if (
+              !commandMenuPos() &&
+              !autocomplete() &&
+              !wikilinkAC() &&
+              !promoteRange()
+            ) {
+              setShowBubbleMenu(true);
+              setShowTableToolbar(false);
+            }
           } else {
+            pendingBubble = false;
             setShowBubbleMenu(false);
             // Show table toolbar when cursor is in a table with no selection
             if (
-              !hasSelection &&
               editorRef?.isActive("table") &&
               !commandMenuPos() &&
               !autocomplete() &&

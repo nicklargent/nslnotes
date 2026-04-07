@@ -35,7 +35,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
     // Center horizontally between selection start and end
     const centerX = (startCoords.left + endCoords.right) / 2;
     // Position above the selection
-    const top = startCoords.top - 8;
+    const top = startCoords.top - 14;
     setPosition({ top, left: centerX });
   }
 

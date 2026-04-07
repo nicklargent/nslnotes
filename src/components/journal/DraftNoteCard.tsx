@@ -99,6 +99,7 @@ export function DraftNoteCard(props: DraftNoteCardProps) {
             content={body()}
             placeholder="Start writing..."
             autofocus={true}
+            embedded={true}
             onUpdate={setBody}
           />
         ) : (

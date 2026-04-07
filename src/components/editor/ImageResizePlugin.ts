@@ -232,6 +232,18 @@ export const ImageResizePlugin = Extension.create({
             return imageResizeKey.getState(state);
           }
 
+          // Reposition resize handle on scroll so it stays anchored to the image
+          const scrollParent =
+            (editorView.dom.closest(".overflow-y-auto") as HTMLElement) ??
+            editorView.dom.parentElement;
+          function handleScroll() {
+            if (resizing || !selectedImg) return;
+            positionHandle(selectedImg);
+          }
+          scrollParent?.addEventListener("scroll", handleScroll, {
+            passive: true,
+          });
+
           return {
             update(view, prevState) {
               if (resizing) return;
@@ -244,6 +256,7 @@ export const ImageResizePlugin = Extension.create({
             },
             destroy() {
               removeHandle();
+              scrollParent?.removeEventListener("scroll", handleScroll);
               document.removeEventListener("mousemove", onMouseMove);
               document.removeEventListener("mouseup", onMouseUp);
             },
