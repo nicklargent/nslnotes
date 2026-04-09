@@ -176,29 +176,34 @@ export function ProseEditor(props: ProseEditorProps) {
               },
             };
           },
-          // Ensure a paragraph always exists after an image so the cursor
-          // has a valid landing spot. Without this, images at the end of the
-          // doc (or adjacent to other block nodes) leave no place to click/type.
+          // Ensure a paragraph always exists after block nodes (images,
+          // code blocks, tables, etc.) so the cursor has a valid landing
+          // spot. Without this, block nodes at the end of the doc leave
+          // no place to click/type.
           addProseMirrorPlugins() {
             return [
               new Plugin({
-                key: new PluginKey("imageTrailingParagraph"),
+                key: new PluginKey("trailingParagraph"),
                 appendTransaction(_transactions, _oldState, newState) {
                   if (!_transactions.some((t) => t.docChanged)) return null;
                   const { doc, schema, tr } = newState;
                   const paragraph = schema.nodes["paragraph"];
                   if (!paragraph) return null;
+                  // Block types that trap the cursor (no text insertion point)
+                  const trapping = new Set([
+                    "image",
+                    "codeBlock",
+                    "table",
+                    "horizontalRule",
+                  ]);
                   let changed = false;
-                  // Check each top-level node; if an image is followed by
-                  // another image or is the last child, insert a paragraph.
                   for (let i = doc.childCount - 1; i >= 0; i--) {
                     const child = doc.child(i);
-                    if (child.type.name !== "image") continue;
+                    if (!trapping.has(child.type.name)) continue;
                     const isLast = i === doc.childCount - 1;
-                    const nextIsImage =
-                      !isLast && doc.child(i + 1).type.name === "image";
-                    if (isLast || nextIsImage) {
-                      // Position right after this image node
+                    const nextIsTrapping =
+                      !isLast && trapping.has(doc.child(i + 1).type.name);
+                    if (isLast || nextIsTrapping) {
                       let pos = 0;
                       for (let j = 0; j <= i; j++) pos += doc.child(j).nodeSize;
                       tr.insert(pos, paragraph.create());
@@ -1312,6 +1317,10 @@ function htmlFromMarkdown(
     } else if (/^\d+\. /.test(trimmed)) {
       if (currentListDepth < 0) {
         openList("ol");
+      } else if (currentListType() !== "ol") {
+        // Switching from bullet/task to ordered — close the old list and start a new one
+        closeListsTo(-1);
+        openList("ol");
       } else {
         result.push("</li>");
       }
@@ -1329,15 +1338,14 @@ function htmlFromMarkdown(
       // Emit a closing/opening <p> to create visual paragraph break within the <li>
       result.push("<p></p>");
     } else if (trimmed === "") {
-      const wasList = currentListDepth >= 0;
-      closeListsTo(-1);
       if (inTable) {
+        closeListsTo(-1);
         result.push(tableLinesToHtml(tableLines));
         inTable = false;
         tableLines = [];
-      }
-      // Emit empty paragraph to separate list groups so TipTap doesn't merge them
-      if (wasList) {
+      } else if (currentListDepth >= 0) {
+        // Blank line between list items — keep list open (loose list).
+        // Emit <p></p> inside current <li> for paragraph spacing.
         result.push("<p></p>");
       }
     } else if (currentListDepth >= 0 && /^\s/.test(line)) {
@@ -1537,30 +1545,49 @@ export function markdownFromHtml(
   }
 
   function liText(li: Element, listDepth: number): string {
-    let result = "";
+    // Collect paragraph contents separately to handle multi-paragraph list items.
+    // When a <li> contains multiple <p> tags (e.g. user pressed Enter inside the item),
+    // subsequent paragraphs are emitted with blank line + indent so they stay
+    // associated with the list item on re-parse.
+    const paragraphs: string[] = [];
+    let other = "";
     for (const child of Array.from(li.childNodes)) {
       if (child.nodeType === Node.ELEMENT_NODE) {
         const tag = (child as HTMLElement).tagName.toLowerCase();
         if (tag === "ul" || tag === "ol") continue;
-        // Skip the checkbox label rendered by TaskItem
         if (tag === "label") continue;
-        // Skip code blocks — handled separately by liNestedBlocks
         if (tag === "pre") continue;
+        if (tag === "p") {
+          const inner = convert(child, listDepth).replace(/\n$/, "");
+          paragraphs.push(inner);
+          continue;
+        }
       }
-      result += convert(child as Node, listDepth);
+      other += convert(child as Node, listDepth);
     }
-    return result;
+    if (paragraphs.length <= 1) {
+      return (paragraphs[0] ?? "") + other;
+    }
+    // Multiple paragraphs: join with blank line + indent
+    const indent = "  ".repeat(listDepth + 1);
+    return paragraphs.join(`\n${indent}\n${indent}`) + other;
   }
 
   function liNestedBlocks(li: Element, listDepth: number): string {
     let result = "";
+    const indent = "  ".repeat(listDepth);
     for (const child of Array.from(li.children)) {
       const tag = child.tagName.toLowerCase();
       if (tag === "ul" || tag === "ol") {
         result += convert(child, listDepth);
       } else if (tag === "pre") {
-        // Code blocks inside list items — emit on own lines with proper fencing
-        result += convert(child, listDepth);
+        // Code blocks inside list items — indent each line so they stay
+        // associated with the list item on re-parse.
+        const codeBlock = convert(child, listDepth);
+        result += codeBlock
+          .split("\n")
+          .map((line) => (line ? `${indent}${line}` : line))
+          .join("\n");
       }
     }
     return result;
@@ -1580,7 +1607,9 @@ export function markdownFromHtml(
     return result;
   }
 
-  return convert(doc.body, 0).trim();
+  return convert(doc.body, 0)
+    .trim()
+    .replace(/\n{3,}/g, "\n\n");
 }
 
 function escapeHtml(str: string): string {
