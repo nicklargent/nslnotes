@@ -1,6 +1,6 @@
 import { createSignal, createMemo, onMount, onCleanup, For } from "solid-js";
 import { Portal } from "solid-js/web";
-import { getTodayISO, toISODate } from "../../lib/dates";
+import { todayISO, toISODate } from "../../lib/dates";
 
 interface CalendarPickerProps {
   datesWithNotes: Set<string>;
@@ -31,8 +31,6 @@ export function CalendarPicker(props: CalendarPickerProps) {
   const [viewMonth, setViewMonth] = createSignal(now.getMonth());
 
   let containerRef: HTMLDivElement | undefined;
-
-  const todayISO = getTodayISO();
 
   const cells = createMemo(() => {
     const year = viewYear();
@@ -155,7 +153,7 @@ export function CalendarPicker(props: CalendarPickerProps) {
           <For each={cells()}>
             {(cell) => {
               if (!cell) return <div />;
-              const isToday = cell.iso === todayISO;
+              const isToday = cell.iso === todayISO();
               const hasNote = props.datesWithNotes.has(cell.iso);
               return (
                 <button

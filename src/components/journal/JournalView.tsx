@@ -14,7 +14,7 @@ import { DraftNoteCard } from "./DraftNoteCard";
 import { MonthBar } from "./MonthBar";
 import { MonthNavButton, formatMonthKey } from "./MonthNavButton";
 import {
-  getTodayISO,
+  todayISO,
   getMonthKey,
   getDaysInMonth,
   nextMonthKey,
@@ -56,7 +56,7 @@ export function JournalView(props: JournalViewProps) {
 
   /** Effective current month (null → today's month). */
   const effectiveMonth = createMemo(() => {
-    return contextStore.currentMonth ?? getMonthKey(getTodayISO());
+    return contextStore.currentMonth ?? getMonthKey(todayISO());
   });
 
   /** Set of all dates that have notes, for quick lookup. */
@@ -70,7 +70,7 @@ export function JournalView(props: JournalViewProps) {
 
   /** Earliest month with content — used for boundary checks. */
   const earliestMonth = createMemo(() => {
-    let earliest = getMonthKey(getTodayISO());
+    let earliest = getMonthKey(todayISO());
     for (const d of datesWithContent()) {
       const mk = getMonthKey(d);
       if (mk < earliest) earliest = mk;
@@ -81,7 +81,7 @@ export function JournalView(props: JournalViewProps) {
   /** Buffer dates from adjacent months, pre-sorted for rendering. */
   const bufferData = createMemo(() => {
     const mk = effectiveMonth();
-    const todayMonth = getMonthKey(getTodayISO());
+    const todayMonth = getMonthKey(todayISO());
     const contentDates = datesWithContent();
     const nextMk = nextMonthKey(mk);
     const prevMk = prevMonthKey(mk);
@@ -112,13 +112,13 @@ export function JournalView(props: JournalViewProps) {
 
   /** Main-month dates (today + dates with content). */
   const mainDates = createMemo((): string[] => {
-    const todayISO = getTodayISO();
+    const today = todayISO();
     const contentDates = datesWithContent();
     const mk = effectiveMonth();
     const [y, m] = mk.split("-").map(Number) as [number, number];
     const dates: string[] = [];
     for (const iso of getDaysInMonth(y, m)) {
-      if (iso === todayISO || contentDates.has(iso)) dates.push(iso);
+      if (iso === today || contentDates.has(iso)) dates.push(iso);
     }
     return dates;
   });
@@ -126,7 +126,7 @@ export function JournalView(props: JournalViewProps) {
   /** Whether a "Load next month" button should appear at the top. */
   const nextMonthNav = createMemo(() => {
     const mk = effectiveMonth();
-    const todayMonth = getMonthKey(getTodayISO());
+    const todayMonth = getMonthKey(todayISO());
     if (mk >= todayMonth) return null;
     const next = nextMonthKey(mk);
     if (next > todayMonth) return null;
@@ -241,7 +241,7 @@ export function JournalView(props: JournalViewProps) {
   createEffect(() => {
     if (contextStore.isHomeState) {
       setPendingScrollDate(null);
-      const todayMonth = getMonthKey(getTodayISO());
+      const todayMonth = getMonthKey(todayISO());
       setContextStore("currentMonth", todayMonth);
       requestAnimationFrame(() => {
         if (scrollRef) scrollRef.scrollTop = 0;

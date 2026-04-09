@@ -3,6 +3,8 @@
  * All dates use ISO 8601 format (YYYY-MM-DD) for consistency with frontmatter.
  */
 
+import { createSignal } from "solid-js";
+
 /**
  * ISO date regex pattern (YYYY-MM-DD)
  */
@@ -84,19 +86,48 @@ export function getTodayISO(): string {
 }
 
 /**
+ * Reactive signal for today's ISO date that auto-updates at midnight.
+ * Use this in SolidJS components/memos so they re-evaluate when the date changes.
+ */
+const [todayISO, setTodayISO] = createSignal(getTodayISO());
+
+let midnightTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleMidnightUpdate() {
+  if (midnightTimer !== undefined) clearTimeout(midnightTimer);
+  const now = new Date();
+  const midnight = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1
+  );
+  const ms = midnight.getTime() - now.getTime() + 100; // 100ms buffer past midnight
+  midnightTimer = setTimeout(() => {
+    setTodayISO(getTodayISO());
+    scheduleMidnightUpdate();
+  }, ms);
+}
+scheduleMidnightUpdate();
+
+export { todayISO };
+
+/**
  * Calculate the number of days between a date and today.
  * Positive = future, negative = past (overdue).
  *
  * @param date - The date to compare (Date object or ISO string)
  * @returns Number of days relative to today
  */
-export function getRelativeDays(date: Date | string): number {
+export function getRelativeDays(
+  date: Date | string,
+  referenceToday?: string
+): number {
   const targetDate = typeof date === "string" ? parseISODate(date) : date;
   if (!targetDate) {
     return 0;
   }
 
-  const today = getToday();
+  const today = referenceToday ? parseISODate(referenceToday)! : getToday();
   const diffMs = targetDate.getTime() - today.getTime();
   return Math.round(diffMs / MS_PER_DAY);
 }

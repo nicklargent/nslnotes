@@ -1,8 +1,8 @@
 import {
   formatLongDate,
-  isToday,
   getRelativeDays,
   getWeekdayName,
+  todayISO,
 } from "../../lib/dates";
 
 interface DateHeaderProps {
@@ -16,7 +16,8 @@ interface DateHeaderProps {
  * Shows human-readable date and + New Note button (visible on hover).
  */
 export function DateHeader(props: DateHeaderProps) {
-  const relativeDays = () => getRelativeDays(props.date);
+  const relativeDays = () => getRelativeDays(props.date, todayISO());
+  const isDateToday = () => props.date === todayISO();
   const isRecent = () => {
     const r = relativeDays();
     return r >= -6 && r < 0;
@@ -28,7 +29,7 @@ export function DateHeader(props: DateHeaderProps) {
         class="text-gray-500 dark:text-gray-400 tracking-wide"
         style={{ "font-variant": "small-caps" }}
       >
-        {isToday(props.date) ? (
+        {isDateToday() ? (
           <>
             <span class="text-xl font-semibold">Today</span>
             <span class="ml-1.5 text-base text-gray-500 dark:text-gray-400">

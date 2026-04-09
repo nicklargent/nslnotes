@@ -1,5 +1,5 @@
 import { createMemo, createEffect, onMount, onCleanup, For } from "solid-js";
-import { getTodayISO, getMonthKey, prevMonthKey } from "../../lib/dates";
+import { todayISO, getMonthKey, prevMonthKey } from "../../lib/dates";
 import { indexStore } from "../../stores/indexStore";
 
 interface MonthBarProps {
@@ -32,7 +32,7 @@ export function MonthBar(props: MonthBarProps) {
 
   /** Derive month range from notes index: earliest note to today. */
   const monthList = createMemo(() => {
-    const todayKey = getMonthKey(getTodayISO());
+    const todayKey = getMonthKey(todayISO());
     let earliest = todayKey;
 
     for (const note of indexStore.notes.values()) {
