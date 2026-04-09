@@ -107,11 +107,13 @@ export function CommandMenu(props: CommandMenuProps) {
 
     switch (e.key) {
       case "ArrowDown":
+        if (cmds.length === 0) return;
         e.preventDefault();
         e.stopPropagation();
         setSelectedIndex((i) => Math.min(i + 1, cmds.length - 1));
         break;
       case "ArrowUp":
+        if (cmds.length === 0) return;
         e.preventDefault();
         e.stopPropagation();
         setSelectedIndex((i) => Math.max(i - 1, 0));
@@ -138,7 +140,7 @@ export function CommandMenu(props: CommandMenuProps) {
     // Use capture phase to intercept before TipTap handles Enter/Arrow keys
     document.addEventListener("keydown", handleKeyDown, true);
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef && !menuRef.contains(e.target as Node)) {
+      if (!menuRef || !menuRef.contains(e.target as Node)) {
         props.onClose();
       }
     }

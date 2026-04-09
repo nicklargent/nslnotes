@@ -47,11 +47,13 @@ export function TopicAutocomplete(props: TopicAutocompleteProps) {
 
     switch (e.key) {
       case "ArrowDown":
+        if (items.length === 0) return;
         e.preventDefault();
         e.stopPropagation();
         setSelectedIndex((i) => Math.min(i + 1, items.length - 1));
         break;
       case "ArrowUp":
+        if (items.length === 0) return;
         e.preventDefault();
         e.stopPropagation();
         setSelectedIndex((i) => Math.max(i - 1, 0));
@@ -80,7 +82,7 @@ export function TopicAutocomplete(props: TopicAutocompleteProps) {
     document.addEventListener("keydown", handleKeyDown, true);
 
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef && !menuRef.contains(e.target as Node)) {
+      if (!menuRef || !menuRef.contains(e.target as Node)) {
         props.onClose();
       }
     }

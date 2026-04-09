@@ -136,25 +136,39 @@ export function Editor(props: EditorProps) {
     }
   }
 
+  /** Dismiss any autocomplete whose trigger is after the cursor. */
+  function dismissStaleAutocompletes() {
+    if (!editorRef) return;
+    const cursorPos = editorRef.state.selection.from;
+    const ac = autocomplete();
+    if (ac && cursorPos <= ac.startPos) {
+      setAutocomplete(null);
+    }
+    const wac = wikilinkAC();
+    if (wac && cursorPos <= wac.startPos) {
+      setWikilinkAC(null);
+    }
+    const sp = slashPos();
+    if (sp !== null && cursorPos <= sp) {
+      closeCommandMenu();
+    }
+  }
+
   function handleContentUpdate(content: string) {
-    let inProgressToken: string | undefined;
+    dismissStaleAutocompletes();
 
     // Update autocomplete filter if active
     const ac = autocomplete();
     if (ac && editorRef) {
       const { state } = editorRef;
       const cursorPos = state.selection.from;
-      if (cursorPos <= ac.startPos) {
-        // Cursor moved before the trigger character — close autocomplete
-        setAutocomplete(null);
-      } else {
+      if (cursorPos > ac.startPos) {
         // Extract text between start position and cursor
         const textBetween = state.doc.textBetween(ac.startPos, cursorPos, "");
         if (textBetween.includes(" ") || textBetween.includes("\n")) {
           setAutocomplete(null);
         } else {
           handleAutocompleteFilter(textBetween);
-          inProgressToken = textBetween;
         }
       }
     }
@@ -164,20 +178,16 @@ export function Editor(props: EditorProps) {
     if (wac && editorRef) {
       const { state } = editorRef;
       const cursorPos = state.selection.from;
-      if (cursorPos <= wac.startPos) {
+      // +2 skips the `[[` trigger characters to get the filter text
+      const textBetween = state.doc.textBetween(
+        wac.startPos + 2,
+        cursorPos,
+        ""
+      );
+      if (textBetween.includes("\n") || textBetween.includes("]")) {
         setWikilinkAC(null);
       } else {
-        // +2 skips the `[[` trigger characters to get the filter text
-        const textBetween = state.doc.textBetween(
-          wac.startPos + 2,
-          cursorPos,
-          ""
-        );
-        if (textBetween.includes("\n") || textBetween.includes("]")) {
-          setWikilinkAC(null);
-        } else {
-          setWikilinkAC({ ...wac, filter: textBetween });
-        }
+        setWikilinkAC({ ...wac, filter: textBetween });
       }
     }
 
@@ -186,34 +196,19 @@ export function Editor(props: EditorProps) {
     if (sp !== null && commandMenuPos() && editorRef) {
       const { state } = editorRef;
       const cursorPos = state.selection.from;
-      if (cursorPos <= sp) {
+      const filterText = state.doc.textBetween(sp + 1, cursorPos, "");
+      if (
+        filterText.includes(" ") ||
+        filterText.includes("\n") ||
+        filterCommands(filterText).length === 0
+      ) {
         closeCommandMenu();
       } else {
-        const filterText = state.doc.textBetween(sp + 1, cursorPos, "");
-        if (
-          filterText.includes(" ") ||
-          filterText.includes("\n") ||
-          filterCommands(filterText).length === 0
-        ) {
-          closeCommandMenu();
-        } else {
-          setCommandFilter(filterText);
-        }
+        setCommandFilter(filterText);
       }
     }
 
-    // Strip in-progress autocomplete token so partial topics don't get indexed
-    let updatedContent = content;
-    if (inProgressToken) {
-      const idx = updatedContent.lastIndexOf(inProgressToken);
-      if (idx !== -1) {
-        updatedContent =
-          updatedContent.slice(0, idx) +
-          updatedContent.slice(idx + inProgressToken.length);
-      }
-    }
-
-    props.onUpdate(updatedContent);
+    props.onUpdate(content);
   }
 
   function handleAutocompleteSelect(ref: TopicRef) {
@@ -545,6 +540,7 @@ export function Editor(props: EditorProps) {
           setEditorReady(true);
         }}
         onSelectionChange={(hasSelection) => {
+          dismissStaleAutocompletes();
           if (hasSelection) {
             // Defer bubble menu until mouseup so it doesn't obscure
             // content while the user is still dragging a selection.
