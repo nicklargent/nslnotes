@@ -1267,8 +1267,8 @@ function htmlFromMarkdown(
     ) {
       closeListsTo(-1);
       result.push(trimmed);
-    } else if (/^(\s*)([-*])\s(.*)$/.test(line)) {
-      const match = /^(\s*)([-*])\s(.*)$/.exec(line)!;
+    } else if (/^(\s*)([-*])(?:\s(.*))?$/.test(line)) {
+      const match = /^(\s*)([-*])(?:\s(.*))?$/.exec(line)!;
       const rawIndent = match[1] ?? "";
       let content = match[3] ?? "";
       // Expand tabs: each tab = 1 nesting level, each 2 spaces = 1 nesting level
