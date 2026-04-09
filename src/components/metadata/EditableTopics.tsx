@@ -1,5 +1,6 @@
 import { createSignal, Show, For } from "solid-js";
 import { TopicAutocomplete } from "../editor/TopicAutocomplete";
+import { NavigationService } from "../../services/NavigationService";
 import type { TopicRef } from "../../types/topics";
 
 interface EditableTopicsProps {
@@ -8,6 +9,16 @@ interface EditableTopicsProps {
 }
 
 const VALID_TOPIC = /^[#@][a-z0-9-]+$/i;
+
+// Singleton ctrl/meta key tracker shared across all EditableTopics instances
+const [ctrlHeld, setCtrlHeld] = createSignal(false);
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Control" || e.key === "Meta") setCtrlHeld(true);
+});
+window.addEventListener("keyup", (e) => {
+  if (e.key === "Control" || e.key === "Meta") setCtrlHeld(false);
+});
+window.addEventListener("blur", () => setCtrlHeld(false));
 
 function parseTopics(input: string): TopicRef[] {
   // Split on commas and/or whitespace to handle "#a, #b" and "#a #b"
@@ -157,7 +168,17 @@ export function EditableTopics(props: EditableTopicsProps) {
           >
             <For each={props.topics}>
               {(t) => (
-                <span class="rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600">
+                <span
+                  class="rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  classList={{ "cursor-pointer": ctrlHeld() }}
+                  onClick={(e) => {
+                    if (e.ctrlKey || e.metaKey) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      NavigationService.navigateToTopic(t);
+                    }
+                  }}
+                >
                   {t}
                 </span>
               )}
