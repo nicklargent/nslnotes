@@ -313,7 +313,7 @@ export function ProseEditor(props: ProseEditorProps) {
             const parentText = $from.parent.textContent;
             const offset = $from.parentOffset;
             const mdLinkRe =
-              /(?<!\[!?)\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g;
+              /(?<!\[!?)\[([^\]]+)\]\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
             let insideLink = false;
             let m;
             while ((m = mdLinkRe.exec(parentText)) !== null) {
@@ -321,6 +321,13 @@ export function ProseEditor(props: ProseEditorProps) {
                 insideLink = true;
                 break;
               }
+            }
+            // Also detect partial markdown link: cursor right after [text](
+            if (
+              !insideLink &&
+              /\[([^\]]+)\]\($/.test(parentText.slice(0, offset))
+            ) {
+              insideLink = true;
             }
             const toInsert = insideLink
               ? plainText
@@ -368,7 +375,7 @@ export function ProseEditor(props: ProseEditorProps) {
           // Cmd/Ctrl+click to open links (raw markdown links)
           if (event.metaKey || event.ctrlKey) {
             const mdLinkRegex =
-              /(?<!\[!?)\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g;
+              /(?<!\[!?)\[([^\]]+)\]\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
             let mlMatch;
             while ((mlMatch = mdLinkRegex.exec(nodeText)) !== null) {
               if (
