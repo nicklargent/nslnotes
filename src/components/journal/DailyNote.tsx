@@ -29,6 +29,7 @@ export function DailyNote(props: DailyNoteProps) {
   const [rawMode, setRawMode] = createSignal(false);
   const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   let saveTimeout: number | undefined;
+  let savingPromise: Promise<void> | null = null;
   let rawFlush: (() => Promise<void>) | null = null;
   let lastLocalContent: string | undefined;
 
@@ -67,8 +68,11 @@ export function DailyNote(props: DailyNoteProps) {
       window.clearTimeout(saveTimeout);
       saveTimeout = window.setTimeout(() => {
         if (pendingSave) {
-          void saveDailyNote(pendingSave.date, pendingSave.body);
+          const { date: d, body: b } = pendingSave;
           pendingSave = null;
+          savingPromise = saveDailyNote(d, b).finally(() => {
+            savingPromise = null;
+          });
         }
       }, 300);
     }
@@ -83,10 +87,26 @@ export function DailyNote(props: DailyNoteProps) {
       await saveDailyNote(pendingSave.date, pendingSave.body);
       pendingSave = null;
     }
+    if (savingPromise) {
+      await savingPromise;
+    }
   }
+
+  function hasPendingChanges() {
+    return !!pendingSave || !!savingPromise || !!saveTimeout;
+  }
+
+  function handleBeforeUnload(e: BeforeUnloadEvent) {
+    if (hasPendingChanges()) {
+      e.preventDefault();
+    }
+  }
+
+  window.addEventListener("beforeunload", handleBeforeUnload);
 
   // Flush pending saves on cleanup
   onCleanup(() => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
     void flushPendingSave();
   });
 
