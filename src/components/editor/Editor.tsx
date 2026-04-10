@@ -1,6 +1,7 @@
 import { createSignal, Show, onCleanup } from "solid-js";
 import { DOMSerializer } from "@tiptap/pm/model";
-import { ProseEditor, markdownFromHtml } from "./ProseEditor";
+import { ProseEditor } from "./ProseEditor";
+import { markdownFromHtml } from "./htmlToMarkdown";
 import { CommandMenu, filterCommands } from "./CommandMenu";
 import { BubbleMenu } from "./BubbleMenu";
 import { TableToolbar } from "./TableToolbar";
