@@ -333,6 +333,16 @@ export function ProseEditor(props: ProseEditorProps) {
               ? plainText
               : `[${plainText}](${plainText})`;
             editor!.commands.insertContent(toInsert);
+            if (!insideLink) {
+              // Select the link text so the user can immediately type a label
+              const endPos = editor!.state.selection.from;
+              const linkTextStart = endPos - toInsert.length + 1; // after "["
+              const linkTextEnd = linkTextStart + plainText.length; // before "]("
+              editor!.commands.setTextSelection({
+                from: linkTextStart,
+                to: linkTextEnd,
+              });
+            }
             return true;
           }
 
