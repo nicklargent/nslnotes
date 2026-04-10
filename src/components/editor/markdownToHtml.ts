@@ -312,7 +312,15 @@ export function htmlFromMarkdown(
   // Strip trailing newlines — the old implementation returned no trailing whitespace
   html = html.replace(/\n+$/, "");
 
-  return html || "<p></p>";
+  if (!html) return "<p></p>";
+
+  // Ensure a trailing empty paragraph so the cursor always has a place
+  // to land outside the last block (e.g. when the only content is a wikilink).
+  if (!html.endsWith("<p></p>")) {
+    html += "<p></p>";
+  }
+
+  return html;
 }
 
 // ---------------------------------------------------------------------------

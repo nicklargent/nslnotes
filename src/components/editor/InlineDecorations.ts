@@ -12,6 +12,9 @@ const WIKILINK_RE = /\[\[(task|doc|note):([^\]]+)\]\]/g;
 const TOPIC_RE = /(?:^|(?<=\s))([#@][a-z0-9][a-z0-9-]+)/gi;
 const MD_LINK_RE = /(?<!\[!?)\[([^\]]+)\]\(((?:[^()]*|\([^()]*\))*)\)/g;
 const HIDDEN_STYLE = "font-size:0;letter-spacing:-1ch;color:transparent;";
+const inlineDecorationsKey = new PluginKey<{ focused: boolean }>(
+  "inlineDecorations"
+);
 
 function resolveWikilinkTitle(type: EntityType, target: string): string | null {
   const entity = IndexService.resolveWikilink({
@@ -234,11 +237,45 @@ export const InlineDecorations = Extension.create({
         },
       }),
       new Plugin({
-        key: new PluginKey("inlineDecorations"),
+        key: inlineDecorationsKey,
+        state: {
+          init() {
+            return { focused: false };
+          },
+          apply(tr, value) {
+            const meta = tr.getMeta(inlineDecorationsKey);
+            if (meta !== undefined) return meta;
+            return value;
+          },
+        },
+        view(editorView) {
+          const setFocused = (focused: boolean) => {
+            const cur = inlineDecorationsKey.getState(editorView.state);
+            if (cur?.focused !== focused) {
+              editorView.dispatch(
+                editorView.state.tr.setMeta(inlineDecorationsKey, { focused })
+              );
+            }
+          };
+          const onFocus = () => setFocused(true);
+          const onBlur = () => setFocused(false);
+          editorView.dom.addEventListener("focus", onFocus);
+          editorView.dom.addEventListener("blur", onBlur);
+          return {
+            destroy() {
+              editorView.dom.removeEventListener("focus", onFocus);
+              editorView.dom.removeEventListener("blur", onBlur);
+            },
+          };
+        },
         props: {
           decorations(state) {
             const decorations: Decoration[] = [];
-            const { from: selFrom, to: selTo } = state.selection;
+            const focused =
+              inlineDecorationsKey.getState(state)?.focused ?? false;
+            const { from: selFrom, to: selTo } = focused
+              ? state.selection
+              : { from: -1, to: -1 };
 
             // Check if any find match overlaps a given range.
             // Matches are sorted by position (produced by doc.descendants),
