@@ -48,7 +48,7 @@ export function markdownFromHtml(
             result += `### ${el.textContent}\n`;
             break;
           case "p":
-            result += `${convert(el, listDepth)}\n`;
+            result += `${convert(el, listDepth)}\n\n`;
             break;
           case "strong": {
             const inner = convert(el, listDepth);
@@ -194,7 +194,7 @@ export function markdownFromHtml(
         if (tag === "label") continue;
         if (tag === "pre") continue;
         if (tag === "p") {
-          const inner = convert(child, listDepth).replace(/\n$/, "");
+          const inner = convert(child, listDepth).replace(/\n+$/, "");
           paragraphs.push(inner);
           continue;
         }
