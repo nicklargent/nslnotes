@@ -92,8 +92,10 @@ export const InlineDecorations = Extension.create({
             if (m) oldMarkers.set(pos, m[1]!);
           });
 
-          newState.doc.descendants((node, pos) => {
+          newState.doc.descendants((node, pos, parent) => {
             if (!node.isTextblock) return;
+            // Only match TODO keywords inside list items
+            if (parent?.type.name !== "listItem") return;
             const text = node.textContent;
 
             // Match TODO/DOING/WAITING/LATER/DONE text that needs replacing with Unicode

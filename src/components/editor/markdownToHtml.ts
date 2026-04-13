@@ -40,17 +40,43 @@ function tiptapListParagraphs(md: MarkdownIt): void {
 // ---------------------------------------------------------------------------
 // Plugin: task list support  — - [ ] / - [x] → TipTap taskList/taskItem
 // ---------------------------------------------------------------------------
+
+/** Find the token range of each top-level list item (list_item_open..list_item_close at nesting 1). */
+function findListItemRanges(
+  tokens: Token[],
+  listOpenIdx: number
+): { start: number; end: number; isTask: boolean }[] {
+  const listLevel = tokens[listOpenIdx]!.level;
+  const ranges: { start: number; end: number; isTask: boolean }[] = [];
+  for (let i = listOpenIdx + 1; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (t.type === "bullet_list_close" && t.level === listLevel) break;
+    if (t.type === "list_item_open" && t.level === listLevel + 1) {
+      const start = i;
+      const isTask = t.attrGet("data-type") === "taskItem";
+      for (let j = i + 1; j < tokens.length; j++) {
+        if (
+          tokens[j]!.type === "list_item_close" &&
+          tokens[j]!.level === listLevel + 1
+        ) {
+          ranges.push({ start, end: j, isTask });
+          i = j;
+          break;
+        }
+      }
+    }
+  }
+  return ranges;
+}
+
 function taskListPlugin(md: MarkdownIt): void {
   md.core.ruler.push("task_lists", (state) => {
     const tokens = state.tokens;
-    // Track which bullet_list_open tokens contain at least one task item,
-    // so we can add data-type="taskList" to them.
-    const taskListOpens = new Set<Token>();
 
+    // First pass: mark individual task items and strip checkbox prefixes
     for (let i = 0; i < tokens.length; i++) {
       const tok = tokens[i]!;
       if (tok.type !== "inline") continue;
-      // Must be the first inline inside a list_item_open
       if (i < 1 || tokens[i - 1]!.type !== "paragraph_open") continue;
       if (i < 2 || tokens[i - 2]!.type !== "list_item_open") continue;
 
@@ -61,32 +87,126 @@ function taskListPlugin(md: MarkdownIt): void {
       const checked = checkMatch[1] !== " ";
       const liOpen = tokens[i - 2]!;
 
-      // Mark the list_item as a taskItem
       liOpen.attrSet("data-type", "taskItem");
       liOpen.attrSet("data-checked", String(checked));
 
-      // Strip the checkbox prefix from content
       tok.content = content.slice(checkMatch[0].length);
-      // Also strip from children tokens if present
       if (tok.children && tok.children.length > 0) {
         const firstChild = tok.children[0]!;
         if (firstChild.type === "text") {
           firstChild.content = firstChild.content.slice(checkMatch[0].length);
         }
       }
+    }
 
-      // Find the enclosing bullet_list_open and mark it
-      for (let j = i - 2; j >= 0; j--) {
-        if (tokens[j]!.type === "bullet_list_open" && tokens[j]!.tag === "ul") {
-          taskListOpens.add(tokens[j]!);
+    // Second pass (backwards so splice indices stay valid): split or promote lists.
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const tok = tokens[i]!;
+      if (tok.type !== "bullet_list_open" || tok.tag !== "ul") continue;
+
+      // Single backward scan: determine if this list is nested and whether
+      // it's inside a taskItem (ProseMirror requires consistent child types,
+      // and taskList CSS breaks plain bulletList rendering inside taskItems).
+      let ancestorTaskItem = false;
+      let isNested = false;
+      for (let j = i - 1; j >= 0; j--) {
+        const t = tokens[j]!;
+        if (t.type === "list_item_open") {
+          isNested = true;
+          ancestorTaskItem = t.attrGet("data-type") === "taskItem";
+          break;
+        }
+        if (t.type === "list_item_close" || t.level < tok.level) break;
+      }
+      if (isNested) {
+        if (ancestorTaskItem) {
+          tok.attrSet("data-type", "taskList");
+          const ranges = findListItemRanges(tokens, i);
+          for (const range of ranges) {
+            if (!range.isTask) {
+              tokens[range.start]!.attrSet("data-type", "taskItem");
+              tokens[range.start]!.attrSet("data-checked", "false");
+            }
+          }
+        }
+        continue;
+      }
+
+      const ranges = findListItemRanges(tokens, i);
+      const hasTask = ranges.some((r) => r.isTask);
+      const hasPlain = ranges.some((r) => !r.isTask);
+
+      if (!hasTask) continue; // all plain — nothing to do
+
+      if (!hasPlain) {
+        // All items are tasks — just mark the whole list
+        tok.attrSet("data-type", "taskList");
+        continue;
+      }
+
+      // Mixed list — split into runs of same-kind items, each becoming its own list.
+      // Find the list_close token
+      let listCloseIdx = -1;
+      for (let j = i + 1; j < tokens.length; j++) {
+        if (
+          tokens[j]!.type === "bullet_list_close" &&
+          tokens[j]!.level === tok.level
+        ) {
+          listCloseIdx = j;
           break;
         }
       }
-    }
+      if (listCloseIdx === -1) continue;
 
-    // Apply data-type="taskList" to the bullet_list_open tokens
-    for (const tok of taskListOpens) {
-      tok.attrSet("data-type", "taskList");
+      // Group consecutive items by kind
+      const groups: { isTask: boolean; startIdx: number; endIdx: number }[] =
+        [];
+      let cur = ranges[0]!;
+      let groupStart = cur.start;
+      for (let r = 1; r < ranges.length; r++) {
+        if (ranges[r]!.isTask !== cur.isTask) {
+          groups.push({
+            isTask: cur.isTask,
+            startIdx: groupStart,
+            endIdx: cur.end,
+          });
+          groupStart = ranges[r]!.start;
+        }
+        cur = ranges[r]!;
+      }
+      groups.push({
+        isTask: cur.isTask,
+        startIdx: groupStart,
+        endIdx: cur.end,
+      });
+
+      if (groups.length <= 1) {
+        // Shouldn't happen given hasTask && hasPlain, but guard
+        if (hasTask) tok.attrSet("data-type", "taskList");
+        continue;
+      }
+
+      // Build replacement token array: for each group, wrap in ul open/close
+      const replacement: Token[] = [];
+      for (const group of groups) {
+        const open = new state.Token("bullet_list_open", "ul", 1);
+        open.level = tok.level;
+        open.markup = tok.markup;
+        if (group.isTask) open.attrSet("data-type", "taskList");
+
+        replacement.push(open);
+        // Copy all tokens for the items in this group
+        for (let t = group.startIdx; t <= group.endIdx; t++) {
+          replacement.push(tokens[t]!);
+        }
+        const close = new state.Token("bullet_list_close", "ul", -1);
+        close.level = tok.level;
+        close.markup = tok.markup;
+        replacement.push(close);
+      }
+
+      // Replace the original list_open..list_close range
+      tokens.splice(i, listCloseIdx - i + 1, ...replacement);
     }
   });
 }
@@ -112,9 +232,14 @@ function todoMarkerSpan(kw: TodoKeyword): string {
 function todoMarkersPlugin(md: MarkdownIt): void {
   md.core.ruler.push("todo_markers", (state) => {
     const tokens = state.tokens;
+    let listDepth = 0;
     for (let i = 0; i < tokens.length; i++) {
       const tok = tokens[i]!;
+      if (tok.type === "list_item_open") listDepth++;
+      else if (tok.type === "list_item_close") listDepth--;
+
       if (tok.type !== "inline" || !tok.children) continue;
+      if (listDepth <= 0) continue;
 
       // Walk children tokens looking for text tokens starting with a keyword
       const children = tok.children;
@@ -276,6 +401,104 @@ function codeBlockTrimPlugin(md: MarkdownIt): void {
 }
 
 // ---------------------------------------------------------------------------
+// Plugin: preserve blank-line gaps between blocks as empty paragraphs
+// ---------------------------------------------------------------------------
+function blankLineGapsPlugin(md: MarkdownIt): void {
+  md.core.ruler.push("blank_line_gaps", (state) => {
+    const tokens = state.tokens;
+    const src = state.src;
+    // Pre-compute which source lines are blank
+    const srcLines = src.split("\n");
+
+    /** Get the last source line of a top-level block ending at index `idx`. */
+    function blockEndLine(idx: number): number | null {
+      // Walk backwards from idx to find the opening token with a map
+      for (let j = idx; j >= 0; j--) {
+        if (tokens[j]!.map) return tokens[j]!.map![1];
+      }
+      return null;
+    }
+
+    /** Get the first source line of a top-level block starting at index `idx`. */
+    function blockStartLine(idx: number): number | null {
+      if (tokens[idx]!.map) return tokens[idx]!.map![0];
+      // For synthetic tokens (from list split), check children
+      for (let j = idx + 1; j < tokens.length; j++) {
+        if (tokens[j]!.map) return tokens[j]!.map![0];
+        if (tokens[j]!.nesting === -1 && tokens[j]!.level === 0) break;
+      }
+      return null;
+    }
+
+    // Walk top-level open/self-closing tokens and check for blank-line gaps
+    const insertions: { beforeIdx: number; count: number }[] = [];
+    let prevEndLine: number | null = null;
+
+    for (let i = 0; i < tokens.length; i++) {
+      const tok = tokens[i]!;
+      if (tok.level !== 0) continue;
+      if (tok.nesting === -1) {
+        // closing token — record end line
+        prevEndLine = blockEndLine(i);
+        continue;
+      }
+
+      // opening or self-closing token at level 0
+      if (prevEndLine !== null) {
+        const startLine = blockStartLine(i);
+        if (startLine !== null && startLine > prevEndLine) {
+          // Count blank lines between blocks
+          let blanks = 0;
+          for (let line = prevEndLine; line < startLine; line++) {
+            if (srcLines[line] !== undefined && srcLines[line]!.trim() === "")
+              blanks++;
+          }
+          // Every blank line in the source should produce visible spacing.
+          // Standard markdown uses 1 blank line as a block separator with no
+          // visual gap, but users expect the whitespace they wrote to appear.
+          if (blanks > 0) {
+            insertions.push({ beforeIdx: i, count: blanks });
+          }
+        }
+      }
+
+      // Skip past this block's children
+      if (tok.nesting === 1) {
+        // Find matching close
+        let depth = 1;
+        for (let j = i + 1; j < tokens.length; j++) {
+          depth += tokens[j]!.nesting;
+          if (depth === 0) {
+            prevEndLine = blockEndLine(j);
+            i = j;
+            break;
+          }
+        }
+      } else {
+        prevEndLine = tok.map ? tok.map[1] : prevEndLine;
+      }
+    }
+
+    for (let k = insertions.length - 1; k >= 0; k--) {
+      const { beforeIdx, count } = insertions[k]!;
+      const emptyTokens: Token[] = [];
+      for (let n = 0; n < count; n++) {
+        const open = new state.Token("paragraph_open", "p", 1);
+        open.level = 0;
+        const inline = new state.Token("inline", "", 0);
+        inline.level = 1;
+        inline.content = "";
+        inline.children = [];
+        const close = new state.Token("paragraph_close", "p", -1);
+        close.level = 0;
+        emptyTokens.push(open, inline, close);
+      }
+      tokens.splice(beforeIdx, 0, ...emptyTokens);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Register all plugins
 // ---------------------------------------------------------------------------
 md.use(tiptapListParagraphs);
@@ -284,6 +507,7 @@ md.use(todoMarkersPlugin);
 md.use(imagePlugin);
 md.use(tableCellParagraphs);
 md.use(codeBlockTrimPlugin);
+md.use(blankLineGapsPlugin);
 
 // ---------------------------------------------------------------------------
 // Public API

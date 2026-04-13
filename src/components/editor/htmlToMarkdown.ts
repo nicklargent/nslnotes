@@ -119,7 +119,15 @@ export function markdownFromHtml(
           }
           case "ul":
           case "ol":
+            // Ensure blank line before list if preceded by content
+            if (result.length > 0 && !result.endsWith("\n\n")) {
+              result += "\n";
+            }
             result += processList(el, tag, listDepth);
+            // Ensure blank line after top-level list
+            if (listDepth === 0 && !result.endsWith("\n\n")) {
+              result += "\n";
+            }
             break;
           case "li":
             result += convert(el, listDepth);
@@ -131,7 +139,7 @@ export function markdownFromHtml(
             result += "---\n";
             break;
           case "br":
-            result += "\n";
+            result += "  \n";
             break;
           case "label":
           case "input":
@@ -180,14 +188,32 @@ export function markdownFromHtml(
     return result;
   }
 
+  /** Flatten TipTap's TaskItem <div> content wrapper so callers see direct children. */
+  function unwrapDivs(parent: Element): ChildNode[] {
+    const result: ChildNode[] = [];
+    for (const child of Array.from(parent.childNodes)) {
+      if (
+        child.nodeType === Node.ELEMENT_NODE &&
+        (child as HTMLElement).tagName.toLowerCase() === "div"
+      ) {
+        for (const grandchild of Array.from(child.childNodes)) {
+          result.push(grandchild);
+        }
+      } else {
+        result.push(child);
+      }
+    }
+    return result;
+  }
+
   function liText(li: Element, listDepth: number): string {
     // Collect paragraph contents separately to handle multi-paragraph list items.
-    // When a <li> contains multiple <p> tags (e.g. user pressed Enter inside the item),
-    // subsequent paragraphs are emitted with blank line + indent so they stay
+    // Subsequent paragraphs are emitted with blank line + indent so they stay
     // associated with the list item on re-parse.
     const paragraphs: string[] = [];
     let other = "";
-    for (const child of Array.from(li.childNodes)) {
+
+    for (const child of unwrapDivs(li)) {
       if (child.nodeType === Node.ELEMENT_NODE) {
         const tag = (child as HTMLElement).tagName.toLowerCase();
         if (tag === "ul" || tag === "ol") continue;
@@ -212,7 +238,8 @@ export function markdownFromHtml(
   function liNestedBlocks(li: Element, listDepth: number): string {
     let result = "";
     const indent = "  ".repeat(listDepth);
-    for (const child of Array.from(li.children)) {
+    for (const child of unwrapDivs(li)) {
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
       const tag = child.tagName.toLowerCase();
       if (tag === "ul" || tag === "ol") {
         result += convert(child, listDepth);
