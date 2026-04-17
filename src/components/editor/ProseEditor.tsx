@@ -626,7 +626,12 @@ export function ProseEditor(props: ProseEditorProps) {
             event.preventDefault();
             if (editor?.can().sinkListItem("listItem")) {
               editor.chain().focus().sinkListItem("listItem").run();
-            } else if (!editor?.isActive("listItem")) {
+            } else if (editor?.can().sinkListItem("taskItem")) {
+              editor.chain().focus().sinkListItem("taskItem").run();
+            } else if (
+              !editor?.isActive("listItem") &&
+              !editor?.isActive("taskItem")
+            ) {
               editor?.chain().focus().toggleBulletList().run();
             }
             return true;
@@ -635,7 +640,11 @@ export function ProseEditor(props: ProseEditorProps) {
           // Shift+Tab to outdent / unwrap list items
           if (event.key === "Tab" && event.shiftKey) {
             event.preventDefault();
-            editor?.chain().focus().liftListItem("listItem").run();
+            if (editor?.can().liftListItem("listItem")) {
+              editor.chain().focus().liftListItem("listItem").run();
+            } else if (editor?.can().liftListItem("taskItem")) {
+              editor.chain().focus().liftListItem("taskItem").run();
+            }
             return true;
           }
 
