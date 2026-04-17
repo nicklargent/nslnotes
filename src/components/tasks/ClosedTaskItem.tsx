@@ -20,7 +20,8 @@ export function ClosedTaskItem(props: ClosedTaskItemProps) {
 
   return (
     <div
-      class="group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
+      class="group flex w-full cursor-pointer items-center gap-1 rounded px-2 py-1.5 text-left text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
+      onClick={() => props.onClick(props.task)}
       draggable={true}
       onDragStart={(e: DragEvent) =>
         setWikilinkDragData(e, "task", props.task.slug)
@@ -40,13 +41,12 @@ export function ClosedTaskItem(props: ClosedTaskItemProps) {
       </span>
 
       {/* Title */}
-      <button
+      <span
         class="flex-1 truncate text-left line-through"
         title={`[[task:${props.task.slug}]]`}
-        onClick={() => props.onClick(props.task)}
       >
         {props.task.title}
-      </button>
+      </span>
 
       {/* Reopen button - shown on hover */}
       <button

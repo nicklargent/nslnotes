@@ -33,7 +33,7 @@ export function TaskItem(props: TaskItemProps) {
 
   return (
     <div
-      class={`group flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm transition-all duration-200 ${
+      class={`group flex w-full cursor-pointer items-center gap-1 rounded px-2 py-1.5 text-left text-sm transition-all duration-200 ${
         completing() === "done"
           ? "bg-green-50 dark:bg-green-900/30 opacity-60"
           : completing() === "cancelled"
@@ -49,6 +49,7 @@ export function TaskItem(props: TaskItemProps) {
       onPointerDown={makePointerDragHandler(
         () => `[[task:${props.task.slug}]]`
       )}
+      onClick={() => props.onClick(props.task)}
     >
       {/* Checkbox button for quick done */}
       <button
@@ -62,17 +63,16 @@ export function TaskItem(props: TaskItemProps) {
       </button>
 
       {/* Title */}
-      <button
+      <span
         class={`flex-1 truncate text-left ${
           completing()
             ? "line-through text-gray-400 dark:text-gray-500"
             : "text-gray-700 dark:text-gray-200"
         }`}
         title={`[[task:${props.task.slug}]]`}
-        onClick={() => props.onClick(props.task)}
       >
         {props.task.title}
-      </button>
+      </span>
 
       {/* Due date */}
       {props.task.due && (
