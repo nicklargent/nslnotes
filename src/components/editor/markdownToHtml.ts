@@ -10,7 +10,7 @@ interface RenderEnv {
 // ---------------------------------------------------------------------------
 // markdown-it instance — configured once, reused for every render call.
 // ---------------------------------------------------------------------------
-const md = new MarkdownIt({ html: true, linkify: false, breaks: false });
+const md = new MarkdownIt({ html: true, linkify: false, breaks: true });
 
 // Disable link parsing so [text](url) stays as raw text.
 // Image parsing (![alt](url)) uses a separate rule and remains enabled.
@@ -453,11 +453,10 @@ function blankLineGapsPlugin(md: MarkdownIt): void {
             if (srcLines[line] !== undefined && srcLines[line]!.trim() === "")
               blanks++;
           }
-          // Every blank line in the source should produce visible spacing.
-          // Standard markdown uses 1 blank line as a block separator with no
-          // visual gap, but users expect the whitespace they wrote to appear.
+          // 1+ blank lines → one visible gap (empty paragraph).
+          // Multiple blank lines collapse to a single gap (Obsidian behavior).
           if (blanks > 0) {
-            insertions.push({ beforeIdx: i, count: blanks });
+            insertions.push({ beforeIdx: i, count: 1 });
           }
         }
       }

@@ -285,49 +285,6 @@ function fixBlockTransitions(content: string): string {
   return result.join("\n");
 }
 
-/**
- * Obsidian treats bare newlines as hard line breaks, but CommonMark treats
- * consecutive non-blank lines as a single paragraph. Add trailing "  " (two
- * spaces) to plain text lines followed by another plain text line so that
- * CommonMark renders them as hard breaks.
- */
-function fixHardBreaks(content: string): string {
-  const lines = content.split("\n");
-  const result: string[] = [];
-
-  const isPlainText = (line: string) =>
-    line.trim() !== "" &&
-    !/^\s*[-*+]\s/.test(line) &&        // not a bullet
-    !/^\s*\d+\.\s/.test(line) &&         // not an ordered list
-    !/^#{1,6}\s/.test(line) &&           // not a heading
-    !/^>/.test(line) &&                  // not a blockquote
-    !/^```/.test(line) &&                // not a code fence
-    !/^\|/.test(line) &&                 // not a table row
-    !/^---\s*$/.test(line);              // not a horizontal rule
-
-  let inCodeBlock = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-
-    if (/^```/.test(line.trim())) inCodeBlock = !inCodeBlock;
-    if (inCodeBlock) {
-      result.push(line);
-      continue;
-    }
-
-    const next = i + 1 < lines.length ? lines[i + 1]! : "";
-    // If this is a plain text line followed by another plain text line,
-    // and it doesn't already have a trailing hard break, add one
-    if (isPlainText(line) && isPlainText(next) && !line.endsWith("  ")) {
-      result.push(line + "  ");
-    } else {
-      result.push(line);
-    }
-  }
-
-  return result.join("\n");
-}
-
 /** Apply all content transformations */
 function transformContent(
   content: string,
@@ -342,7 +299,6 @@ function transformContent(
   c = removeHtmlBlocks(c);
   c = convertWikiLinks(c);
   c = fixBlockTransitions(c);
-  c = fixHardBreaks(c);
   c = cleanWhitespace(c);
   return c;
 }

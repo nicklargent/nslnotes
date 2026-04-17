@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import * as path from "node:path";
 import { setupApp, teardownApp } from "./helpers/app-setup";
 import { sidebar, centerPanel, rawModeToggle, tiptapEditor } from "./helpers/selectors";
-import { waitForSave } from "./helpers/editor";
+import { waitForSave, fillTextarea, waitForFileContent } from "./helpers/editor";
 import { expectFileContains } from "./helpers/assertions";
 
 test.describe("Raw mode", () => {
@@ -41,15 +41,11 @@ test.describe("Raw mode", () => {
     const textarea = centerPanel(page).locator("textarea");
     await expect(textarea).toBeVisible({ timeout: 2000 });
     // Append text
-    await textarea.click();
-    await page.keyboard.press("Control+a");
     const currentValue = await textarea.inputValue();
-    await textarea.fill(currentValue + "\n\nRaw mode addition.");
-    await waitForSave(page, 800);
-    expectFileContains(
-      path.join(testRoot, "docs", "api-reference.md"),
-      "Raw mode addition.",
-    );
+    const filePath = path.join(testRoot, "docs", "api-reference.md");
+    await fillTextarea(page, textarea, currentValue + "\n\nRaw mode addition.");
+    await waitForFileContent(page, filePath, "Raw mode addition.", 5000);
+    expectFileContains(filePath, "Raw mode addition.");
   });
 
   test("switching back to rendered mode preserves content", async ({ page }) => {
@@ -59,11 +55,12 @@ test.describe("Raw mode", () => {
     await expect(textarea).toBeVisible({ timeout: 2000 });
     // Add content in raw mode
     const currentValue = await textarea.inputValue();
-    await textarea.fill(currentValue + "\n\nPersistence test.");
-    await waitForSave(page, 800);
+    const filePath = path.join(testRoot, "docs", "api-reference.md");
+    await fillTextarea(page, textarea, currentValue + "\n\nPersistence test.");
+    await waitForFileContent(page, filePath, "Persistence test.", 5000);
     // Switch back to rendered
     await rawModeToggle(page).click();
-    await expect(tiptapEditor(page)).toBeVisible({ timeout: 2000 });
+    await expect(tiptapEditor(page)).toBeVisible({ timeout: 5000 });
     // Verify content is visible in rendered mode
     const html = await tiptapEditor(page).innerHTML();
     expect(html).toContain("Persistence test.");

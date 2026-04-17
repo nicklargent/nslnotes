@@ -1052,6 +1052,11 @@ export function ProseEditor(props: ProseEditorProps) {
       editor.commands.setContent(
         htmlFromMarkdown(newContent, entityPath, rootPath())
       );
+      // setContent is synchronous — if it triggered onUpdate, the flag was
+      // already cleared inside the handler.  If it did NOT trigger onUpdate
+      // (e.g. because the new HTML resolved to the same ProseMirror doc),
+      // we must clear it ourselves so the next real user edit isn't eaten.
+      skipNextUpdate = false;
     }
   });
 

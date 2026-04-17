@@ -26,6 +26,25 @@ export function markdownFromHtml(
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === Node.TEXT_NODE) {
         let text = child.textContent ?? "";
+        // Skip whitespace-only text nodes between block elements (e.g. \n
+        // between </p> and <p> from markdown-it's HTML output)
+        if (
+          /^\s+$/.test(text) &&
+          child.previousSibling?.nodeType === Node.ELEMENT_NODE &&
+          child.nextSibling?.nodeType === Node.ELEMENT_NODE
+        ) {
+          continue;
+        }
+        // Strip leading \n from text nodes right after <br> — markdown-it
+        // emits a \n after <br> for formatting, but we already emit \n for
+        // the <br> itself so keeping it would double the line break.
+        if (
+          text.startsWith("\n") &&
+          child.previousSibling?.nodeType === Node.ELEMENT_NODE &&
+          (child.previousSibling as HTMLElement).tagName?.toLowerCase() === "br"
+        ) {
+          text = text.slice(1);
+        }
         text = text
           .replace(/^\u2610\s*/, "TODO ")
           .replace(/^\u25a3\s*/, "DOING ")
@@ -39,17 +58,26 @@ export function markdownFromHtml(
 
         switch (tag) {
           case "h1":
-            result += `# ${el.textContent}\n`;
-            break;
           case "h2":
-            result += `## ${el.textContent}\n`;
+          case "h3": {
+            const level = tag[1]!;
+            result += `\n${"#".repeat(Number(level))} ${el.textContent}\n`;
             break;
-          case "h3":
-            result += `### ${el.textContent}\n`;
+          }
+          case "p": {
+            // Empty paragraphs (visual spacers) output \n, same as content
+            // paragraphs. Two adjacent \n create a blank line in markdown.
+            const isEmpty =
+              el.childNodes.length === 0 ||
+              (el.textContent === "" &&
+                Array.from(el.childNodes).every((c) => c.nodeName === "BR"));
+            if (isEmpty) {
+              result += "\n";
+            } else {
+              result += `${convert(el, listDepth)}\n`;
+            }
             break;
-          case "p":
-            result += `${convert(el, listDepth)}\n\n`;
-            break;
+          }
           case "strong": {
             const inner = convert(el, listDepth);
             if (inner.startsWith("**") && inner.endsWith("**")) {
@@ -114,21 +142,22 @@ export function markdownFromHtml(
             const codeEl = el.querySelector("code");
             const langClass = codeEl?.className.match(/language-(\w+)/);
             const lang = langClass ? langClass[1] : "";
-            result += `\`\`\`${lang}\n${el.textContent}\n\`\`\`\n`;
+            result += `\n\`\`\`${lang}\n${el.textContent}\n\`\`\`\n\n`;
             break;
           }
           case "ul":
-          case "ol":
-            // Ensure blank line before list if preceded by content
-            if (result.length > 0 && !result.endsWith("\n\n")) {
-              result += "\n";
-            }
+          case "ol": {
             result += processList(el, tag, listDepth);
-            // Ensure blank line after top-level list
-            if (listDepth === 0 && !result.endsWith("\n\n")) {
+            // Ensure blank line after top-level list — but not if followed
+            // by another list (consecutive <ul>/<ol> from TipTap's mixed
+            // bullet/task list splitting).
+            const nextSibTag = el.nextElementSibling?.tagName?.toLowerCase();
+            const nextIsList = nextSibTag === "ul" || nextSibTag === "ol";
+            if (listDepth === 0 && !result.endsWith("\n\n") && !nextIsList) {
               result += "\n";
             }
             break;
+          }
           case "li":
             result += convert(el, listDepth);
             break;
@@ -136,10 +165,10 @@ export function markdownFromHtml(
             result += convertTable(el);
             break;
           case "hr":
-            result += "---\n";
+            result += "\n---\n\n";
             break;
           case "br":
-            result += "  \n";
+            result += "\n";
             break;
           case "label":
           case "input":
@@ -240,7 +269,7 @@ export function markdownFromHtml(
     const indent = "  ".repeat(listDepth);
     for (const child of unwrapDivs(li)) {
       if (child.nodeType !== Node.ELEMENT_NODE) continue;
-      const tag = child.tagName.toLowerCase();
+      const tag = (child as HTMLElement).tagName.toLowerCase();
       if (tag === "ul" || tag === "ol") {
         result += convert(child, listDepth);
       } else if (tag === "pre") {

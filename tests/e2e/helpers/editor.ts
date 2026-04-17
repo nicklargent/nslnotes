@@ -1,7 +1,8 @@
 /**
  * TipTap editor helpers for E2E tests.
  */
-import type { Page } from "@playwright/test";
+import * as fs from "node:fs";
+import type { Page, Locator } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { tiptapEditor } from "./selectors";
 
@@ -65,8 +66,78 @@ export async function blurActiveElement(page: Page): Promise<void> {
 }
 
 /**
- * Wait for the editor save debounce to complete.
+ * Wait a fixed duration for the editor save debounce to flush.
  */
 export async function waitForSave(page: Page, ms = 500): Promise<void> {
   await page.waitForTimeout(ms);
+}
+
+/**
+ * Wait until a file on disk contains the expected substring.
+ * Polls every 100ms, fails after `timeoutMs`.
+ */
+export async function waitForFileContent(
+  page: Page,
+  filePath: string,
+  expected: string,
+  timeoutMs = 5000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const content = fs.readFileSync(filePath, "utf-8");
+      if (content.includes(expected)) return;
+    } catch {
+      // file may not exist yet
+    }
+    await page.waitForTimeout(100);
+  }
+  const content = fs.readFileSync(filePath, "utf-8");
+  expect(
+    content,
+    `File ${filePath} did not contain "${expected.slice(0, 60)}" after ${timeoutMs}ms. ` +
+    `File length: ${content.length}. First 200 chars: ${content.slice(0, 200)}`,
+  ).toContain(expected);
+}
+
+/**
+ * Wait for a textarea to have non-empty content (i.e., the async file read
+ * in SolidJS's RawEditor has completed and called setText).
+ */
+export async function waitForTextareaLoaded(
+  page: Page,
+  textarea: Locator,
+  timeoutMs = 5000,
+): Promise<string> {
+  const start = Date.now();
+  let value = "";
+  while (Date.now() - start < timeoutMs) {
+    value = await textarea.inputValue();
+    if (value.length > 0 && value.includes("---")) return value;
+    await page.waitForTimeout(50);
+  }
+  return value;
+}
+
+/**
+ * Fill a textarea reliably for SolidJS.
+ *
+ * Playwright's fill() dispatches synthetic events that SolidJS's event
+ * delegation sometimes misses on controlled inputs (value={signal()}).
+ * We use pressSequentially() after select-all, which fires real keyboard
+ * InputEvents that SolidJS always catches.
+ *
+ * Also waits for the textarea to be populated first, since RawEditor
+ * loads content asynchronously and would overwrite early input.
+ */
+export async function fillTextarea(
+  page: Page,
+  textarea: Locator,
+  value: string,
+): Promise<void> {
+  await waitForTextareaLoaded(page, textarea);
+
+  await textarea.click();
+  await page.keyboard.press("Control+a");
+  await textarea.pressSequentially(value, { delay: 0 });
 }
