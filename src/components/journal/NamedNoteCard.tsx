@@ -154,6 +154,15 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
         </div>
       </div>
 
+      <div class="mt-1" onClick={(e) => e.stopPropagation()}>
+        <EditableTopics
+          topics={liveNote().topics}
+          onSave={(topics) =>
+            void EntityService.updateFrontmatter(props.note.path, { topics })
+          }
+        />
+      </div>
+
       <div
         class="mt-2"
         onClick={(e) => {
@@ -180,15 +189,6 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
             }}
           />
         </Show>
-      </div>
-
-      <div class="mt-1.5" onClick={(e) => e.stopPropagation()}>
-        <EditableTopics
-          topics={liveNote().topics}
-          onSave={(topics) =>
-            void EntityService.updateFrontmatter(props.note.path, { topics })
-          }
-        />
       </div>
 
       <Show when={showDeleteModal()}>
