@@ -16,6 +16,7 @@ import { parse, serialize } from "../../lib/frontmatter";
 import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
+import { SlugBadge } from "../metadata/SlugBadge";
 import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
 import type { Note } from "../../types/entities";
 
@@ -113,13 +114,16 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
           if (props.isFocused) e.stopPropagation();
         }}
       >
-        <EditableText
-          value={liveNote().title ?? liveNote().slug}
-          onSave={(title) =>
-            void EntityService.updateFrontmatter(props.note.path, { title })
-          }
-          class="text-lg font-semibold text-gray-800 dark:text-gray-100"
-        />
+        <div class="flex flex-wrap items-center gap-2">
+          <EditableText
+            value={liveNote().title ?? liveNote().slug}
+            onSave={(title) =>
+              void EntityService.updateFrontmatter(props.note.path, { title })
+            }
+            class="text-lg font-semibold text-gray-800 dark:text-gray-100"
+          />
+          <SlugBadge type="note" slug={liveNote().slug} />
+        </div>
         <div
           class={`ml-2 flex shrink-0 items-center gap-1 transition-opacity duration-300 ${props.hovered || props.isFocused ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         >

@@ -11,6 +11,7 @@ import { editorStore, setEditorStore } from "../../stores/editorStore";
 import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
+import { SlugBadge } from "../metadata/SlugBadge";
 import { consumeAutofocus } from "../draft/DraftView";
 import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
 import { BacklinksSection } from "../backlinks/BacklinksSection";
@@ -104,19 +105,16 @@ export function DocView(props: DocViewProps) {
   return (
     <div class="h-full overflow-y-auto">
       <div class="px-[8%] py-6">
-        {/* Header */}
         <div class="mb-4">
-          <EditableText
-            value={liveDoc().title}
-            onSave={(title) =>
-              void EntityService.updateFrontmatter(props.doc.path, { title })
-            }
-            class="text-xl font-semibold text-gray-900 dark:text-gray-100"
-          />
-          <div class="mt-1">
-            <code class="select-all rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">
-              [[doc:{liveDoc().slug}]]
-            </code>
+          <div class="flex flex-wrap items-center gap-2">
+            <EditableText
+              value={liveDoc().title}
+              onSave={(title) =>
+                void EntityService.updateFrontmatter(props.doc.path, { title })
+              }
+              class="text-xl font-semibold text-gray-900 dark:text-gray-100"
+            />
+            <SlugBadge type="doc" slug={liveDoc().slug} />
           </div>
           <div class="mt-2">
             <EditableTopics
