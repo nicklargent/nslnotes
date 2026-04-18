@@ -38,6 +38,9 @@ coverage/
 playwright-report/
 test-results/
 
+# Obsidian conversion overrides (personal note names)
+scripts/obsidian-overrides.json
+
 # Logs
 *.log
 npm-debug.log*

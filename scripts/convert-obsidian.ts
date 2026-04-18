@@ -32,6 +32,14 @@ const SKIP_DIRS = new Set([".obsidian", ".trash", "Playground"]);
 const SKIP_FILE_EXTENSIONS = new Set([".canvas", ".base"]);
 const SKIP_FILE_PREFIXES = [".smtcmp_"];
 
+// Load overrides from external file (not committed)
+const overridesPath = path.join(path.dirname(new URL(import.meta.url).pathname), "obsidian-overrides.json");
+const overrides = fs.existsSync(overridesPath)
+  ? JSON.parse(fs.readFileSync(overridesPath, "utf-8"))
+  : { titleMap: {}, referenceAsNotes: [] };
+const REFERENCE_TITLE_MAP: Record<string, string> = overrides.titleMap;
+const REFERENCE_AS_NOTES = new Set<string>(overrides.referenceAsNotes);
+
 // --- Stats ---
 const stats = {
   notes: 0,
@@ -318,14 +326,6 @@ function parseEventFilename(filename: string): { date: string | null; title: str
   return { date: null, title: filename.replace(/\.md$/, "") };
 }
 
-/** Get the leaf topic name for a file path within the vault */
-function getLeafFolder(filePath: string, vaultDir: string): string | null {
-  const rel = path.relative(vaultDir, path.dirname(filePath));
-  const parts = rel.split(path.sep).filter(Boolean);
-  // Return the deepest folder name (leaf)
-  return parts.length > 0 ? parts[parts.length - 1] : null;
-}
-
 /** Get the top-level folder relative to vault */
 function getTopFolder(filePath: string, vaultDir: string): string | null {
   const rel = path.relative(vaultDir, filePath);
@@ -408,17 +408,45 @@ function main(): void {
 
     const rawContent = fs.readFileSync(filePath, "utf-8");
 
-    // --- Reference/ → notes with leaf-subfolder topic ---
+    // --- Reference/ → docs (or named notes for bookmark-like stubs) ---
     if (topFolder === "Reference") {
-      const leaf = getLeafFolder(filePath, SOURCE);
-      const topicLabel = leaf && leaf !== "Reference" ? leaf : "Reference";
-      const topicRef = registerTopic(topicLabel, topicLabel);
+      const relPath = path.relative(SOURCE, filePath).replace(/\\/g, "/");
+      const rel = path.relative(SOURCE, path.dirname(filePath));
+      const parts = rel.split(path.sep).filter(Boolean); // ["Reference", "Linux", "KDE"]
+      const folderTopics = parts.slice(1); // drop "Reference" itself
+      const topicRefs = folderTopics.length > 0
+        ? folderTopics.map((f) => registerTopic(f, f))
+        : [registerTopic("reference", "Reference")];
 
-      const title = titleFromFilename(filename);
-      const date = getFileMtime(filePath);
-      const slug = uniqueSlug(title, notesDir);
+      const rawTitle = titleFromFilename(filename);
+      const title = REFERENCE_TITLE_MAP[relPath] ?? rawTitle;
 
-      const body = transformContent(rawContent, slug, notesDir, attachmentIndex);
+      if (REFERENCE_AS_NOTES.has(relPath)) {
+        // Bookmark/stub → named note on the journal
+        const date = getFileMtime(filePath);
+        const slug = uniqueSlug(title, notesDir);
+        const body = transformContent(rawContent, slug, notesDir, attachmentIndex);
+        if (isTrivial(body)) {
+          stats.skipped++;
+          skippedFiles.push(path.relative(SOURCE, filePath));
+          continue;
+        }
+        const fm: Record<string, unknown> = {
+          type: "note",
+          date,
+          title,
+          topics: topicRefs,
+        };
+        fs.writeFileSync(path.join(notesDir, `${date}-${slug}.md`), serialize(fm, body));
+        stats.notes++;
+        continue;
+      }
+
+      // Real reference → doc
+      const created = getFileMtime(filePath);
+      const slug = uniqueSlug(title, docsDir);
+
+      const body = transformContent(rawContent, slug, docsDir, attachmentIndex);
       if (isTrivial(body)) {
         stats.skipped++;
         skippedFiles.push(path.relative(SOURCE, filePath));
@@ -426,14 +454,14 @@ function main(): void {
       }
 
       const fm: Record<string, unknown> = {
-        type: "note",
-        date,
+        type: "doc",
         title,
-        topics: [topicRef],
+        created,
+        topics: topicRefs,
       };
 
-      fs.writeFileSync(path.join(notesDir, `${date}-${slug}.md`), serialize(fm, body));
-      stats.notes++;
+      fs.writeFileSync(path.join(docsDir, `${slug}.md`), serialize(fm, body));
+      stats.docs++;
       continue;
     }
 
@@ -659,7 +687,8 @@ function main(): void {
       for (const fp of files) {
         const filename = path.basename(fp);
         const rawContent = fs.readFileSync(fp, "utf-8");
-        const title = titleFromFilename(filename);
+        const rawTitle = titleFromFilename(filename);
+        const title = REFERENCE_TITLE_MAP[path.relative(SOURCE, fp).replace(/\\/g, "/")] ?? rawTitle;
         const created = getFileMtime(fp);
         const docSlug = uniqueSlug(title, docsDir);
 
