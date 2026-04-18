@@ -13,6 +13,8 @@ import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import { consumeAutofocus } from "../draft/DraftView";
 import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
+import { BacklinksSection } from "../backlinks/BacklinksSection";
+import { NavigationService } from "../../services/NavigationService";
 import type { Doc } from "../../types/entities";
 
 interface DocViewProps {
@@ -208,6 +210,11 @@ export function DocView(props: DocViewProps) {
             Saving...
           </div>
         </Show>
+
+        <BacklinksSection
+          backlinks={indexStore.backlinkIndex.get(props.doc.path) ?? []}
+          onBacklinkClick={NavigationService.navigateByPath}
+        />
       </div>
 
       <Show when={showDeleteModal()}>

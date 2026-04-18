@@ -3,6 +3,8 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { Transaction } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { IndexService } from "../../services/IndexService";
+import { NavigationService } from "../../services/NavigationService";
+import { runtime } from "../../lib/runtime";
 import { indexStore } from "../../stores/indexStore";
 import { findHighlightKey } from "./FindHighlightPlugin";
 import type { TopicRef } from "../../types/topics";
@@ -34,6 +36,40 @@ function resolveTopicLabel(ref: string): string | null {
   return null;
 }
 
+function navigateFromWidget(className: string, attrs: Record<string, string>) {
+  if (className === "wikilink-resolved") {
+    const type = attrs["data-wikilink-type"] as EntityType | undefined;
+    const target = attrs["data-wikilink-target"];
+    if (type && target) {
+      const entity = IndexService.resolveWikilink({
+        raw: `[[${type}:${target}]]`,
+        type,
+        target,
+        isValid: true,
+      });
+      if (entity) NavigationService.navigateTo(entity);
+    }
+  } else if (className === "topic-resolved") {
+    const ref = attrs["data-topic-ref"];
+    if (ref) NavigationService.navigateToTopic(ref.toLowerCase() as TopicRef);
+  } else if (className === "md-link-resolved") {
+    const href = attrs["data-link-href"];
+    if (href) runtime.openUrl(href);
+  }
+}
+
+function attachWidgetClick(el: HTMLElement, onClick: () => void) {
+  el.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  el.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
+}
+
 function createResolvedSpan(
   className: string,
   text: string,
@@ -41,10 +77,32 @@ function createResolvedSpan(
 ): HTMLElement {
   const span = document.createElement("span");
   span.className = className;
-  span.textContent = text;
+  span.setAttribute("contenteditable", "false");
   for (const [k, v] of Object.entries(attrs)) {
     span.setAttribute(k, v);
   }
+
+  const textEl = document.createElement("span");
+  textEl.className = `${className}-text`;
+  textEl.textContent = text;
+  attachWidgetClick(textEl, () => navigateFromWidget(className, attrs));
+  span.appendChild(textEl);
+
+  const icon = document.createElement("span");
+  icon.className = "inline-edit-icon";
+  icon.textContent = "✎";
+  attachWidgetClick(icon, () => {
+    const pos = attrs["data-pos"];
+    if (!pos) return;
+    span.dispatchEvent(
+      new CustomEvent("inline-edit", {
+        bubbles: true,
+        detail: { pos: parseInt(pos, 10) },
+      })
+    );
+  });
+  span.appendChild(icon);
+
   return span;
 }
 
@@ -372,6 +430,7 @@ export const InlineDecorations = Extension.create({
                         createResolvedSpan("wikilink-resolved", title, {
                           "data-wikilink-type": type,
                           "data-wikilink-target": target,
+                          "data-pos": String(wlFrom),
                         }),
                       { side: -1, key: `wl:${type}:${target}` }
                     )
@@ -419,8 +478,8 @@ export const InlineDecorations = Extension.create({
                       mlFrom,
                       () =>
                         createResolvedSpan("md-link-resolved", linkText, {
-                          "data-link-pos": String(mlFrom),
                           "data-link-href": linkUrl,
+                          "data-pos": String(mlFrom),
                         }),
                       { side: -1, key: `mdlink:${mlFrom}:${linkText}` }
                     )
@@ -461,6 +520,7 @@ export const InlineDecorations = Extension.create({
                       () =>
                         createResolvedSpan("topic-resolved", label, {
                           "data-topic-ref": rawRef,
+                          "data-pos": String(topicFrom),
                         }),
                       { side: -1, key: `topic:${rawRef}` }
                     )

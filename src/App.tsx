@@ -31,7 +31,6 @@ import { debouncedSave } from "./components/layout/Layout";
 import { findStore, openFind, closeFind } from "./stores/findStore";
 import type { Topic } from "./types/topics";
 import type { Doc } from "./types/entities";
-import type { BacklinkEntry } from "./types/backlinks";
 
 /**
  * Module-level AbortController for global keyboard shortcut listener.
@@ -362,17 +361,6 @@ function App() {
     return null;
   });
 
-  const activeBacklinks = createMemo((): BacklinkEntry[] => {
-    const entity = contextStore.activeEntity;
-    if (!entity || entity.type === "note") return [];
-    return indexStore.backlinkIndex.get(entity.path) ?? [];
-  });
-
-  const handleBacklinkClick = (path: string) => {
-    const entity = IndexService.resolveEntityByPath(path);
-    if (entity) NavigationService.navigateTo(entity);
-  };
-
   const datesWithNotes = createMemo((): Set<string> => {
     const dates = new Set<string>();
     for (const note of indexStore.notes.values()) {
@@ -432,8 +420,6 @@ function App() {
               highlightedTaskPath={highlightedTaskPath()}
               onTaskClick={(task) => NavigationService.navigateTo(task)}
               onCreateTask={() => setContextStore("draft", { type: "task" })}
-              backlinks={activeBacklinks()}
-              onBacklinkClick={handleBacklinkClick}
             />
           }
         />

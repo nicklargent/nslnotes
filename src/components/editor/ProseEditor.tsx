@@ -754,52 +754,34 @@ export function ProseEditor(props: ProseEditorProps) {
       },
     });
 
-    // Prevent native <a> click navigation — links are opened via Cmd/Ctrl+click.
-    // Use capture phase to intercept before ProseMirror or browser default handling.
-    // Also handle clicks on resolved link widgets to place cursor at the raw text.
+    // Prevent native <a> click navigation inside the editor — widgets handle
+    // their own clicks and dispatch navigation events.
     function handleLinkClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
       const anchor = target.tagName === "A" ? target : target.closest("a");
       if (anchor && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
       }
-
-      // Click on resolved markdown link widget → place cursor at raw text position
-      const resolved = target.closest(
-        ".md-link-resolved"
-      ) as HTMLElement | null;
-      if (resolved && editor && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        const posStr = resolved.getAttribute("data-link-pos");
-        if (posStr) {
-          const pos = parseInt(posStr, 10);
-          // Place cursor inside the link text (after the opening "[")
-          const safePos = Math.min(pos + 1, editor.state.doc.content.size);
-          editor
-            .chain()
-            .focus()
-            .command(({ tr }) => {
-              tr.setSelection(TextSelection.create(tr.doc, safePos));
-              return true;
-            })
-            .run();
-        }
-        return;
-      }
-
-      // Ctrl+click on resolved link widget → open URL
-      if (resolved && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        e.stopPropagation();
-        const href = resolved.getAttribute("data-link-href");
-        if (href) {
-          runtime.openUrl(href);
-        }
-        return;
-      }
     }
     containerRef.addEventListener("click", handleLinkClick, true);
+
+    // Edit icon on resolved widgets dispatches this event with the raw text pos
+    function handleInlineEdit(e: Event) {
+      const ce = e as CustomEvent<{ pos: number }>;
+      const pos = ce.detail?.pos;
+      if (editor && typeof pos === "number") {
+        const safePos = Math.min(pos + 1, editor.state.doc.content.size);
+        editor
+          .chain()
+          .focus()
+          .command(({ tr }) => {
+            tr.setSelection(TextSelection.create(tr.doc, safePos));
+            return true;
+          })
+          .run();
+      }
+    }
+    containerRef.addEventListener("inline-edit", handleInlineEdit);
 
     // Visual feedback for wikilink drag-and-drop
     function handleDragOver(e: DragEvent) {
@@ -992,6 +974,7 @@ export function ProseEditor(props: ProseEditorProps) {
     onCleanup(() => {
       tauriUnlisten?.();
       containerRef!.removeEventListener("click", handleLinkClick, true);
+      containerRef!.removeEventListener("inline-edit", handleInlineEdit);
       containerRef!.removeEventListener("mousedown", handleMouseDown, true);
       document.removeEventListener("mouseup", handleMouseUp);
       containerRef!.removeEventListener("dragover", handleDragOver);

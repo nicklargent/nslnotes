@@ -182,12 +182,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
         </Show>
       </div>
 
-      <div
-        class="mt-1.5"
-        onClick={(e) => {
-          if (props.isFocused) e.stopPropagation();
-        }}
-      >
+      <div class="mt-1.5" onClick={(e) => e.stopPropagation()}>
         <EditableTopics
           topics={liveNote().topics}
           onSave={(topics) =>

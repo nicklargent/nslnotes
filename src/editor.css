@@ -461,6 +461,38 @@
   border-bottom-color: var(--color-topic-ref-hover);
 }
 
+/* Resolved widget text clicks navigate — show pointer cursor */
+.wikilink-resolved-text,
+.topic-resolved-text,
+.md-link-resolved-text {
+  cursor: pointer;
+}
+
+/* Edit icon on resolved widgets — appears on hover, enters raw edit mode */
+.inline-edit-icon {
+  display: inline-block;
+  visibility: hidden;
+  margin-left: 0.15em;
+  padding: 0 0.2em;
+  font-size: 0.8em;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+  opacity: 0.6;
+  user-select: none;
+}
+
+.wikilink-resolved:hover .inline-edit-icon,
+.topic-resolved:hover .inline-edit-icon,
+.md-link-resolved:hover .inline-edit-icon {
+  visibility: visible;
+}
+
+.inline-edit-icon:hover {
+  opacity: 1;
+  background-color: var(--color-wikilink-hover-bg);
+}
+
 /* Toast animation */
 @keyframes slide-up {
   from {

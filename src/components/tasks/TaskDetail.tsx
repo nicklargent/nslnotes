@@ -14,6 +14,8 @@ import { EditableTopics } from "../metadata/EditableTopics";
 import { EditableDate } from "../metadata/EditableDate";
 import { consumeAutofocus } from "../draft/DraftView";
 import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
+import { BacklinksSection } from "../backlinks/BacklinksSection";
+import { NavigationService } from "../../services/NavigationService";
 import type { Task } from "../../types/entities";
 
 interface TaskDetailProps {
@@ -208,6 +210,11 @@ export function TaskDetail(props: TaskDetailProps) {
             Saving...
           </div>
         </Show>
+
+        <BacklinksSection
+          backlinks={indexStore.backlinkIndex.get(props.task.path) ?? []}
+          onBacklinkClick={NavigationService.navigateByPath}
+        />
       </div>
 
       <Show when={showDeleteModal()}>

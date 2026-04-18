@@ -1,7 +1,13 @@
 import { createSignal, Show, For } from "solid-js";
 import { TopicAutocomplete } from "../editor/TopicAutocomplete";
 import { NavigationService } from "../../services/NavigationService";
+import { indexStore } from "../../stores/indexStore";
 import type { TopicRef } from "../../types/topics";
+
+function topicLabel(ref: TopicRef): string {
+  const topic = indexStore.topics.get(ref);
+  return topic?.label ?? ref;
+}
 
 interface EditableTopicsProps {
   topics: TopicRef[];
@@ -9,16 +15,6 @@ interface EditableTopicsProps {
 }
 
 const VALID_TOPIC = /^[#@][a-z0-9-]+$/i;
-
-// Singleton ctrl/meta key tracker shared across all EditableTopics instances
-const [ctrlHeld, setCtrlHeld] = createSignal(false);
-window.addEventListener("keydown", (e) => {
-  if (e.key === "Control" || e.key === "Meta") setCtrlHeld(true);
-});
-window.addEventListener("keyup", (e) => {
-  if (e.key === "Control" || e.key === "Meta") setCtrlHeld(false);
-});
-window.addEventListener("blur", () => setCtrlHeld(false));
 
 function parseTopics(input: string): TopicRef[] {
   // Split on commas and/or whitespace to handle "#a, #b" and "#a #b"
@@ -157,32 +153,37 @@ export function EditableTopics(props: EditableTopicsProps) {
     <Show
       when={editing()}
       fallback={
-        <div class="flex cursor-text flex-wrap gap-1" onClick={startEdit}>
+        <div class="flex flex-wrap items-center gap-1">
           <Show
             when={props.topics.length > 0}
             fallback={
-              <span class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400">
+              <button
+                class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400"
+                onClick={startEdit}
+              >
                 + Add topics
-              </span>
+              </button>
             }
           >
             <For each={props.topics}>
               {(t) => (
-                <span
-                  class="rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  classList={{ "cursor-pointer": ctrlHeld() }}
-                  onClick={(e) => {
-                    if (e.ctrlKey || e.metaKey) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      NavigationService.navigateToTopic(t);
-                    }
-                  }}
+                <button
+                  class="cursor-pointer rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-700 dark:hover:text-blue-300"
+                  onClick={() => NavigationService.navigateToTopic(t)}
+                  title={t}
                 >
-                  {t}
-                </span>
+                  {topicLabel(t)}
+                </button>
               )}
             </For>
+            <button
+              class="rounded px-1 py-0.5 text-xs text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
+              onClick={startEdit}
+              title="Edit topics"
+              aria-label="Edit topics"
+            >
+              ✎
+            </button>
           </Show>
         </div>
       }

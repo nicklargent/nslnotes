@@ -211,6 +211,14 @@ export const NavigationService = {
   },
 
   /**
+   * Resolve an entity by its file path and navigate to it.
+   */
+  navigateByPath: (path: string): void => {
+    const entity = IndexService.resolveEntityByPath(path);
+    if (entity) NavigationService.navigateTo(entity);
+  },
+
+  /**
    * Navigate to a topic/person view.
    */
   navigateToTopic: (ref: TopicRef): void => {
