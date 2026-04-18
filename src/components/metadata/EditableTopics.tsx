@@ -177,12 +177,23 @@ export function EditableTopics(props: EditableTopicsProps) {
               )}
             </For>
             <button
-              class="rounded px-1 py-0.5 text-xs text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
+              class="inline-flex items-center rounded bg-gray-100 dark:bg-gray-700 p-0.5 text-gray-500 dark:text-gray-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-700 dark:hover:text-blue-300"
               onClick={startEdit}
               title="Edit topics"
               aria-label="Edit topics"
             >
-              ✎
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
             </button>
           </Show>
         </div>
