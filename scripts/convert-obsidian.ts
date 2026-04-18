@@ -643,7 +643,7 @@ function main(): void {
       }
     }
 
-    // Process each subfolder: create task (with folded content) + docs
+    // Process each subfolder: create docs first, then task (with wikilinks to docs)
     for (const [sub, { files, foldFiles }] of subfolders) {
       const projectTopicRef = registerTopic(sub, sub);
       const taskSlug = uniqueSlug(sub, tasksDir);
@@ -671,19 +671,8 @@ function main(): void {
 
       if (earliestDate === "9999-99-99") earliestDate = getFileMtime(projectsDir);
 
-      const taskBody = foldedSections.join("\n\n");
-      const fm: Record<string, unknown> = {
-        type: "task",
-        title: sub,
-        status: "open",
-        created: earliestDate,
-        topics: [projectsTopicRef, projectTopicRef],
-      };
-
-      fs.writeFileSync(path.join(tasksDir, `${taskSlug}.md`), serialize(fm, taskBody));
-      stats.tasks++;
-
-      // Write remaining nested files as docs
+      // Write docs first so we can collect their slugs for wikilinks
+      const docSlugs: string[] = [];
       for (const fp of files) {
         const filename = path.basename(fp);
         const rawContent = fs.readFileSync(fp, "utf-8");
@@ -707,8 +696,28 @@ function main(): void {
         };
 
         fs.writeFileSync(path.join(docsDir, `${docSlug}.md`), serialize(docFm, body));
+        docSlugs.push(docSlug);
         stats.docs++;
       }
+
+      // Build task body: folded sections + wikilinks to child docs
+      const wikilinks = docSlugs.map((s) => `[[doc:${s}]]`).join("\n");
+      const sections = [...foldedSections];
+      if (wikilinks) {
+        sections.push(`## Docs\n\n${wikilinks}`);
+      }
+      const taskBody = sections.join("\n\n");
+
+      const fm: Record<string, unknown> = {
+        type: "task",
+        title: sub,
+        status: "open",
+        created: earliestDate,
+        topics: [projectsTopicRef, projectTopicRef],
+      };
+
+      fs.writeFileSync(path.join(tasksDir, `${taskSlug}.md`), serialize(fm, taskBody));
+      stats.tasks++;
     }
   }
 
