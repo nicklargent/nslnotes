@@ -12,6 +12,7 @@ function makeEntity(
     frontmatter: {},
     content: "",
     modifiedAt: new Date(),
+    hasUnchecked: false,
     ...overrides,
   };
 

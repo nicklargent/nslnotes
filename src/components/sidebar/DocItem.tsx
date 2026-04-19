@@ -1,5 +1,6 @@
 import { Show } from "solid-js";
 import { makePointerDragHandler, setWikilinkDragData } from "../../lib/drag";
+import { UncheckedIndicator } from "../metadata/UncheckedIndicator";
 import type { Doc } from "../../types/entities";
 
 interface DocItemProps {
@@ -41,6 +42,7 @@ export function DocItem(props: DocItemProps) {
         </svg>
       </Show>
       <span class="truncate">{props.doc.title}</span>
+      <UncheckedIndicator show={props.doc.hasUnchecked} />
     </button>
   );
 }

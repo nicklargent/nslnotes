@@ -120,6 +120,27 @@ export function parseTodosAndCheckboxes(content: string): {
 }
 
 /**
+ * Fast check for any unchecked TODO (non-DONE state) or `- [ ]` checkbox
+ * in content. Short-circuits on first match. Skips fenced code blocks.
+ */
+export function hasUncheckedItems(content: string): boolean {
+  const lines = content.split("\n");
+  const codeLines = getCodeBlockLines(lines);
+  for (let i = 0; i < lines.length; i++) {
+    if (codeLines.has(i)) continue;
+    const line = lines[i];
+    if (line === undefined) continue;
+    const todoMatch = TODO_PATTERN.exec(line);
+    if (todoMatch) {
+      if (todoMatch[2] !== "DONE") return true;
+      continue;
+    }
+    if (CHECKBOX_PATTERN.test(line)) return true;
+  }
+  return false;
+}
+
+/**
  * Parse wikilinks from markdown content.
  *
  * @param content - Markdown body content

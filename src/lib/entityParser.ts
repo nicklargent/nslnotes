@@ -1,4 +1,5 @@
 import { parse, validateNote, validateTask, validateDoc } from "./frontmatter";
+import { hasUncheckedItems } from "./markdown";
 import type { Note, Task, Doc } from "../types/entities";
 import type { TopicRef } from "../types/topics";
 
@@ -36,6 +37,7 @@ export function parseNote(path: string, content: string): Note | null {
     frontmatter: parsed.frontmatter,
     content: parsed.body,
     modifiedAt: new Date(),
+    hasUnchecked: hasUncheckedItems(parsed.body),
     date: fm.date,
     title: fm.title ?? null,
     isDaily,
@@ -71,6 +73,7 @@ export function parseTask(path: string, content: string): Task | null {
     frontmatter: parsed.frontmatter,
     content: parsed.body,
     modifiedAt: new Date(),
+    hasUnchecked: hasUncheckedItems(parsed.body),
     status: fm.status,
     created: fm.created,
     due: fm.due ?? null,
@@ -100,6 +103,7 @@ export function parseDoc(path: string, content: string): Doc | null {
     frontmatter: parsed.frontmatter,
     content: parsed.body,
     modifiedAt: new Date(),
+    hasUnchecked: hasUncheckedItems(parsed.body),
     title: fm.title,
     created: fm.created,
     pinned: fm.pinned === true,

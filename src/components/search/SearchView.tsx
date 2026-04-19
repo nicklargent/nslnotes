@@ -15,6 +15,7 @@ import { contextStore, setContextStore } from "../../stores/contextStore";
 import { registerContainer, unregisterContainer } from "../../stores/findStore";
 import { ImageGrid } from "./ImageGrid";
 import { TodoList } from "./TodoList";
+import { UncheckedIndicator } from "../metadata/UncheckedIndicator";
 import {
   TYPE_BADGES,
   getEntityTitle,
@@ -175,6 +176,9 @@ export function SearchView() {
                                 <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                                   {getEntityTitle(result.entity)}
                                 </span>
+                                <UncheckedIndicator
+                                  show={result.entity.hasUnchecked}
+                                />
                                 <span class="ml-auto shrink-0 text-xs text-gray-400 dark:text-gray-500">
                                   {getEntityDate(result.entity)}
                                 </span>

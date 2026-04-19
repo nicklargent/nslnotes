@@ -16,6 +16,8 @@ export interface BaseEntity {
   content: string;
   /** File modification timestamp */
   modifiedAt: Date;
+  /** True if body contains any unchecked TODO or `- [ ]` item (excl. code blocks) */
+  hasUnchecked: boolean;
 }
 
 /**

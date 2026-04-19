@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseTodos, parseWikilinks, parseTopicRefs } from "./markdown";
+import {
+  parseTodos,
+  parseWikilinks,
+  parseTopicRefs,
+  hasUncheckedItems,
+} from "./markdown";
 
 describe("parseTodos", () => {
   it("parses TODO items", () => {
@@ -48,6 +53,39 @@ describe("parseTodos", () => {
   it("returns empty array for content without todos", () => {
     const content = "regular text\n- normal list item";
     expect(parseTodos(content)).toHaveLength(0);
+  });
+});
+
+describe("hasUncheckedItems", () => {
+  it("returns true for a non-DONE TODO", () => {
+    expect(hasUncheckedItems("- TODO buy milk")).toBe(true);
+  });
+
+  it("returns true for DOING/WAITING/LATER states", () => {
+    expect(hasUncheckedItems("- DOING write report")).toBe(true);
+    expect(hasUncheckedItems("- WAITING reply")).toBe(true);
+    expect(hasUncheckedItems("- LATER someday")).toBe(true);
+  });
+
+  it("returns true for an unchecked `- [ ]` checkbox", () => {
+    expect(hasUncheckedItems("- [ ] unchecked")).toBe(true);
+  });
+
+  it("returns false when only DONE items exist", () => {
+    expect(hasUncheckedItems("- DONE send email")).toBe(false);
+  });
+
+  it("returns false for content with no todos or checkboxes", () => {
+    expect(hasUncheckedItems("regular text\n- normal list item")).toBe(false);
+  });
+
+  it("ignores items inside fenced code blocks", () => {
+    const content = "```\n- TODO in code\n- [ ] in code\n```\nplain text";
+    expect(hasUncheckedItems(content)).toBe(false);
+  });
+
+  it("returns true when an unchecked item appears after DONE items", () => {
+    expect(hasUncheckedItems("- DONE old\n- TODO new")).toBe(true);
   });
 });
 

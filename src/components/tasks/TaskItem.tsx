@@ -2,6 +2,7 @@ import { createSignal, Show } from "solid-js";
 import { makePointerDragHandler, setWikilinkDragData } from "../../lib/drag";
 import { EntityService } from "../../services/EntityService";
 import { formatRelativeDate } from "../../lib/dates";
+import { UncheckedIndicator } from "../metadata/UncheckedIndicator";
 import type { Task } from "../../types/entities";
 
 interface TaskItemProps {
@@ -63,16 +64,19 @@ export function TaskItem(props: TaskItemProps) {
       </button>
 
       {/* Title */}
-      <span
-        class={`flex-1 truncate text-left ${
-          completing()
-            ? "line-through text-gray-400 dark:text-gray-500"
-            : "text-gray-700 dark:text-gray-200"
-        }`}
-        title={`[[task:${props.task.slug}]]`}
-      >
-        {props.task.title}
-      </span>
+      <div class="flex min-w-0 flex-1 items-center gap-1">
+        <span
+          class={`min-w-0 truncate text-left ${
+            completing()
+              ? "line-through text-gray-400 dark:text-gray-500"
+              : "text-gray-700 dark:text-gray-200"
+          }`}
+          title={`[[task:${props.task.slug}]]`}
+        >
+          {props.task.title}
+        </span>
+        <UncheckedIndicator show={props.task.hasUnchecked} />
+      </div>
 
       {/* Due date */}
       {props.task.due && (

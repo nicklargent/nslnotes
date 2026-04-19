@@ -65,13 +65,8 @@ export function TopicItem(props: TopicItemProps) {
         />
       </Show>
       <Show when={!editing()}>
-        {props.topic.openTaskCount > 0 && (
-          <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
-            {props.topic.openTaskCount}
-          </span>
-        )}
         <span
-          class="ml-auto hidden shrink-0 cursor-pointer text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 group-hover:inline"
+          class="hidden shrink-0 cursor-pointer text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 group-hover:inline"
           onClick={startEdit}
           title="Edit label"
         >
@@ -89,6 +84,11 @@ export function TopicItem(props: TopicItemProps) {
             <path d="m15 5 4 4" />
           </svg>
         </span>
+        {props.topic.references.length > 0 && (
+          <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
+            {props.topic.references.length}
+          </span>
+        )}
       </Show>
     </button>
   );
