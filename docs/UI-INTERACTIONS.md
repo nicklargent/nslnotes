@@ -340,11 +340,13 @@ Source: `src/components/docs/DocView.tsx`
 - [ ] Title: inline editable (`EditableText`), click to edit, Enter/blur saves, Escape cancels
 - [ ] Wikilink slug displayed (copyable code block)
 - [ ] Topics: inline editable (`EditableTopics`), click to edit, comma/space-separated, autocomplete
-- [ ] Created date displayed (read-only)
+- [ ] Title row: title + slug on left; Raw-mode toggle + Delete trash icon right-aligned
+- [ ] Topics row: topics on left; Created date right-aligned (read-only)
+- [ ] Action row: Pin button (left)
 - [ ] Pin button toggles `pinned` frontmatter field
 - [ ] Pin visual: amber + filled star when pinned; gray + outline star when unpinned
-- [ ] Raw mode toggle (same behavior as notes/tasks)
-- [ ] Delete button (red) opens confirm modal; confirm deletes entity
+- [ ] Raw mode toggle (same behavior/placement as tasks)
+- [ ] Delete trash icon (gray, red on hover) opens confirm modal; confirm deletes entity
 - [ ] Editor content debounce-saved (300ms)
 - [ ] `onCleanup` flushes pending save
 - [ ] Mode switch flushes saves before toggling
@@ -360,11 +362,14 @@ Source: `src/components/tasks/TaskDetail.tsx`
 - [ ] Due date: inline editable (`EditableDate`) with native date picker
 - [ ] Wikilink slug displayed
 - [ ] Status badge: color-coded (blue=open, green=done, gray=cancelled)
+- [ ] Title row: title + slug on left; Raw-mode toggle + Delete trash icon right-aligned
+- [ ] Topics row: topics on left; Created date right-aligned (read-only)
+- [ ] Status/action row: status pill + Due date on left; status change buttons right-aligned
 - [ ] Open task: "Mark Done" button (green), "Cancel" button (gray)
 - [ ] Done/cancelled task: "Reopen" button (blue)
 - [ ] Status change updates frontmatter
-- [ ] Raw mode toggle
-- [ ] Delete button (red) opens confirm modal; confirm deletes
+- [ ] Raw mode toggle (same behavior/placement as docs)
+- [ ] Delete trash icon (gray, red on hover) opens confirm modal; confirm deletes
 - [ ] Editor content debounce-saved (300ms)
 - [ ] `onCleanup` flushes pending save
 - [ ] Autofocus on editor when created from draft (`consumeAutofocus()`)

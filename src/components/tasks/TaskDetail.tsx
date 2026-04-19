@@ -14,7 +14,7 @@ import { EditableTopics } from "../metadata/EditableTopics";
 import { SlugBadge } from "../metadata/SlugBadge";
 import { EditableDate } from "../metadata/EditableDate";
 import { consumeAutofocus } from "../draft/DraftView";
-import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
+import { DeleteIconButton } from "../buttons/DeleteIconButton";
 import { BacklinksSection } from "../backlinks/BacklinksSection";
 import { NavigationService } from "../../services/NavigationService";
 import type { Task } from "../../types/entities";
@@ -30,7 +30,6 @@ interface TaskDetailProps {
 export function TaskDetail(props: TaskDetailProps) {
   const [content, setContent] = createSignal("");
   const [rawMode, setRawMode] = createSignal(false);
-  const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
   let rawFlush: (() => Promise<void>) | null = null;
@@ -104,27 +103,50 @@ export function TaskDetail(props: TaskDetailProps) {
     <div class="h-full overflow-y-auto">
       <div class="px-[8%] py-6">
         <div class="mb-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <EditableText
-              value={liveTask().title}
-              onSave={(title) =>
-                void EntityService.updateFrontmatter(props.task.path, { title })
-              }
-              class="text-xl font-semibold text-gray-900 dark:text-gray-100"
-            />
-            <SlugBadge type="task" slug={liveTask().slug} />
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <EditableText
+                value={liveTask().title}
+                onSave={(title) =>
+                  void EntityService.updateFrontmatter(props.task.path, {
+                    title,
+                  })
+                }
+                class="text-xl font-semibold text-gray-900 dark:text-gray-100"
+              />
+              <SlugBadge type="task" slug={liveTask().slug} />
+            </div>
+            <div class="ml-2 flex shrink-0 items-center gap-1">
+              <RawModeToggle
+                active={rawMode()}
+                onClick={() => void toggleRawMode()}
+              />
+              <DeleteIconButton
+                buttonTitle="Delete task"
+                confirmTitle={liveTask().title}
+                onConfirm={() => EntityService.deleteEntity(props.task.path)}
+              />
+            </div>
           </div>
-          <div class="mt-2">
-            <EditableTopics
-              topics={liveTask().topics}
-              onSave={(topics) =>
-                void EntityService.updateFrontmatter(props.task.path, {
-                  topics,
-                })
-              }
-            />
+          <div class="mt-2 flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <EditableTopics
+                topics={liveTask().topics}
+                onSave={(topics) =>
+                  void EntityService.updateFrontmatter(props.task.path, {
+                    topics,
+                  })
+                }
+              />
+            </div>
+            <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+              Created: {liveTask().created}
+            </span>
           </div>
-          <div class="mt-2 flex items-center gap-3">
+        </div>
+
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
             <span
               class={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor()}`}
             >
@@ -137,46 +159,31 @@ export function TaskDetail(props: TaskDetailProps) {
               }
               label="Due"
             />
-            <span class="text-xs text-gray-400 dark:text-gray-500">
-              Created: {liveTask().created}
-            </span>
-            <RawModeToggle
-              active={rawMode()}
-              onClick={() => void toggleRawMode()}
-            />
           </div>
-        </div>
-
-        {/* Status actions */}
-        <div class="mb-4 flex gap-2">
-          <Show when={liveTask().status === "open"}>
-            <button
-              class="rounded bg-green-50 dark:bg-green-900/30 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40"
-              onClick={() => void handleStatusChange("done")}
-            >
-              Mark Done
-            </button>
-            <button
-              class="rounded bg-gray-50 dark:bg-gray-900 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => void handleStatusChange("cancelled")}
-            >
-              Cancel
-            </button>
-          </Show>
-          <Show when={liveTask().status !== "open"}>
-            <button
-              class="rounded bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
-              onClick={() => void handleStatusChange("open")}
-            >
-              Reopen
-            </button>
-          </Show>
-          <button
-            class="rounded bg-red-50 dark:bg-red-900/30 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40"
-            onClick={() => setShowDeleteModal(true)}
-          >
-            Delete
-          </button>
+          <div class="flex items-center gap-2">
+            <Show when={liveTask().status === "open"}>
+              <button
+                class="rounded bg-green-50 dark:bg-green-900/30 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40"
+                onClick={() => void handleStatusChange("done")}
+              >
+                Mark Done
+              </button>
+              <button
+                class="rounded bg-gray-50 dark:bg-gray-900 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                onClick={() => void handleStatusChange("cancelled")}
+              >
+                Cancel
+              </button>
+            </Show>
+            <Show when={liveTask().status !== "open"}>
+              <button
+                class="rounded bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                onClick={() => void handleStatusChange("open")}
+              >
+                Reopen
+              </button>
+            </Show>
+          </div>
         </div>
 
         {/* Editor */}
@@ -214,17 +221,6 @@ export function TaskDetail(props: TaskDetailProps) {
           onBacklinkClick={NavigationService.navigateByPath}
         />
       </div>
-
-      <Show when={showDeleteModal()}>
-        <ConfirmDeleteModal
-          title={liveTask().title}
-          onClose={() => setShowDeleteModal(false)}
-          onConfirm={() => {
-            setShowDeleteModal(false);
-            void EntityService.deleteEntity(props.task.path);
-          }}
-        />
-      </Show>
     </div>
   );
 }

@@ -111,7 +111,7 @@ export function reopenButton(page: Page): Locator {
 
 // --- Delete button ---
 export function deleteButton(page: Page): Locator {
-  return centerPanel(page).locator("button", { hasText: "Delete" });
+  return centerPanel(page).locator("button[title^='Delete ']");
 }
 
 // --- Quick capture ---

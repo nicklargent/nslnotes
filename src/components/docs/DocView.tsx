@@ -13,7 +13,7 @@ import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import { SlugBadge } from "../metadata/SlugBadge";
 import { consumeAutofocus } from "../draft/DraftView";
-import { ConfirmDeleteModal } from "../modals/ConfirmDeleteModal";
+import { DeleteIconButton } from "../buttons/DeleteIconButton";
 import { BacklinksSection } from "../backlinks/BacklinksSection";
 import { NavigationService } from "../../services/NavigationService";
 import type { Doc } from "../../types/entities";
@@ -29,7 +29,6 @@ interface DocViewProps {
 export function DocView(props: DocViewProps) {
   const [content, setContent] = createSignal("");
   const [rawMode, setRawMode] = createSignal(false);
-  const [showDeleteModal, setShowDeleteModal] = createSignal(false);
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; body: string } | null = null;
@@ -106,78 +105,88 @@ export function DocView(props: DocViewProps) {
     <div class="h-full overflow-y-auto">
       <div class="px-[8%] py-6">
         <div class="mb-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <EditableText
-              value={liveDoc().title}
-              onSave={(title) =>
-                void EntityService.updateFrontmatter(props.doc.path, { title })
-              }
-              class="text-xl font-semibold text-gray-900 dark:text-gray-100"
-            />
-            <SlugBadge type="doc" slug={liveDoc().slug} />
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <EditableText
+                value={liveDoc().title}
+                onSave={(title) =>
+                  void EntityService.updateFrontmatter(props.doc.path, {
+                    title,
+                  })
+                }
+                class="text-xl font-semibold text-gray-900 dark:text-gray-100"
+              />
+              <SlugBadge type="doc" slug={liveDoc().slug} />
+            </div>
+            <div class="ml-2 flex shrink-0 items-center gap-1">
+              <RawModeToggle
+                active={rawMode()}
+                onClick={() => void toggleRawMode()}
+              />
+              <DeleteIconButton
+                buttonTitle="Delete doc"
+                confirmTitle={liveDoc().title}
+                onConfirm={() => EntityService.deleteEntity(props.doc.path)}
+              />
+            </div>
           </div>
-          <div class="mt-2">
-            <EditableTopics
-              topics={liveDoc().topics}
-              onSave={(topics) =>
-                void EntityService.updateFrontmatter(props.doc.path, { topics })
-              }
-            />
-          </div>
-          <div class="mt-2 flex items-center gap-3">
-            <span class="text-xs text-gray-400 dark:text-gray-500">
+          <div class="mt-2 flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <EditableTopics
+                topics={liveDoc().topics}
+                onSave={(topics) =>
+                  void EntityService.updateFrontmatter(props.doc.path, {
+                    topics,
+                  })
+                }
+              />
+            </div>
+            <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">
               Created: {liveDoc().created}
             </span>
-            <button
-              class={`flex items-center gap-1 rounded px-3 py-1 text-xs font-medium ${
-                liveDoc().pinned
-                  ? "bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
-                  : "bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-400"
-              }`}
-              onClick={() =>
-                void EntityService.updateFrontmatter(props.doc.path, {
-                  pinned: liveDoc().pinned ? null : true,
-                })
-              }
-              title={liveDoc().pinned ? "Unpin doc" : "Pin doc"}
-            >
-              <Show
-                when={liveDoc().pinned}
-                fallback={
-                  <svg
-                    class="h-3 w-3"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M12 2l2.09 6.26L21 9.27l-5 3.64L17.18 20 12 16.77 6.82 20 8 12.91l-5-3.64 6.91-1.01z" />
-                  </svg>
-                }
-              >
+          </div>
+        </div>
+
+        <div class="mb-4 flex items-center gap-2">
+          <button
+            class={`flex items-center gap-1 rounded px-3 py-1 text-xs font-medium ${
+              liveDoc().pinned
+                ? "bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                : "bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-400"
+            }`}
+            onClick={() =>
+              void EntityService.updateFrontmatter(props.doc.path, {
+                pinned: liveDoc().pinned ? null : true,
+              })
+            }
+            title={liveDoc().pinned ? "Unpin doc" : "Pin doc"}
+          >
+            <Show
+              when={liveDoc().pinned}
+              fallback={
                 <svg
                   class="h-3 w-3"
                   viewBox="0 0 24 24"
-                  fill="currentColor"
+                  fill="none"
                   stroke="currentColor"
                   stroke-width="2"
                 >
                   <path d="M12 2l2.09 6.26L21 9.27l-5 3.64L17.18 20 12 16.77 6.82 20 8 12.91l-5-3.64 6.91-1.01z" />
                 </svg>
-              </Show>
-              {liveDoc().pinned ? "Pinned" : "Pin"}
-            </button>
-            <RawModeToggle
-              active={rawMode()}
-              onClick={() => void toggleRawMode()}
-            />
-            <button
-              class="rounded bg-red-50 dark:bg-red-900/30 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100"
-              onClick={() => setShowDeleteModal(true)}
+              }
             >
-              Delete
-            </button>
-          </div>
+              <svg
+                class="h-3 w-3"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 2l2.09 6.26L21 9.27l-5 3.64L17.18 20 12 16.77 6.82 20 8 12.91l-5-3.64 6.91-1.01z" />
+              </svg>
+            </Show>
+            {liveDoc().pinned ? "Pinned" : "Pin"}
+          </button>
         </div>
 
         {/* Editor */}
@@ -214,17 +223,6 @@ export function DocView(props: DocViewProps) {
           onBacklinkClick={NavigationService.navigateByPath}
         />
       </div>
-
-      <Show when={showDeleteModal()}>
-        <ConfirmDeleteModal
-          title={liveDoc().title}
-          onClose={() => setShowDeleteModal(false)}
-          onConfirm={() => {
-            setShowDeleteModal(false);
-            void EntityService.deleteEntity(props.doc.path);
-          }}
-        />
-      </Show>
     </div>
   );
 }
