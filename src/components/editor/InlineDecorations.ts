@@ -5,6 +5,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { IndexService } from "../../services/IndexService";
 import { NavigationService } from "../../services/NavigationService";
 import { runtime } from "../../lib/runtime";
+import { isExternalUrl } from "../../lib/url";
 import { indexStore } from "../../stores/indexStore";
 import { findHighlightKey } from "./FindHighlightPlugin";
 import type { TopicRef } from "../../types/topics";
@@ -476,11 +477,20 @@ export const InlineDecorations = Extension.create({
                   decorations.push(
                     Decoration.widget(
                       mlFrom,
-                      () =>
-                        createResolvedSpan("md-link-resolved", linkText, {
+                      () => {
+                        const attrs: Record<string, string> = {
                           "data-link-href": linkUrl,
                           "data-pos": String(mlFrom),
-                        }),
+                        };
+                        if (isExternalUrl(linkUrl)) {
+                          attrs["data-external"] = "true";
+                        }
+                        return createResolvedSpan(
+                          "md-link-resolved",
+                          linkText,
+                          attrs
+                        );
+                      },
                       { side: -1, key: `mdlink:${mlFrom}:${linkText}` }
                     )
                   );

@@ -384,6 +384,15 @@
   text-decoration-color: var(--color-link);
 }
 
+/* External link indicator (↗ after link text) */
+.prose-editor .tiptap a[data-external="true"]::after,
+.md-link-resolved[data-external="true"] > .md-link-resolved-text::after {
+  content: "\2197";
+  font-size: 0.75em;
+  margin-left: 0.15em;
+  opacity: 0.7;
+}
+
 /* Raw markdown link syntax when cursor is inside */
 .md-link {
   color: var(--color-link);

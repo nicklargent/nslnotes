@@ -44,6 +44,7 @@ import { ImageService, rootPathFromEntity } from "../../services/ImageService";
 import { showToast } from "../Toast";
 import { IMAGE_MIME_TYPES } from "../../types/images";
 import { runtime } from "../../lib/runtime";
+import { isExternalUrl } from "../../lib/url";
 import { htmlFromMarkdown } from "./markdownToHtml";
 import { markdownFromHtml } from "./htmlToMarkdown";
 
@@ -134,7 +135,12 @@ export function ProseEditor(props: ProseEditorProps) {
             // Render without href/target to prevent browser navigation.
             // Store href as data-href; mark attributes retain the real href.
             const attrs = HTMLAttributes as Record<string, unknown>;
-            return ["a", { "data-href": attrs["href"] }, 0];
+            const href = attrs["href"];
+            const out: Record<string, unknown> = { "data-href": href };
+            if (typeof href === "string" && isExternalUrl(href)) {
+              out["data-external"] = "true";
+            }
+            return ["a", out, 0];
           },
           parseHTML() {
             return [
