@@ -142,6 +142,19 @@ function buildAttachmentIndex(vaultDir: string): Map<string, string> {
 
 // --- Content transformations ---
 
+/** Sanitize an attachment filename so it has no spaces or characters that break markdown links. */
+function sanitizeAttachmentFilename(filename: string): string {
+  const ext = path.extname(filename);
+  const base = path.basename(filename, ext);
+  const safeBase = base
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9.-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") || "attachment";
+  return `${safeBase}${ext.toLowerCase()}`;
+}
+
 /** Convert Obsidian image embeds: ![[filename.png]] → ![filename](./slug.assets/filename.png) */
 function convertImageEmbeds(
   content: string,
@@ -164,12 +177,13 @@ function convertImageEmbeds(
         return `[${filename} (missing)]`;
       }
       // Copy non-image file and link to it
+      const safeName = sanitizeAttachmentFilename(filename);
       const assetsDir = path.join(targetDir, `${slug}.assets`);
       fs.mkdirSync(assetsDir, { recursive: true });
-      fs.copyFileSync(srcPath, path.join(assetsDir, filename));
+      fs.copyFileSync(srcPath, path.join(assetsDir, safeName));
       stats.images++;
       stats.imageEmbeds++;
-      return `[${filename}](./${slug}.assets/${filename})`;
+      return `[${filename}](./${slug}.assets/${safeName})`;
     }
 
     const srcPath = attachmentIndex.get(filename);
@@ -179,16 +193,17 @@ function convertImageEmbeds(
       return `[${filename} (missing)]`;
     }
 
-    // Copy the image
+    // Copy the image under a sanitized filename
+    const safeName = sanitizeAttachmentFilename(filename);
     const assetsDir = path.join(targetDir, `${slug}.assets`);
     fs.mkdirSync(assetsDir, { recursive: true });
-    fs.copyFileSync(srcPath, path.join(assetsDir, filename));
+    fs.copyFileSync(srcPath, path.join(assetsDir, safeName));
     stats.images++;
     stats.imageEmbeds++;
 
     const alt = path.basename(filename, ext);
     const widthAttr = parts[1] ? `{width=${parts[1].trim()}}` : "";
-    return `![${alt}](./${slug}.assets/${filename})${widthAttr}`;
+    return `![${alt}](./${slug}.assets/${safeName})${widthAttr}`;
   });
 }
 
@@ -491,9 +506,16 @@ function main(): void {
       continue;
     }
 
-    // --- Inbox/ → notes with #inbox topic ---
+    // --- Inbox/ → notes with #inbox topic (+ #archive for Inbox/Archive/) ---
     if (topFolder === "Inbox") {
-      const topicRef = registerTopic("inbox", "Inbox");
+      const inboxTopic = registerTopic("inbox", "Inbox");
+      const rel = path.relative(SOURCE, filePath);
+      const parts = rel.split(path.sep);
+      const topics = [inboxTopic];
+      if (parts[1] === "Archive") {
+        topics.push(registerTopic("archive", "Archive"));
+      }
+
       const title = titleFromFilename(filename);
       const date = getFileMtime(filePath);
       const slug = uniqueSlug(title, notesDir);
@@ -509,7 +531,7 @@ function main(): void {
         type: "note",
         date,
         title,
-        topics: [topicRef],
+        topics,
       };
 
       fs.writeFileSync(path.join(notesDir, `${date}-${slug}.md`), serialize(fm, body));
