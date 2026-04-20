@@ -8,7 +8,7 @@ import { TableToolbar } from "./TableToolbar";
 import { TopicAutocomplete } from "./TopicAutocomplete";
 import { WikilinkAutocomplete } from "./WikilinkAutocomplete";
 import { PromoteConfirmBar } from "./PromoteConfirmBar";
-import { detectPromoteRange } from "./promoteRange";
+import { detectPromoteRange, detectSelectionRange } from "./promoteRange";
 import { promoteHighlightKey } from "./PromoteHighlightPlugin";
 import { EntityService } from "../../services/EntityService";
 import { rootPathFromEntity } from "../../services/ImageService";
@@ -312,7 +312,9 @@ export function Editor(props: EditorProps) {
    */
   function startPromote() {
     if (!editorRef) return;
-    const range = detectPromoteRange(editorRef.state);
+    const range =
+      detectSelectionRange(editorRef.state) ??
+      detectPromoteRange(editorRef.state);
     if (!range) return;
 
     // Set highlight decoration

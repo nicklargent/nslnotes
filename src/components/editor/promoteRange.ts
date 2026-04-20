@@ -21,6 +21,41 @@ export interface PromoteRange {
  *   node (including any nested sub-lists within it).
  * - Paragraph: title = paragraph text, range = just that paragraph.
  */
+/**
+ * Detect a promote range from the user's current selection.
+ *
+ * Activates only when the selection crosses a block boundary (its text
+ * contains a newline). Returns the raw selection range so the wikilink
+ * replaces exactly what the user highlighted.
+ */
+export function detectSelectionRange(state: EditorState): PromoteRange | null {
+  const { from, to } = state.selection;
+  if (from === to) return null;
+
+  const text = state.doc.textBetween(from, to, "\n", "\n");
+  if (!text.includes("\n")) return null;
+
+  const lines = text.split("\n");
+  const firstIdx = lines.findIndex((l) => l.trim() !== "");
+  if (firstIdx === -1) return null;
+
+  const title = cleanSelectionTitle(lines[firstIdx]!);
+  if (!title) return null;
+
+  const hasBody = lines.slice(firstIdx + 1).some((l) => l.trim() !== "");
+
+  return { from, to, title, hasBody };
+}
+
+function cleanSelectionTitle(raw: string): string {
+  return raw
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^\s*[-*+]\s+/, "")
+    .replace(/^\s*\d+\.\s+/, "")
+    .replace(/^\s*>\s+/, "")
+    .trim();
+}
+
 export function detectPromoteRange(state: EditorState): PromoteRange | null {
   const { $from } = state.selection;
 

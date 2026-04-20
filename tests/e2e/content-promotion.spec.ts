@@ -1,7 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { setupApp, teardownApp } from "./helpers/app-setup";
 import { sidebar, tiptapEditor, bubbleMenu } from "./helpers/selectors";
-import { typeInEditor, selectAllInEditor, waitForSave } from "./helpers/editor";
+import {
+  typeInEditor,
+  selectAllInEditor,
+  selectTextByShiftArrow,
+  waitForSave,
+} from "./helpers/editor";
 
 test.describe("Content promotion (extract)", () => {
   let testRoot: string;
@@ -56,6 +61,51 @@ test.describe("Content promotion (extract)", () => {
     // Verify no promote bar is visible
     const promoteVisible = await page.locator(".animate-bubble-up").filter({ hasText: /Task|Doc|Note/ }).isVisible();
     expect(promoteVisible).toBe(false);
+  });
+
+  test("Multi-line selection uses first selected line as title", async ({ page }) => {
+    await typeInEditor(page, "FIRST-LINE-HEADING");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("SECOND-LINE-BODY");
+    await waitForSave(page, 500);
+    await selectAllInEditor(page);
+    await page.waitForTimeout(300);
+    await expect(bubbleMenu(page)).toBeVisible({ timeout: 2000 });
+    await bubbleMenu(page).getByRole("button", { name: "Extract" }).click();
+    const confirmBar = page.locator(".animate-bubble-up").filter({ hasText: "slug:" });
+    await expect(confirmBar).toBeVisible({ timeout: 3000 });
+    await expect(confirmBar).toContainText("FIRST-LINE-HEADING");
+    await expect(confirmBar).toContainText("+ content");
+  });
+
+  test("Within-paragraph selection falls back to block auto-detect", async ({ page }) => {
+    await typeInEditor(page, "WHOLE-PARAGRAPH-WITH-TRAILING-XYZ");
+    await waitForSave(page, 500);
+    // Select only the trailing 3 chars "XYZ" — single-line selection (no newline)
+    await selectTextByShiftArrow(page, 3);
+    await page.waitForTimeout(300);
+    await expect(bubbleMenu(page)).toBeVisible({ timeout: 2000 });
+    await bubbleMenu(page).getByRole("button", { name: "Extract" }).click();
+    const confirmBar = page.locator(".animate-bubble-up").filter({ hasText: "slug:" });
+    await expect(confirmBar).toBeVisible({ timeout: 3000 });
+    // Auto-detect picks the whole paragraph, not the 3-char selection
+    await expect(confirmBar).toContainText("WHOLE-PARAGRAPH-WITH-TRAILING-XYZ");
+  });
+
+  test("Multi-line selection across list items uses first item as title", async ({ page }) => {
+    // "* " triggers TipTap's bullet-list input rule
+    await typeInEditor(page, "* BULLET-ALPHA");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("BULLET-BETA");
+    await waitForSave(page, 500);
+    await selectAllInEditor(page);
+    await page.waitForTimeout(300);
+    await expect(bubbleMenu(page)).toBeVisible({ timeout: 2000 });
+    await bubbleMenu(page).getByRole("button", { name: "Extract" }).click();
+    const confirmBar = page.locator(".animate-bubble-up").filter({ hasText: "slug:" });
+    await expect(confirmBar).toBeVisible({ timeout: 3000 });
+    await expect(confirmBar).toContainText("BULLET-ALPHA");
+    await expect(confirmBar).toContainText("+ content");
   });
 
   test("promote confirm bar has type buttons", async ({ page }) => {

@@ -323,6 +323,8 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 Source: `src/components/editor/Editor.tsx`, `PromoteConfirmBar.tsx`
 
 - [ ] Select text → click Extract in bubble menu (or `/` command menu) → starts promote flow
+- [ ] Selection that crosses a newline (multi-line) extracts exactly the highlighted span; title is the first selected line (with leading `#`/`-`/`*`/`>`/`N.` markers stripped)
+- [ ] Cursor-only or single-line selection falls back to block auto-detect (enclosing list item, heading section, or paragraph)
 - [ ] `PromoteHighlightPlugin` marks selected range with decoration
 - [ ] Confirm bar appears below highlighted range (`animate-bubble-up`, max-width 448px)
 - [ ] Slug input field accepts text
