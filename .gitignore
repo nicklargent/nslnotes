@@ -41,6 +41,9 @@ test-results/
 # Obsidian conversion overrides (personal note names)
 scripts/obsidian-overrides.json
 
+# Corpus test config (personal vault paths)
+tests/corpus.config.ts
+
 # Logs
 *.log
 npm-debug.log*

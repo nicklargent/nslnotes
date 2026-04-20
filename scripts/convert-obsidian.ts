@@ -48,6 +48,8 @@ const stats = {
   skipped: 0,
   images: 0,
   wikiLinks: 0,
+  wikiLinksResolved: 0,
+  wikiLinksUnresolved: 0,
   imageEmbeds: 0,
   brokenEmbeds: 0,
   callouts: 0,
@@ -58,6 +60,33 @@ const stats = {
 
 const brokenEmbedFiles: string[] = [];
 const skippedFiles: string[] = [];
+const unresolvedWikilinks: string[] = [];
+
+// --- Title → entity map (used for post-pass wikilink resolution) ---
+type EntityType = "doc" | "note" | "task";
+const titleMap = new Map<string, { type: EntityType; slug: string }>();
+
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase();
+}
+
+function registerEntity(title: string, type: EntityType, slug: string): void {
+  titleMap.set(normalizeTitle(title), { type, slug });
+}
+
+/** Register one or more titles (aliases) pointing to the same entity. */
+function registerEntityAliases(
+  aliases: string[],
+  type: EntityType,
+  slug: string,
+): void {
+  for (const a of aliases) {
+    if (!a) continue;
+    // First writer wins — don't let an alias overwrite an earlier explicit registration
+    const key = normalizeTitle(a);
+    if (!titleMap.has(key)) titleMap.set(key, { type, slug });
+  }
+}
 
 // --- Slug generation (mirrors src/lib/slug.ts) ---
 function generateSlug(title: string): string {
@@ -207,14 +236,10 @@ function convertImageEmbeds(
   });
 }
 
-/** Convert Obsidian wiki-links: [[Page Name]] → Page Name */
-function convertWikiLinks(content: string): string {
-  return content.replace(/\[\[([^\]]+)\]\]/g, (_match, inner: string) => {
-    stats.wikiLinks++;
-    // Handle [[Page Name|Display Text]] → Display Text
-    const parts = inner.split("|");
-    return parts.length > 1 ? parts[1].trim() : parts[0].trim();
-  });
+/** Count wikilinks (they are resolved in a post-pass after all entities are written). */
+function countWikiLinks(content: string): void {
+  const matches = content.match(/(?<!!)\[\[([^\]]+)\]\]/g);
+  if (matches) stats.wikiLinks += matches.length;
 }
 
 /** Convert Obsidian callouts: > [!info] Title → > **Info:** Title */
@@ -261,13 +286,48 @@ function cleanWhitespace(content: string): string {
   for (const line of lines) {
     if (line.trim() === "") {
       blankCount++;
-      if (blankCount <= 2) result.push(line);
+      // Normalize whitespace-only lines to truly empty — editor round-trips
+      // `"    "` to `""`, so emit that canonical form at conversion time.
+      if (blankCount <= 2) result.push("");
     } else {
       blankCount = 0;
       result.push(line);
     }
   }
   return result.join("\n").trim();
+}
+
+/**
+ * Normalize GFM table separator rows (`|-------|--------|`) to the form the
+ * editor round-trips to: `| --- | --- |`. Only rewrites rows that appear
+ * between a header row and at least one body row, to avoid false matches.
+ */
+function normalizeTableSeparators(content: string): string {
+  const lines = content.split("\n");
+  for (let i = 1; i < lines.length - 1; i++) {
+    const line = lines[i]!;
+    if (!/^\|[\s\-:|]+\|$/.test(line)) continue;
+    const prev = lines[i - 1]!;
+    const next = lines[i + 1]!;
+    if (!prev.trim().startsWith("|") || !next.trim().startsWith("|")) continue;
+    const cols = line
+      .slice(1, -1)
+      .split("|")
+      .map((c) => c.trim());
+    if (cols.some((c) => !/^:?-+:?$/.test(c))) continue;
+    const normalized = cols
+      .map((c) => {
+        const hasLeft = c.startsWith(":");
+        const hasRight = c.endsWith(":");
+        if (hasLeft && hasRight) return ":---:";
+        if (hasLeft) return ":---";
+        if (hasRight) return "---:";
+        return "---";
+      })
+      .join(" | ");
+    lines[i] = `| ${normalized} |`;
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -308,7 +368,7 @@ function fixBlockTransitions(content: string): string {
   return result.join("\n");
 }
 
-/** Apply all content transformations */
+/** Apply all content transformations. Wikilinks are preserved as `[[X]]` for a post-pass. */
 function transformContent(
   content: string,
   slug: string,
@@ -320,7 +380,8 @@ function transformContent(
   c = convertCallouts(c);
   c = removeDataviewQueries(c);
   c = removeHtmlBlocks(c);
-  c = convertWikiLinks(c);
+  c = normalizeTableSeparators(c);
+  countWikiLinks(c);
   c = fixBlockTransitions(c);
   c = cleanWhitespace(c);
   return c;
@@ -453,6 +514,7 @@ function main(): void {
           topics: topicRefs,
         };
         fs.writeFileSync(path.join(notesDir, `${date}-${slug}.md`), serialize(fm, body));
+        registerEntityAliases([title, rawTitle], "note", `${date}-${slug}`);
         stats.notes++;
         continue;
       }
@@ -476,6 +538,7 @@ function main(): void {
       };
 
       fs.writeFileSync(path.join(docsDir, `${slug}.md`), serialize(fm, body));
+      registerEntityAliases([title, rawTitle], "doc", slug);
       stats.docs++;
       continue;
     }
@@ -502,6 +565,7 @@ function main(): void {
       };
 
       fs.writeFileSync(path.join(notesDir, `${date}-${slug}.md`), serialize(fm, body));
+      registerEntity(title, "note", `${date}-${slug}`);
       stats.notes++;
       continue;
     }
@@ -535,6 +599,7 @@ function main(): void {
       };
 
       fs.writeFileSync(path.join(notesDir, `${date}-${slug}.md`), serialize(fm, body));
+      registerEntity(title, "note", `${date}-${slug}`);
       stats.notes++;
       continue;
     }
@@ -561,6 +626,7 @@ function main(): void {
       };
 
       fs.writeFileSync(path.join(notesDir, `${date}.md`), serialize(fm, body));
+      registerEntity(date, "note", date);
       stats.notes++;
       continue;
     }
@@ -596,6 +662,7 @@ function main(): void {
       }
 
       fs.writeFileSync(path.join(tasksDir, `${slug}.md`), serialize(fm, body));
+      registerEntity(parsed.title, "task", slug);
       stats.tasks++;
       continue;
     }
@@ -649,6 +716,7 @@ function main(): void {
         };
 
         fs.writeFileSync(path.join(tasksDir, `${slug}.md`), serialize(fm, body));
+        registerEntity(title, "task", slug);
         stats.tasks++;
       } else if (parts.length >= 3) {
         // Nested file: Projects/HomeLab/something.md
@@ -718,6 +786,7 @@ function main(): void {
         };
 
         fs.writeFileSync(path.join(docsDir, `${docSlug}.md`), serialize(docFm, body));
+        registerEntityAliases([title, rawTitle], "doc", docSlug);
         docSlugs.push(docSlug);
         stats.docs++;
       }
@@ -739,9 +808,15 @@ function main(): void {
       };
 
       fs.writeFileSync(path.join(tasksDir, `${taskSlug}.md`), serialize(fm, taskBody));
+      registerEntity(sub, "task", taskSlug);
       stats.tasks++;
     }
   }
+
+  // --- Resolve wikilinks in all written files ---
+  resolveWikilinksInDir(notesDir);
+  resolveWikilinksInDir(tasksDir);
+  resolveWikilinksInDir(docsDir);
 
   // --- Generate topics.yaml ---
   const topicEntries = [...topicRegistry.entries()]
@@ -757,7 +832,13 @@ function main(): void {
   console.log(`  Docs created:           ${stats.docs}`);
   console.log(`  Topics discovered:      ${topicEntries.length}`);
   console.log(`  Images copied:          ${stats.images}`);
-  console.log(`  Wiki-links converted:   ${stats.wikiLinks}`);
+  console.log(`  Wiki-links seen:        ${stats.wikiLinks}`);
+  console.log(`    resolved:             ${stats.wikiLinksResolved}`);
+  console.log(`    unresolved (flat):    ${stats.wikiLinksUnresolved}`);
+  if (unresolvedWikilinks.length > 0) {
+    const unique = [...new Set(unresolvedWikilinks)];
+    for (const w of unique) console.log(`      - [[${w}]]`);
+  }
   console.log(`  Image embeds converted: ${stats.imageEmbeds}`);
   console.log(`  Callouts converted:     ${stats.callouts}`);
   console.log(`  Dataview queries removed: ${stats.dataviewQueries}`);
@@ -775,6 +856,67 @@ function main(): void {
     }
   }
   console.log(`\nOutput: ${TARGET}`);
+}
+
+// --- Wikilink post-pass (code-fence-aware) ---
+
+/**
+ * Resolve `[[Page Name]]` wikilinks in every .md file under dir.
+ * Already-typed `[[doc:...]]`, `[[note:...]]`, `[[task:...]]` are left alone.
+ * Unresolved targets are flattened to plain text (display alias preferred).
+ * Lines inside fenced code blocks (```) and inline code (`...`) are skipped.
+ */
+function resolveWikilinksInDir(dir: string): void {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    const full = path.join(dir, entry.name);
+    const content = fs.readFileSync(full, "utf-8");
+    const updated = resolveWikilinksInContent(content);
+    if (updated !== content) {
+      fs.writeFileSync(full, updated);
+    }
+  }
+}
+
+function resolveWikilinksInContent(content: string): string {
+  const lines = content.split("\n");
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    lines[i] = replaceOutsideInlineCode(line, resolveWikilinksInText);
+  }
+  return lines.join("\n");
+}
+
+function replaceOutsideInlineCode(line: string, fn: (s: string) => string): string {
+  const parts = line.split(/(`[^`]+`)/);
+  return parts
+    .map((p) => (p.startsWith("`") && p.endsWith("`") ? p : fn(p)))
+    .join("");
+}
+
+function resolveWikilinksInText(text: string): string {
+  return text.replace(/(?<!!)\[\[([^\]\n]+)\]\]/g, (_match, inner: string) => {
+    // Leave already-typed wikilinks alone
+    if (/^(doc|note|task):/.test(inner)) return `[[${inner}]]`;
+    const parts = inner.split("|");
+    const target = parts[0]!.trim();
+    const display = parts.length > 1 ? parts.slice(1).join("|").trim() : null;
+    const targetNoAnchor = target.split("#")[0]!.trim();
+    const entry = titleMap.get(normalizeTitle(targetNoAnchor));
+    if (entry) {
+      stats.wikiLinksResolved++;
+      return `[[${entry.type}:${entry.slug}]]`;
+    }
+    stats.wikiLinksUnresolved++;
+    unresolvedWikilinks.push(inner);
+    return display ?? target;
+  });
 }
 
 main();

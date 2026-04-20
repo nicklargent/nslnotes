@@ -208,6 +208,34 @@ function taskListPlugin(md: MarkdownIt): void {
       // Replace the original list_open..list_close range
       tokens.splice(i, listCloseIdx - i + 1, ...replacement);
     }
+
+    // Third pass (forward): propagate taskItem promotion to nested lists.
+    // The backward pass can promote a list_item to taskItem AFTER its nested
+    // child list has already been visited. Walk forward and fix that so a
+    // plain nested list under a taskItem becomes a taskList with taskItems.
+    for (let i = 0; i < tokens.length; i++) {
+      const tok = tokens[i]!;
+      if (tok.type !== "bullet_list_open" || tok.tag !== "ul") continue;
+      if (tok.attrGet("data-type") === "taskList") continue;
+      let ancestor: Token | null = null;
+      for (let j = i - 1; j >= 0; j--) {
+        const t = tokens[j]!;
+        if (t.type === "list_item_open") {
+          ancestor = t;
+          break;
+        }
+        if (t.type === "list_item_close" || t.level < tok.level) break;
+      }
+      if (!ancestor || ancestor.attrGet("data-type") !== "taskItem") continue;
+      tok.attrSet("data-type", "taskList");
+      const ranges = findListItemRanges(tokens, i);
+      for (const range of ranges) {
+        if (!range.isTask) {
+          tokens[range.start]!.attrSet("data-type", "taskItem");
+          tokens[range.start]!.attrSet("data-checked", "false");
+        }
+      }
+    }
   });
 }
 
