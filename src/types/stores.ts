@@ -20,6 +20,8 @@ export interface IndexState {
   topicsYaml: Map<TopicRef, TopicDecoration>;
   /** Last full index timestamp */
   lastIndexed: Date | null;
+  /** True while a background full-disk rebuild is in flight. */
+  indexing: boolean;
   /** All discovered image files indexed by absolute path */
   imageFiles: Map<string, ImageFile>;
   /** Entity path → image absolute paths referenced in its markdown */

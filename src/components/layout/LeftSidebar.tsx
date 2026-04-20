@@ -3,8 +3,6 @@ import { TodayButton } from "../sidebar/TodayButton";
 import { CalendarPicker } from "../sidebar/CalendarPicker";
 import { TopicsList } from "../sidebar/TopicsList";
 import { DocsList } from "../sidebar/DocsList";
-import { uiStore, setUIStore } from "../../stores/uiStore";
-import { debouncedSave } from "./Layout";
 import { TopicService } from "../../services/TopicService";
 import { IndexService } from "../../services/IndexService";
 import { SettingsService } from "../../services/SettingsService";
@@ -25,20 +23,11 @@ interface LeftSidebarProps {
   onDateSelect: (date: string) => void;
 }
 
-function clampFontSize(size: number): number {
-  return Math.min(24, Math.max(12, size));
-}
-
 /**
- * Left sidebar with Today button, Topics section, Docs section, and font size controls.
- * Satisfies FR-UI-010–012.
+ * Left sidebar with Today button, Topics section, and Docs section.
+ * Satisfies FR-UI-010–012. Font-size and theme controls live in the top tab bar.
  */
 export function LeftSidebar(props: LeftSidebarProps) {
-  function changeFontSize(delta: number) {
-    setUIStore("fontSize", clampFontSize(uiStore.fontSize + delta));
-    debouncedSave();
-  }
-
   async function handleEditLabel(topic: Topic, newLabel: string) {
     await TopicService.saveTopicLabel(topic.ref, newLabel);
     const rootPath = await SettingsService.getRootPath();
@@ -189,64 +178,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
             onCreateDoc={() => props.onCreateDoc()}
           />
         </Show>
-      </div>
-
-      {/* Font size & dark mode controls */}
-      <div class="flex items-center justify-center gap-2 border-t border-gray-200 px-3 py-2 dark:border-gray-700">
-        <button
-          type="button"
-          class="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-          onClick={() => changeFontSize(-1)}
-          title="Decrease font size"
-        >
-          A&minus;
-        </button>
-        <span class="min-w-[3ch] text-center text-xs text-gray-500 dark:text-gray-400">
-          {uiStore.fontSize}
-        </span>
-        <button
-          type="button"
-          class="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-          onClick={() => changeFontSize(1)}
-          title="Increase font size"
-        >
-          A+
-        </button>
-        <div class="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
-        <button
-          type="button"
-          class="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-          onClick={() => {
-            setUIStore("darkMode", !uiStore.darkMode);
-            debouncedSave();
-          }}
-          title={
-            uiStore.darkMode ? "Switch to light mode" : "Switch to dark mode"
-          }
-        >
-          {uiStore.darkMode ? (
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle cx="12" cy="12" r="5" />
-              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-            </svg>
-          ) : (
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-            </svg>
-          )}
-        </button>
       </div>
     </div>
   );

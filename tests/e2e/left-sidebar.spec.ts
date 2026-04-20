@@ -35,16 +35,36 @@ test.describe("Left sidebar", () => {
   });
 
   test("font size buttons change font size", async ({ page }) => {
-    const fontDisplay = sidebar(page).locator("span.min-w-\\[3ch\\]");
-    const initial = Number(await fontDisplay.textContent());
+    // Font size lives in the root element's font-size style (applied reactively).
+    const initialPx = Number(
+      (
+        await page.evaluate(() =>
+          getComputedStyle(document.documentElement).fontSize
+        )
+      ).replace("px", "")
+    );
 
     await fontIncreaseButton(page).click();
     await page.waitForTimeout(100);
-    expect(Number(await fontDisplay.textContent())).toBe(initial + 1);
+    const afterIncrease = Number(
+      (
+        await page.evaluate(() =>
+          getComputedStyle(document.documentElement).fontSize
+        )
+      ).replace("px", "")
+    );
+    expect(afterIncrease).toBe(initialPx + 1);
 
     await fontDecreaseButton(page).click();
     await page.waitForTimeout(100);
-    expect(Number(await fontDisplay.textContent())).toBe(initial);
+    const afterDecrease = Number(
+      (
+        await page.evaluate(() =>
+          getComputedStyle(document.documentElement).fontSize
+        )
+      ).replace("px", "")
+    );
+    expect(afterDecrease).toBe(initialPx);
   });
 
   test("topics list shows topics from fixtures", async ({ page }) => {

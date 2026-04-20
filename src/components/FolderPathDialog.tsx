@@ -2,6 +2,7 @@ import { createSignal } from "solid-js";
 import { FileService } from "../services/FileService";
 
 interface FolderPathDialogProps {
+  heading?: string;
   currentPath?: string | undefined;
   onSelect: (path: string) => void;
   onCancel: () => void;
@@ -58,7 +59,7 @@ export function FolderPathDialog(props: FolderPathDialogProps) {
     >
       <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
         <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
-          Switch Notes Folder
+          {props.heading ?? "Switch Notes Folder"}
         </h2>
 
         <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">

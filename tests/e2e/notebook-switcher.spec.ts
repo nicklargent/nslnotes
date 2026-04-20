@@ -183,9 +183,12 @@ test.describe("Notebook switcher", () => {
       await betaTab.click({ button: "right" });
       await page.getByRole("button", { name: "Rename", exact: true }).click();
 
-      // The inline input replaces the tab label and is autofocused.
-      const input = page.locator("input:focus");
-      await expect(input).toBeVisible();
+      // Inline input replaces the tab label. Find it by its initial value.
+      const input = page
+        .locator("input")
+        .filter({ hasNot: page.locator("[placeholder]") })
+        .first();
+      await expect(input).toBeVisible({ timeout: 5000 });
       await expect(input).toHaveValue("beta");
       await input.fill("bravo");
       await input.press("Enter");

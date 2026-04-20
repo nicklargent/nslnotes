@@ -27,16 +27,17 @@ export function searchButton(page: Page): Locator {
 }
 
 export function fontDecreaseButton(page: Page): Locator {
-  return sidebar(page).getByRole("button", { name: "A−" });
+  return page.locator("button[title^='Decrease font size']");
 }
 
 export function fontIncreaseButton(page: Page): Locator {
-  return sidebar(page).getByRole("button", { name: "A+" });
+  return page.locator("button[title^='Increase font size']");
 }
 
 export function darkModeToggle(page: Page): Locator {
-  // The dark mode button is in the bottom controls, next to font controls
-  return sidebar(page).locator("button").filter({ has: page.locator("svg") }).last();
+  return page.locator(
+    "button[title='Switch to light mode'], button[title='Switch to dark mode']"
+  );
 }
 
 // --- Editor ---

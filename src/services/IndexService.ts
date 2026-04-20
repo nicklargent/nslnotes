@@ -200,68 +200,73 @@ export const IndexService = {
     rootPath: string,
     notebookId: string
   ): Promise<void> => {
-    const notesDir = joinPath(rootPath, "notes");
-    const tasksDir = joinPath(rootPath, "tasks");
-    const docsDir = joinPath(rootPath, "docs");
+    setIndexStore("indexing", true);
+    try {
+      const notesDir = joinPath(rootPath, "notes");
+      const tasksDir = joinPath(rootPath, "tasks");
+      const docsDir = joinPath(rootPath, "docs");
 
-    const [noteFiles, taskFiles, docFiles] = await Promise.all([
-      FileService.listMarkdownFiles(notesDir).catch(() => []),
-      FileService.listMarkdownFiles(tasksDir).catch(() => []),
-      FileService.listMarkdownFiles(docsDir).catch(() => []),
-    ]);
+      const [noteFiles, taskFiles, docFiles] = await Promise.all([
+        FileService.listMarkdownFiles(notesDir).catch(() => []),
+        FileService.listMarkdownFiles(tasksDir).catch(() => []),
+        FileService.listMarkdownFiles(docsDir).catch(() => []),
+      ]);
 
-    const notePromises = noteFiles.map(async (entry) => {
-      const content = await FileService.read(entry.path);
-      return parseNote(entry.path, content);
-    });
-    const taskPromises = taskFiles.map(async (entry) => {
-      const content = await FileService.read(entry.path);
-      return parseTask(entry.path, content);
-    });
-    const docPromises = docFiles.map(async (entry) => {
-      const content = await FileService.read(entry.path);
-      return parseDoc(entry.path, content);
-    });
+      const notePromises = noteFiles.map(async (entry) => {
+        const content = await FileService.read(entry.path);
+        return parseNote(entry.path, content);
+      });
+      const taskPromises = taskFiles.map(async (entry) => {
+        const content = await FileService.read(entry.path);
+        return parseTask(entry.path, content);
+      });
+      const docPromises = docFiles.map(async (entry) => {
+        const content = await FileService.read(entry.path);
+        return parseDoc(entry.path, content);
+      });
 
-    const [noteResults, taskResults, docResults] = await Promise.all([
-      Promise.all(notePromises),
-      Promise.all(taskPromises),
-      Promise.all(docPromises),
-    ]);
+      const [noteResults, taskResults, docResults] = await Promise.all([
+        Promise.all(notePromises),
+        Promise.all(taskPromises),
+        Promise.all(docPromises),
+      ]);
 
-    const notes = new Map<string, Note>();
-    for (const note of noteResults) {
-      if (note) notes.set(note.path, note);
+      const notes = new Map<string, Note>();
+      for (const note of noteResults) {
+        if (note) notes.set(note.path, note);
+      }
+      const tasks = new Map<string, Task>();
+      for (const task of taskResults) {
+        if (task) tasks.set(task.path, task);
+      }
+      const docs = new Map<string, Doc>();
+      for (const doc of docResults) {
+        if (doc) docs.set(doc.path, doc);
+      }
+
+      const topicsYamlPath = joinPath(rootPath, "topics.yaml");
+      const topicsYaml = await TopicService.loadTopicsYaml(topicsYamlPath);
+      const topics = buildTopics(notes, tasks, docs, topicsYaml);
+
+      setIndexStore({
+        notes,
+        tasks,
+        docs,
+        topics,
+        topicsYaml,
+        lastIndexed: new Date(),
+      });
+
+      saveIndexCache(notebookId, notes, tasks, docs, topicsYaml);
+
+      // Build image index (T6.4)
+      void IndexService.buildImageIndex(rootPath);
+
+      // Build backlinks
+      buildBacklinks();
+    } finally {
+      setIndexStore("indexing", false);
     }
-    const tasks = new Map<string, Task>();
-    for (const task of taskResults) {
-      if (task) tasks.set(task.path, task);
-    }
-    const docs = new Map<string, Doc>();
-    for (const doc of docResults) {
-      if (doc) docs.set(doc.path, doc);
-    }
-
-    const topicsYamlPath = joinPath(rootPath, "topics.yaml");
-    const topicsYaml = await TopicService.loadTopicsYaml(topicsYamlPath);
-    const topics = buildTopics(notes, tasks, docs, topicsYaml);
-
-    setIndexStore({
-      notes,
-      tasks,
-      docs,
-      topics,
-      topicsYaml,
-      lastIndexed: new Date(),
-    });
-
-    saveIndexCache(notebookId, notes, tasks, docs, topicsYaml);
-
-    // Build image index (T6.4)
-    void IndexService.buildImageIndex(rootPath);
-
-    // Build backlinks
-    buildBacklinks();
   },
 
   /**

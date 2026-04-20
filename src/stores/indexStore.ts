@@ -13,6 +13,7 @@ function initialIndexState(): IndexState {
     topics: new Map<TopicRef, Topic>(),
     topicsYaml: new Map<TopicRef, TopicDecoration>(),
     lastIndexed: null,
+    indexing: false,
     imageFiles: new Map<string, ImageFile>(),
     entityToImages: new Map<string, string[]>(),
     imageToEntities: new Map<string, string[]>(),
