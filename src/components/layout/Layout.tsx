@@ -4,6 +4,7 @@ import { uiStore, setUIStore } from "../../stores/uiStore";
 import { SettingsService } from "../../services/SettingsService";
 
 interface LayoutProps {
+  top?: JSX.Element;
   left: JSX.Element;
   center: JSX.Element;
   right: JSX.Element;
@@ -34,39 +35,42 @@ function clamp(value: number, min: number, max: number): number {
  */
 export function Layout(props: LayoutProps) {
   return (
-    <div
-      class="grid h-screen overflow-hidden bg-gray-50 dark:bg-gray-900"
-      style={{
-        "grid-template-columns": `${uiStore.leftColumnWidth}px 4px 1fr 4px ${uiStore.rightColumnWidth}px`,
-      }}
-    >
-      <aside class="flex flex-col overflow-y-auto border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        {props.left}
-      </aside>
-      <ResizeHandle
-        onResize={(delta) => {
-          setUIStore(
-            "leftColumnWidth",
-            clamp(uiStore.leftColumnWidth + delta, 160, 400)
-          );
+    <div class="flex h-screen flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
+      {props.top}
+      <div
+        class="grid min-h-0 flex-1"
+        style={{
+          "grid-template-columns": `${uiStore.leftColumnWidth}px 4px 1fr 4px ${uiStore.rightColumnWidth}px`,
         }}
-        onResizeEnd={debouncedSave}
-      />
-      <main class="flex flex-col overflow-y-auto overflow-x-hidden">
-        {props.center}
-      </main>
-      <ResizeHandle
-        onResize={(delta) => {
-          setUIStore(
-            "rightColumnWidth",
-            clamp(uiStore.rightColumnWidth - delta, 180, 480)
-          );
-        }}
-        onResizeEnd={debouncedSave}
-      />
-      <aside class="flex flex-col overflow-y-auto border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        {props.right}
-      </aside>
+      >
+        <aside class="flex flex-col overflow-y-auto border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          {props.left}
+        </aside>
+        <ResizeHandle
+          onResize={(delta) => {
+            setUIStore(
+              "leftColumnWidth",
+              clamp(uiStore.leftColumnWidth + delta, 160, 400)
+            );
+          }}
+          onResizeEnd={debouncedSave}
+        />
+        <main class="flex flex-col overflow-y-auto overflow-x-hidden">
+          {props.center}
+        </main>
+        <ResizeHandle
+          onResize={(delta) => {
+            setUIStore(
+              "rightColumnWidth",
+              clamp(uiStore.rightColumnWidth - delta, 180, 480)
+            );
+          }}
+          onResizeEnd={debouncedSave}
+        />
+        <aside class="flex flex-col overflow-y-auto border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          {props.right}
+        </aside>
+      </div>
     </div>
   );
 }

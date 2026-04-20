@@ -55,6 +55,7 @@ export const IndexService = {
    */
   buildIndex: async (
     rootPath: string,
+    notebookId: string,
     onProgress?: (completed: number, total: number) => void
   ): Promise<{
     durationMs: number;
@@ -63,7 +64,7 @@ export const IndexService = {
     const startTime = performance.now();
 
     // Try loading cached index first (T7.2)
-    const cached = loadIndexCache();
+    const cached = loadIndexCache(notebookId);
     if (cached) {
       const topics = buildTopics(
         cached.notes,
@@ -84,7 +85,7 @@ export const IndexService = {
         cached.notes.size + cached.tasks.size + cached.docs.size;
       onProgress?.(cachedTotal, cachedTotal);
       // Rebuild in background to pick up any changes since cache
-      void IndexService._rebuildFresh(rootPath);
+      void IndexService._rebuildFresh(rootPath, notebookId);
       const durationMs = performance.now() - startTime;
       return {
         durationMs,
@@ -176,7 +177,7 @@ export const IndexService = {
     });
 
     // Save to cache (T7.2)
-    saveIndexCache(notes, tasks, docs, topicsYaml);
+    saveIndexCache(notebookId, notes, tasks, docs, topicsYaml);
 
     // Build image index (T6.4)
     void IndexService.buildImageIndex(rootPath);
@@ -195,7 +196,10 @@ export const IndexService = {
    * Background rebuild after loading from cache (T7.2).
    * Performs a full file system read and updates the store with fresh data.
    */
-  _rebuildFresh: async (rootPath: string): Promise<void> => {
+  _rebuildFresh: async (
+    rootPath: string,
+    notebookId: string
+  ): Promise<void> => {
     const notesDir = joinPath(rootPath, "notes");
     const tasksDir = joinPath(rootPath, "tasks");
     const docsDir = joinPath(rootPath, "docs");
@@ -251,7 +255,7 @@ export const IndexService = {
       lastIndexed: new Date(),
     });
 
-    saveIndexCache(notes, tasks, docs, topicsYaml);
+    saveIndexCache(notebookId, notes, tasks, docs, topicsYaml);
 
     // Build image index (T6.4)
     void IndexService.buildImageIndex(rootPath);

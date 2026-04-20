@@ -5,6 +5,7 @@ import {
   onMount,
   onCleanup,
   Show,
+  batch,
 } from "solid-js";
 import { SetupScreen } from "./components/SetupScreen";
 import { AppErrorBoundary } from "./components/ErrorBoundary";
@@ -23,12 +24,26 @@ import {
   NavigationService,
   FileService,
 } from "./services";
-import { clearIndexCache } from "./lib/indexCache";
-import { indexStore, setIndexStore } from "./stores/indexStore";
-import { contextStore, setContextStore } from "./stores/contextStore";
+import { clearAllIndexCaches, clearIndexCache } from "./lib/indexCache";
+import { indexStore, resetIndexStore } from "./stores/indexStore";
+import {
+  contextStore,
+  setContextStore,
+  resetContextStore,
+} from "./stores/contextStore";
 import { uiStore, setUIStore } from "./stores/uiStore";
+import {
+  editorStore,
+  setEditorStore,
+  resetEditorStore,
+} from "./stores/editorStore";
+import { notebooksStore, notebooksApi } from "./stores/notebooksStore";
+import { closeImagePreview } from "./stores/imagePreviewStore";
 import { debouncedSave } from "./components/layout/Layout";
 import { findStore, openFind, closeFind } from "./stores/findStore";
+import { NotebookTabBar } from "./components/layout/NotebookTabBar";
+import { ConfirmDiscardChangesModal } from "./components/modals/ConfirmDiscardChangesModal";
+import type { Notebook } from "./services/SettingsService";
 import type { Topic } from "./types/topics";
 import type { Doc } from "./types/entities";
 
@@ -46,14 +61,16 @@ type AppState = "loading" | "setup" | "ready";
 function App() {
   const [appState, setAppState] = createSignal<AppState>("loading");
 
-  const [rootPath, setRootPath] = createSignal<string | null>(null);
   const [showShortcuts, setShowShortcuts] = createSignal(false);
   const [showQuickCapture, setShowQuickCapture] = createSignal(false);
+  const [pendingSwitch, setPendingSwitch] = createSignal<Notebook | null>(null);
   const [loadProgress, setLoadProgress] = createSignal<LoadProgress>({
     percent: 0,
     status: "Loading settings...",
   });
   let unwatchFn: (() => void) | null = null;
+  // Incremented per switch; watcher callbacks keyed to a stale epoch drop their events.
+  let switchEpoch = 0;
 
   // Apply font size to document root reactively
   createEffect(() => {
@@ -67,7 +84,6 @@ function App() {
 
   onMount(async () => {
     try {
-      // Hydrate UI store from persisted settings
       const settings = await SettingsService.loadSettings();
       if (settings.leftColumnWidth != null) {
         setUIStore("leftColumnWidth", settings.leftColumnWidth);
@@ -83,39 +99,35 @@ function App() {
       }
 
       setLoadProgress({ percent: 10, status: "Checking configuration..." });
-      const configured = await SettingsService.isConfigured();
+      notebooksApi.hydrateFrom(settings);
+      const active = notebooksApi.activeNotebook();
 
-      if (configured) {
-        const path = await SettingsService.getRootPath();
-        setRootPath(path);
-        if (path) {
-          setLoadProgress({ percent: 15, status: "Building index..." });
-          let lastPct = 15;
-          const onProgress = (completed: number, total: number) => {
-            // Map file parsing progress into 15–90% range
-            const pct =
-              total > 0 ? Math.round(15 + (completed / total) * 75) : 15;
-            if (pct === lastPct) return;
-            lastPct = pct;
-            setLoadProgress({
-              percent: pct,
-              status: `Indexing files... ${completed} / ${total}`,
-            });
-          };
-          try {
-            await IndexService.buildIndex(path, onProgress);
-          } catch (indexErr) {
-            // Index build failed (likely stale cache) — clear cache and retry
-            console.warn(
-              "Index build failed, clearing cache and retrying:",
-              indexErr
-            );
-            clearIndexCache();
-            await IndexService.buildIndex(path, onProgress);
-          }
-          setLoadProgress({ percent: 95, status: "Starting file watcher..." });
-          startFileWatcher(path);
+      if (active) {
+        setLoadProgress({ percent: 15, status: "Building index..." });
+        let lastPct = 15;
+        const onProgress = (completed: number, total: number) => {
+          // Map file parsing progress into 15–90% range
+          const pct =
+            total > 0 ? Math.round(15 + (completed / total) * 75) : 15;
+          if (pct === lastPct) return;
+          lastPct = pct;
+          setLoadProgress({
+            percent: pct,
+            status: `Indexing files... ${completed} / ${total}`,
+          });
+        };
+        try {
+          await IndexService.buildIndex(active.path, active.id, onProgress);
+        } catch (indexErr) {
+          console.warn(
+            "Index build failed, clearing cache and retrying:",
+            indexErr
+          );
+          clearAllIndexCaches();
+          await IndexService.buildIndex(active.path, active.id, onProgress);
         }
+        setLoadProgress({ percent: 95, status: "Starting file watcher..." });
+        startFileWatcher(active.path);
         NavigationService.initHistory();
         setLoadProgress({ percent: 100, status: "Ready" });
         setAppState("ready");
@@ -223,9 +235,10 @@ function App() {
   });
 
   function startFileWatcher(path: string) {
+    const epoch = switchEpoch;
     unwatchFn = FileService.onFileChange((event) => {
+      if (epoch !== switchEpoch) return;
       if (event.path.endsWith(".md") || event.path.endsWith(".yaml")) {
-        // Skip redundant invalidation for files we just wrote ourselves
         if (FileService.isRecentWrite(event.path)) return;
         void IndexService.invalidate(event.path, path);
       }
@@ -234,74 +247,74 @@ function App() {
   }
 
   async function handleSetupComplete(path: string) {
-    setRootPath(path);
-    await IndexService.buildIndex(path);
+    const nb = await notebooksApi.add(path);
+    await IndexService.buildIndex(path, nb.id);
     startFileWatcher(path);
     setAppState("ready");
     showToast("Notes folder configured successfully", "success");
   }
 
-  async function switchFolderToPath(selected: string) {
-    // Tear down current state
-    unwatchFn?.();
-    unwatchFn = null;
-    await FileService.stopWatching();
-    clearIndexCache();
-    setIndexStore("notes", new Map());
-    setIndexStore("tasks", new Map());
-    setIndexStore("docs", new Map());
-    setIndexStore("topics", new Map());
-    setIndexStore("topicsYaml", new Map());
-    setIndexStore("imageFiles", new Map());
-    setIndexStore("entityToImages", new Map());
-    setIndexStore("imageToEntities", new Map());
-    setIndexStore("backlinkIndex", new Map());
-    setIndexStore("lastIndexed", null);
+  async function switchToNotebook(nb: Notebook) {
+    if (notebooksStore.switching) return;
+    if (notebooksStore.activeNotebookId === nb.id) return;
 
-    // Initialize with new folder
-    await SettingsService.setRootPath(selected);
-    setRootPath(selected);
-    await IndexService.buildIndex(selected);
-    startFileWatcher(selected);
-    NavigationService.goHome();
-    showToast("Switched notes folder", "success");
+    if (editorStore.isDirty) {
+      setPendingSwitch(nb);
+      return;
+    }
+    await performSwitch(nb);
   }
 
-  async function switchFolder() {
+  async function performSwitch(nb: Notebook) {
+    notebooksApi.setSwitching(true);
     try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: "Select Notes Folder",
+      switchEpoch += 1;
+
+      unwatchFn?.();
+      unwatchFn = null;
+      await FileService.stopWatching();
+
+      batch(() => {
+        resetIndexStore();
+        resetContextStore();
+        resetEditorStore();
       });
+      closeFind();
+      closeImagePreview();
 
-      if (!selected || typeof selected !== "string") return;
-
-      const status = await FileService.verifyDirectory(selected);
-      if (!status.readable || !status.writable) {
-        showToast("Selected folder is not readable/writable", "error");
-        return;
-      }
-
-      await FileService.ensureDirectory(selected);
-      await switchFolderToPath(selected);
-    } catch (err) {
-      showToast(
-        `Failed to switch folder: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "error"
-      );
+      await Promise.all([
+        notebooksApi.setActive(nb.id),
+        IndexService.buildIndex(nb.path, nb.id),
+      ]);
+      startFileWatcher(nb.path);
+      NavigationService.goHome();
+    } finally {
+      notebooksApi.setSwitching(false);
     }
   }
 
-  async function switchFolderWeb(path: string) {
-    try {
-      await switchFolderToPath(path);
-    } catch (err) {
-      showToast(
-        `Failed to switch folder: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "error"
-      );
+  async function handleAddNotebook(path: string) {
+    const status = await FileService.verifyDirectory(path);
+    if (!status.readable || !status.writable) {
+      showToast("Selected folder is not readable/writable", "error");
+      return;
+    }
+    await FileService.ensureDirectory(path);
+    const nb = await notebooksApi.add(path);
+    await switchToNotebook(nb);
+  }
+
+  async function handleRemoveNotebook(id: string) {
+    const wasActive = notebooksStore.activeNotebookId === id;
+    clearIndexCache(id);
+    await notebooksApi.remove(id);
+    if (wasActive) {
+      const next = notebooksStore.notebooks[0];
+      if (next) {
+        await performSwitch(next);
+      } else {
+        setAppState("setup");
+      }
     }
   }
 
@@ -387,6 +400,14 @@ function App() {
 
       <Show when={appState() === "ready"}>
         <Layout
+          top={
+            <NotebookTabBar
+              onSelect={switchToNotebook}
+              onAdd={handleAddNotebook}
+              onRemove={handleRemoveNotebook}
+              onRename={(id, name) => notebooksApi.rename(id, name)}
+            />
+          }
           left={
             <LeftSidebar
               topics={sortedTopics()}
@@ -398,9 +419,6 @@ function App() {
               onTopicClick={(ref) => NavigationService.navigateToTopic(ref)}
               onDocClick={(doc) => NavigationService.navigateTo(doc)}
               onCreateDoc={() => setContextStore("draft", { type: "doc" })}
-              onSwitchFolder={switchFolder}
-              onSwitchFolderWeb={switchFolderWeb}
-              currentRootPath={rootPath()}
               datesWithNotes={datesWithNotes()}
               onDateSelect={(date) => NavigationService.navigateToDate(date)}
             />
@@ -423,6 +441,22 @@ function App() {
             />
           }
         />
+      </Show>
+
+      <Show when={pendingSwitch()}>
+        {(nb) => (
+          <ConfirmDiscardChangesModal
+            target={`notebook "${nb().name}"`}
+            onClose={() => setPendingSwitch(null)}
+            onConfirm={async () => {
+              const target = nb();
+              setPendingSwitch(null);
+              // Clear dirty flag so performSwitch doesn't re-prompt.
+              setEditorStore("isDirty", false);
+              await performSwitch(target);
+            }}
+          />
+        )}
       </Show>
 
       <Show when={showShortcuts()}>

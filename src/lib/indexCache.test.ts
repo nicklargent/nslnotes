@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { saveIndexCache, loadIndexCache, clearIndexCache } from "./indexCache";
+import {
+  saveIndexCache,
+  loadIndexCache,
+  clearIndexCache,
+  clearAllIndexCaches,
+} from "./indexCache";
 import type { Note, Task, Doc } from "../types/entities";
 import type { TopicRef, TopicDecoration } from "../types/topics";
 
-// Mock localStorage
+// Mock localStorage with keys/length support (used by clearAllIndexCaches)
 const storage = new Map<string, string>();
 const localStorageMock = {
   getItem: vi.fn((key: string) => storage.get(key) ?? null),
@@ -13,9 +18,16 @@ const localStorageMock = {
   removeItem: vi.fn((key: string) => {
     storage.delete(key);
   }),
+  key: vi.fn((index: number) => Array.from(storage.keys())[index] ?? null),
+  get length() {
+    return storage.size;
+  },
 };
 
 vi.stubGlobal("localStorage", localStorageMock);
+
+const NB = "nb-test-1";
+const NB2 = "nb-test-2";
 
 function makeNote(overrides: Partial<Note> = {}): Note {
   return {
@@ -87,8 +99,8 @@ describe("indexCache", () => {
         ],
       ]);
 
-      saveIndexCache(notes, tasks, docs, topicsYaml);
-      const loaded = loadIndexCache();
+      saveIndexCache(NB, notes, tasks, docs, topicsYaml);
+      const loaded = loadIndexCache(NB);
 
       expect(loaded).not.toBeNull();
       expect(loaded!.notes.size).toBe(1);
@@ -107,8 +119,8 @@ describe("indexCache", () => {
       const docs = new Map<string, Doc>();
       const topicsYaml = new Map<TopicRef, TopicDecoration>();
 
-      saveIndexCache(notes, tasks, docs, topicsYaml);
-      const loaded = loadIndexCache();
+      saveIndexCache(NB, notes, tasks, docs, topicsYaml);
+      const loaded = loadIndexCache(NB);
 
       const loadedNote = loaded!.notes.get(note.path);
       expect(loadedNote!.title).toBe("Test Note");
@@ -123,8 +135,8 @@ describe("indexCache", () => {
       const docs = new Map<string, Doc>();
       const topicsYaml = new Map<TopicRef, TopicDecoration>();
 
-      saveIndexCache(notes, tasks, docs, topicsYaml);
-      const loaded = loadIndexCache();
+      saveIndexCache(NB, notes, tasks, docs, topicsYaml);
+      const loaded = loadIndexCache(NB);
 
       const loadedNote = loaded!.notes.get("/root/notes/2026-03-10.md");
       expect(loadedNote!.modifiedAt).toBeInstanceOf(Date);
@@ -139,8 +151,8 @@ describe("indexCache", () => {
       const docs = new Map<string, Doc>();
       const topicsYaml = new Map<TopicRef, TopicDecoration>();
 
-      saveIndexCache(notes, tasks, docs, topicsYaml);
-      const loaded = loadIndexCache();
+      saveIndexCache(NB, notes, tasks, docs, topicsYaml);
+      const loaded = loadIndexCache(NB);
 
       const loadedTask = loaded!.tasks.get("/root/tasks/my-task.md");
       expect(loadedTask!.modifiedAt).toBeInstanceOf(Date);
@@ -149,17 +161,17 @@ describe("indexCache", () => {
 
   describe("loadIndexCache", () => {
     it("returns null when no cache exists", () => {
-      expect(loadIndexCache()).toBeNull();
+      expect(loadIndexCache(NB)).toBeNull();
     });
 
     it("returns null for invalid JSON", () => {
-      storage.set("nslnotes-index-cache", "not valid json{{{");
-      expect(loadIndexCache()).toBeNull();
+      storage.set(`nslnotes-index-cache:${NB}`, "not valid json{{{");
+      expect(loadIndexCache(NB)).toBeNull();
     });
 
     it("returns null for wrong version", () => {
       storage.set(
-        "nslnotes-index-cache",
+        `nslnotes-index-cache:${NB}`,
         JSON.stringify({
           version: 999,
           timestamp: Date.now(),
@@ -169,13 +181,13 @@ describe("indexCache", () => {
           topicsYaml: [],
         })
       );
-      expect(loadIndexCache()).toBeNull();
+      expect(loadIndexCache(NB)).toBeNull();
     });
 
     it("returns null for stale cache (>1 hour)", () => {
       const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
       storage.set(
-        "nslnotes-index-cache",
+        `nslnotes-index-cache:${NB}`,
         JSON.stringify({
           version: 1,
           timestamp: twoHoursAgo,
@@ -185,13 +197,13 @@ describe("indexCache", () => {
           topicsYaml: [],
         })
       );
-      expect(loadIndexCache()).toBeNull();
+      expect(loadIndexCache(NB)).toBeNull();
     });
 
     it("returns cache that is less than 1 hour old", () => {
       const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
       storage.set(
-        "nslnotes-index-cache",
+        `nslnotes-index-cache:${NB}`,
         JSON.stringify({
           version: 1,
           timestamp: thirtyMinutesAgo,
@@ -201,24 +213,77 @@ describe("indexCache", () => {
           topicsYaml: [],
         })
       );
-      const result = loadIndexCache();
+      const result = loadIndexCache(NB);
       expect(result).not.toBeNull();
       expect(result!.notes.size).toBe(0);
     });
   });
 
   describe("clearIndexCache", () => {
-    it("removes cache from localStorage", () => {
+    it("removes the target notebook's cache from localStorage", () => {
       const notes = new Map([["/root/notes/2026-03-10.md", makeNote()]]);
       const tasks = new Map<string, Task>();
       const docs = new Map<string, Doc>();
       const topicsYaml = new Map<TopicRef, TopicDecoration>();
 
-      saveIndexCache(notes, tasks, docs, topicsYaml);
-      expect(loadIndexCache()).not.toBeNull();
+      saveIndexCache(NB, notes, tasks, docs, topicsYaml);
+      expect(loadIndexCache(NB)).not.toBeNull();
 
-      clearIndexCache();
-      expect(loadIndexCache()).toBeNull();
+      clearIndexCache(NB);
+      expect(loadIndexCache(NB)).toBeNull();
+    });
+  });
+
+  describe("per-notebook isolation", () => {
+    it("two notebooks' caches do not collide", () => {
+      const notesA = new Map([
+        ["/a/notes/a.md", makeNote({ path: "/a/notes/a.md", slug: "a" })],
+      ]);
+      const notesB = new Map([
+        ["/b/notes/b1.md", makeNote({ path: "/b/notes/b1.md", slug: "b1" })],
+        ["/b/notes/b2.md", makeNote({ path: "/b/notes/b2.md", slug: "b2" })],
+      ]);
+      const empty = new Map();
+
+      saveIndexCache(NB, notesA, empty, empty, empty);
+      saveIndexCache(NB2, notesB, empty, empty, empty);
+
+      const a = loadIndexCache(NB);
+      const b = loadIndexCache(NB2);
+      expect(a!.notes.size).toBe(1);
+      expect(b!.notes.size).toBe(2);
+    });
+
+    it("clearing one notebook does not affect another", () => {
+      const empty = new Map();
+      const notes = new Map([
+        ["/x/notes/x.md", makeNote({ path: "/x/notes/x.md" })],
+      ]);
+
+      saveIndexCache(NB, notes, empty, empty, empty);
+      saveIndexCache(NB2, notes, empty, empty, empty);
+
+      clearIndexCache(NB);
+
+      expect(loadIndexCache(NB)).toBeNull();
+      expect(loadIndexCache(NB2)).not.toBeNull();
+    });
+
+    it("clearAllIndexCaches removes all notebook caches", () => {
+      const empty = new Map();
+      const notes = new Map([
+        ["/x/notes/x.md", makeNote({ path: "/x/notes/x.md" })],
+      ]);
+      saveIndexCache(NB, notes, empty, empty, empty);
+      saveIndexCache(NB2, notes, empty, empty, empty);
+      // An unrelated key should not be touched.
+      storage.set("unrelated-key", "keep me");
+
+      clearAllIndexCaches();
+
+      expect(loadIndexCache(NB)).toBeNull();
+      expect(loadIndexCache(NB2)).toBeNull();
+      expect(storage.get("unrelated-key")).toBe("keep me");
     });
   });
 
@@ -229,8 +294,8 @@ describe("indexCache", () => {
       const docs = new Map<string, Doc>();
       const topicsYaml = new Map<TopicRef, TopicDecoration>();
 
-      saveIndexCache(notes, tasks, docs, topicsYaml);
-      const loaded = loadIndexCache();
+      saveIndexCache(NB, notes, tasks, docs, topicsYaml);
+      const loaded = loadIndexCache(NB);
 
       expect(loaded).not.toBeNull();
       expect(loaded!.notes.size).toBe(0);
@@ -272,8 +337,8 @@ describe("indexCache", () => {
       const docs = new Map<string, Doc>();
       const topicsYaml = new Map<TopicRef, TopicDecoration>();
 
-      saveIndexCache(notes, tasks, docs, topicsYaml);
-      const loaded = loadIndexCache();
+      saveIndexCache(NB, notes, tasks, docs, topicsYaml);
+      const loaded = loadIndexCache(NB);
 
       expect(loaded!.notes.size).toBe(2);
       expect(loaded!.tasks.size).toBe(2);
@@ -291,8 +356,14 @@ describe("indexCache", () => {
 
       // Should not throw
       expect(() =>
-        saveIndexCache(notes, tasks, docs, topicsYaml)
+        saveIndexCache(NB, notes, tasks, docs, topicsYaml)
       ).not.toThrow();
+    });
+
+    it("load/save with empty notebookId are no-ops", () => {
+      const empty = new Map();
+      saveIndexCache("", empty, empty, empty, empty);
+      expect(loadIndexCache("")).toBeNull();
     });
   });
 });

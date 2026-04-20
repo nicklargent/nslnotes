@@ -1,8 +1,12 @@
 import type { Note, Task, Doc } from "../types/entities";
 import type { TopicRef, TopicDecoration } from "../types/topics";
 
-const CACHE_KEY = "nslnotes-index-cache";
+const CACHE_PREFIX = "nslnotes-index-cache:";
 const CACHE_VERSION = 1;
+
+function cacheKey(notebookId: string): string {
+  return `${CACHE_PREFIX}${notebookId}`;
+}
 
 interface CachedIndex {
   version: number;
@@ -17,11 +21,13 @@ interface CachedIndex {
  * Save index to localStorage for faster cold starts (T7.2).
  */
 export function saveIndexCache(
+  notebookId: string,
   notes: Map<string, Note>,
   tasks: Map<string, Task>,
   docs: Map<string, Doc>,
   topicsYaml: Map<TopicRef, TopicDecoration>
 ): void {
+  if (!notebookId) return;
   try {
     const cache: CachedIndex = {
       version: CACHE_VERSION,
@@ -31,7 +37,10 @@ export function saveIndexCache(
       docs: Array.from(docs.entries()),
       topicsYaml: Array.from(topicsYaml.entries()),
     };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache, dateReplacer));
+    localStorage.setItem(
+      cacheKey(notebookId),
+      JSON.stringify(cache, dateReplacer)
+    );
   } catch {
     // localStorage may be full or unavailable — silently ignore
   }
@@ -41,14 +50,15 @@ export function saveIndexCache(
  * Load cached index if valid.
  * Returns null if no cache, cache is stale (>1 hour), or version mismatch.
  */
-export function loadIndexCache(): {
+export function loadIndexCache(notebookId: string): {
   notes: Map<string, Note>;
   tasks: Map<string, Task>;
   docs: Map<string, Doc>;
   topicsYaml: Map<TopicRef, TopicDecoration>;
 } | null {
+  if (!notebookId) return null;
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKey(notebookId));
     if (!raw) return null;
 
     const cache: CachedIndex = JSON.parse(raw, dateReviver) as CachedIndex;
@@ -85,10 +95,28 @@ export function loadIndexCache(): {
 }
 
 /**
- * Clear the index cache.
+ * Clear the cache for a specific notebook.
  */
-export function clearIndexCache(): void {
-  localStorage.removeItem(CACHE_KEY);
+export function clearIndexCache(notebookId: string): void {
+  if (!notebookId) return;
+  localStorage.removeItem(cacheKey(notebookId));
+}
+
+/**
+ * Clear every notebook's index cache. Used when resetting settings or when a
+ * stale-format cache causes the index to fail to build.
+ */
+export function clearAllIndexCaches(): void {
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) toRemove.push(key);
+    }
+    for (const key of toRemove) localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
 }
 
 /** JSON replacer that serializes Date objects. */

@@ -14,11 +14,23 @@ pub fn default_path() -> PathBuf {
         .join("settings.json")
 }
 
+/// A registered notebook (a root folder that holds notes/tasks/docs)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Notebook {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+}
+
 /// Application settings
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct AppSettings {
     #[serde(rename = "rootPath")]
     pub root_path: Option<String>,
+    #[serde(default)]
+    pub notebooks: Vec<Notebook>,
+    #[serde(rename = "activeNotebookId", default)]
+    pub active_notebook_id: Option<String>,
     #[serde(rename = "leftColumnWidth", default)]
     pub left_column_width: Option<f64>,
     #[serde(rename = "rightColumnWidth", default)]
@@ -63,4 +75,37 @@ pub fn save_to_path(path: &Path, settings: &AppSettings) -> Result<(), String> {
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
 
     fs::write(path, content).map_err(|e| format!("Failed to write settings: {}", e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_settings_without_notebooks_deserializes() {
+        // A settings.json from before multi-notebook support: only rootPath.
+        let legacy = r#"{"rootPath": "/home/nsl/docs/nslnotes1"}"#;
+        let parsed: AppSettings = serde_json::from_str(legacy).expect("parse");
+        assert_eq!(parsed.root_path.as_deref(), Some("/home/nsl/docs/nslnotes1"));
+        assert!(parsed.notebooks.is_empty());
+        assert!(parsed.active_notebook_id.is_none());
+    }
+
+    #[test]
+    fn settings_with_notebooks_round_trip() {
+        let s = AppSettings {
+            root_path: Some("/a".into()),
+            notebooks: vec![
+                Notebook { id: "n1".into(), name: "Work".into(), path: "/a".into() },
+                Notebook { id: "n2".into(), name: "Home".into(), path: "/b".into() },
+            ],
+            active_notebook_id: Some("n1".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&s).expect("serialize");
+        let parsed: AppSettings = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed.notebooks.len(), 2);
+        assert_eq!(parsed.notebooks[0].name, "Work");
+        assert_eq!(parsed.active_notebook_id.as_deref(), Some("n1"));
+    }
 }

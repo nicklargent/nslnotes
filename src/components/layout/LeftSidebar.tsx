@@ -3,13 +3,11 @@ import { TodayButton } from "../sidebar/TodayButton";
 import { CalendarPicker } from "../sidebar/CalendarPicker";
 import { TopicsList } from "../sidebar/TopicsList";
 import { DocsList } from "../sidebar/DocsList";
-import { FolderPathDialog } from "../FolderPathDialog";
 import { uiStore, setUIStore } from "../../stores/uiStore";
 import { debouncedSave } from "./Layout";
 import { TopicService } from "../../services/TopicService";
 import { IndexService } from "../../services/IndexService";
 import { SettingsService } from "../../services/SettingsService";
-import { runtime } from "../../lib/runtime";
 import type { Topic, TopicRef } from "../../types/topics";
 import type { Doc } from "../../types/entities";
 
@@ -23,9 +21,6 @@ interface LeftSidebarProps {
   onDocClick: (doc: Doc) => void;
   onCreateDoc: () => void;
   onQuickCapture: () => void;
-  onSwitchFolder: () => void;
-  onSwitchFolderWeb?: (path: string) => void;
-  currentRootPath?: string | null;
   datesWithNotes: Set<string>;
   onDateSelect: (date: string) => void;
 }
@@ -60,7 +55,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
     setExpandedSection((cur) => (cur === section ? null : section));
   }
 
-  const [showFolderDialog, setShowFolderDialog] = createSignal(false);
   const [calendarOpen, setCalendarOpen] = createSignal(false);
   const [anchorRect, setAnchorRect] = createSignal<DOMRect | null>(null);
   let calendarBtnRef: HTMLButtonElement | undefined;
@@ -253,41 +247,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
             </svg>
           )}
         </button>
-        <div class="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
-        <button
-          type="button"
-          class="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-          onClick={() => {
-            if (runtime.isNative()) {
-              props.onSwitchFolder();
-            } else {
-              setShowFolderDialog(true);
-            }
-          }}
-          title="Switch notes folder"
-        >
-          <svg
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-          </svg>
-        </button>
       </div>
-
-      <Show when={showFolderDialog()}>
-        <FolderPathDialog
-          currentPath={props.currentRootPath ?? undefined}
-          onSelect={(path) => {
-            setShowFolderDialog(false);
-            props.onSwitchFolderWeb?.(path);
-          }}
-          onCancel={() => setShowFolderDialog(false)}
-        />
-      </Show>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { createSignal } from "solid-js";
 import { runtime } from "../lib/runtime";
 import { FileService } from "../services/FileService";
-import { SettingsService } from "../services/SettingsService";
 
 export interface SetupScreenProps {
   onComplete: (rootPath: string) => void;
@@ -84,10 +83,7 @@ export function SetupScreen(props: SetupScreenProps) {
       // Create the required subdirectories
       await FileService.ensureDirectory(path);
 
-      // Save the root path to settings
-      await SettingsService.setRootPath(path);
-
-      // Notify parent that setup is complete
+      // Notify parent — it registers the notebook and persists settings.
       props.onComplete(path);
     } catch (err) {
       setError(`Failed to set up folder: ${err}`);
