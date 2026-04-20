@@ -4,10 +4,14 @@
  * .md file survives htmlFromMarkdown → markdownFromHtml → htmlFromMarkdown
  * without changing.
  *
- * Each entry is an absolute path to a directory containing `notes/`, `tasks/`,
- * `docs/` subdirs (i.e. the root of an nslnotes vault).
+ * Each entry in `dirs` is an absolute path to a directory containing
+ * `notes/`, `tasks/`, `docs/` subdirs (i.e. the root of an nslnotes vault).
  */
-export const corpusDirs: string[] = [
-  // "/home/you/docs/nslnotes3",
-  // "/home/you/docs/nslnotes2",
-];
+import type { CorpusConfig } from "./helpers/corpus";
+
+export const corpus: CorpusConfig = {
+  dirs: [
+    // "/home/you/docs/nslnotes3",
+    // "/home/you/docs/nslnotes2",
+  ],
+};
