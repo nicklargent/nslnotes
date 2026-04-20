@@ -23,7 +23,7 @@ const TOPIC_REF_PATTERN =
  * Check if a line is inside a fenced code block.
  * Returns a set of line indices that are within code blocks.
  */
-function getCodeBlockLines(lines: string[]): Set<number> {
+export function getCodeBlockLines(lines: string[]): Set<number> {
   const codeLines = new Set<number>();
   let inCodeBlock = false;
 

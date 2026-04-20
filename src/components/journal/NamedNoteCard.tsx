@@ -18,6 +18,7 @@ import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
 import { SlugBadge } from "../metadata/SlugBadge";
 import { DeleteIconButton } from "../buttons/DeleteIconButton";
+import { RenameConvertButton } from "../buttons/RenameConvertButton";
 import type { Note } from "../../types/entities";
 
 interface NamedNoteCardProps {
@@ -132,6 +133,9 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
               onClick={() => void toggleRawMode()}
             />
           </span>
+          <Show when={!liveNote().isDaily}>
+            <RenameConvertButton entity={liveNote()} stopPropagation />
+          </Show>
           <DeleteIconButton
             buttonTitle="Delete note"
             confirmTitle={liveNote().title ?? liveNote().slug}

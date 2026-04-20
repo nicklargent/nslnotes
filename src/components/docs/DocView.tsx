@@ -14,6 +14,7 @@ import { EditableTopics } from "../metadata/EditableTopics";
 import { SlugBadge } from "../metadata/SlugBadge";
 import { consumeAutofocus } from "../draft/DraftView";
 import { DeleteIconButton } from "../buttons/DeleteIconButton";
+import { RenameConvertButton } from "../buttons/RenameConvertButton";
 import { BacklinksSection } from "../backlinks/BacklinksSection";
 import { NavigationService } from "../../services/NavigationService";
 import type { Doc } from "../../types/entities";
@@ -123,6 +124,7 @@ export function DocView(props: DocViewProps) {
                 active={rawMode()}
                 onClick={() => void toggleRawMode()}
               />
+              <RenameConvertButton entity={liveDoc()} />
               <DeleteIconButton
                 buttonTitle="Delete doc"
                 confirmTitle={liveDoc().title}

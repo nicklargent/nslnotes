@@ -344,7 +344,7 @@ function addImageToIndex(
 }
 
 /** Extract the slug (filename without .md) from an entity path. */
-function entitySlug(entityPath: string): string {
+export function entitySlug(entityPath: string): string {
   return entityPath
     .substring(entityPath.lastIndexOf("/") + 1)
     .replace(/\.md$/, "");

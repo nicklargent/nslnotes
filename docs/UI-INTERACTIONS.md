@@ -339,6 +339,24 @@ Source: `src/components/editor/Editor.tsx`, `PromoteConfirmBar.tsx`
 
 ---
 
+## 6.5. Rename / Convert
+
+Source: `src/components/buttons/RenameConvertButton.tsx`, `src/components/modals/RenameConvertModal.tsx`, `src/services/RenameService.ts`
+
+- [ ] Pencil icon button rendered next to the trash icon on doc, task, and named-note views (hidden on daily notes — `note.isDaily === true`)
+- [ ] Click opens "Rename / Convert" modal
+- [ ] Type radio: Task / Doc / Note (defaults to current type)
+- [ ] Slug input (defaults to current slug; for notes, the part after the date prefix)
+- [ ] Date input (only when type = Note; defaults to current date for notes, today otherwise)
+- [ ] Live preview shows target file path; if backlinks exist, shows count of inbound references that will be updated
+- [ ] Action button label: "Rename" when type unchanged, "Convert" when changing type
+- [ ] Submit moves the file to its new location, rewrites all `[[type:slug]]` references in other files (skipping fenced code blocks), and navigates to the new entity
+- [ ] Source-type-only frontmatter is stashed under `_<sourceType>` (e.g. `_task: { status, due }`) so a round-trip restores the original
+- [ ] Slug collision returns "An entity already exists at that location" without deleting the source
+- [ ] Cancel / Escape / click-outside dismisses without changes
+
+---
+
 ## 7. Doc View
 
 Source: `src/components/docs/DocView.tsx`
