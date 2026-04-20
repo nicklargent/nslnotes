@@ -24,10 +24,10 @@ test.describe("Task list (right panel)", () => {
   test("shows open tasks by default", async ({ page }) => {
     await expect(rightPanel(page).getByText("Open Tasks")).toBeVisible({ timeout: 5000 });
     await expect(
-      rightPanel(page).locator("button", { hasText: "Fix Login Bug" }),
+      rightPanel(page).getByText("Fix Login Bug"),
     ).toBeVisible({ timeout: 5000 });
     await expect(
-      rightPanel(page).locator("button", { hasText: "Write Docs" }),
+      rightPanel(page).getByText("Write Docs"),
     ).toBeVisible({ timeout: 5000 });
   });
 
@@ -36,10 +36,10 @@ test.describe("Task list (right panel)", () => {
     await expect(rightPanel(page).getByText("Closed Tasks")).toBeVisible({ timeout: 5000 });
     // Closed tasks: Old Feature (done) and Abandoned Work (cancelled)
     await expect(
-      rightPanel(page).locator("button", { hasText: "Old Feature" }),
+      rightPanel(page).getByText("Old Feature"),
     ).toBeVisible({ timeout: 5000 });
     await expect(
-      rightPanel(page).locator("button", { hasText: "Abandoned Work" }),
+      rightPanel(page).getByText("Abandoned Work"),
     ).toBeVisible({ timeout: 5000 });
   });
 
@@ -51,19 +51,20 @@ test.describe("Task list (right panel)", () => {
   });
 
   test("clicking task navigates to task detail", async ({ page }) => {
-    const taskBtn = rightPanel(page).locator("button", { hasText: "Write Docs" });
-    await taskBtn.first().click();
+    const taskRow = rightPanel(page).getByText("Write Docs");
+    await taskRow.first().click();
     await expect(centerPanel(page).getByText("Write Docs")).toBeVisible({ timeout: 5000 });
-    // Should show task detail view
+    // Should show task detail view (SlugBadge code is collapsed via max-w-0 until hover —
+    // assert presence via text content rather than visibility)
     await expect(
-      centerPanel(page).locator("code", { hasText: "[[task:write-docs]]" }),
-    ).toBeVisible({ timeout: 5000 });
+      centerPanel(page).locator("code").filter({ hasText: "[[task:write-docs]]" }),
+    ).toHaveCount(1, { timeout: 5000 });
   });
 
   test("clicking task navigates then can mark done via detail view", async ({ page }) => {
     // Navigate to task detail
-    const taskBtn = rightPanel(page).locator("button", { hasText: "Fix Login Bug" });
-    await taskBtn.first().click();
+    const taskRow = rightPanel(page).getByText("Fix Login Bug");
+    await taskRow.first().click();
     await page.waitForTimeout(500);
     // Mark done via detail button
     const markDone = page.getByRole("button", { name: "Mark Done" });
