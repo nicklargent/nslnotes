@@ -311,6 +311,10 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] 300ms debounce save on raw input
 - [ ] `onCleanup` flushes pending saves
 - [ ] Path change flushes pending save before loading new content
+- [ ] `Tab` with no selection (or single-line selection) inserts 2 spaces at cursor
+- [ ] `Shift+Tab` with no selection removes leading 2 spaces (or single tab) from current line
+- [ ] `Tab` with selection spanning multiple lines indents every touched line by 2 spaces and preserves the selection
+- [ ] `Shift+Tab` with selection spanning multiple lines outdents every touched line (strips leading 2 spaces or tab where present) and preserves the selection
 
 ---
 

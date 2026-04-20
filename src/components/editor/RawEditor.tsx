@@ -61,6 +61,75 @@ export function RawEditor(props: RawEditorProps) {
     }, 300);
   }
 
+  function handleKeyDown(
+    e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }
+  ) {
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    const ta = e.currentTarget;
+    const value = ta.value;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const multiLine = value.slice(start, end).includes("\n");
+
+    let newValue: string;
+    let newStart: number;
+    let newEnd: number;
+
+    if (!multiLine) {
+      if (e.shiftKey) {
+        const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+        const removed = value.startsWith("  ", lineStart)
+          ? 2
+          : value.startsWith("\t", lineStart)
+            ? 1
+            : 0;
+        if (removed === 0) return;
+        newValue = value.slice(0, lineStart) + value.slice(lineStart + removed);
+        newStart = Math.max(lineStart, start - removed);
+        newEnd = Math.max(lineStart, end - removed);
+      } else {
+        newValue = value.slice(0, start) + "  " + value.slice(end);
+        newStart = newEnd = start + 2;
+      }
+    } else {
+      const firstLineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const lineStarts: number[] = [firstLineStart];
+      for (let i = firstLineStart; i < end; i++) {
+        if (value[i] === "\n" && i + 1 < end) lineStarts.push(i + 1);
+      }
+      let result = value;
+      let startDelta = 0;
+      let endDelta = 0;
+      for (let i = lineStarts.length - 1; i >= 0; i--) {
+        const ls = lineStarts[i]!;
+        if (e.shiftKey) {
+          const removed = result.startsWith("  ", ls)
+            ? 2
+            : result.startsWith("\t", ls)
+              ? 1
+              : 0;
+          if (removed === 0) continue;
+          result = result.slice(0, ls) + result.slice(ls + removed);
+          endDelta -= Math.min(removed, end - ls);
+          if (ls < start) startDelta -= Math.min(removed, start - ls);
+        } else {
+          result = result.slice(0, ls) + "  " + result.slice(ls);
+          endDelta += 2;
+          if (ls <= start) startDelta += 2;
+        }
+      }
+      if (result === value) return;
+      newValue = result;
+      newStart = Math.max(firstLineStart, start + startDelta);
+      newEnd = end + endDelta;
+    }
+
+    ta.value = newValue;
+    ta.setSelectionRange(newStart, newEnd);
+    handleInput(newValue);
+  }
+
   onCleanup(() => {
     if (saveTimeout) window.clearTimeout(saveTimeout);
     if (pendingSave) {
@@ -75,6 +144,7 @@ export function RawEditor(props: RawEditorProps) {
       spellcheck={false}
       value={text()}
       onInput={(e) => handleInput(e.currentTarget.value)}
+      onKeyDown={handleKeyDown}
     />
   );
 }
