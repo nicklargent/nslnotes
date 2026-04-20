@@ -61,6 +61,16 @@ test.describe("Confirm delete modal", () => {
     await confirmModal(page).click({ position: { x: 5, y: 5 } });
     await expect(confirmModal(page)).not.toBeVisible({ timeout: 2000 });
   });
+
+  test("Escape closes modal without deleting", async ({ page }) => {
+    await deleteButton(page).click();
+    await expect(confirmModal(page)).toBeVisible({ timeout: 2000 });
+    await page.keyboard.press("Escape");
+    await expect(confirmModal(page)).not.toBeVisible({ timeout: 2000 });
+    await expect(
+      sidebar(page).locator("button", { hasText: "Meeting Template" }),
+    ).toBeVisible();
+  });
 });
 
 test.describe("Keyboard shortcuts modal", () => {

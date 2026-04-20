@@ -1,4 +1,4 @@
-import type { JSX } from "solid-js";
+import { onMount, onCleanup, type JSX } from "solid-js";
 
 interface ConfirmModalProps {
   heading: string;
@@ -9,6 +9,18 @@ interface ConfirmModalProps {
 }
 
 export function ConfirmModal(props: ConfirmModalProps) {
+  onMount(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        props.onClose();
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    onCleanup(() => document.removeEventListener("keydown", onKey, true));
+  });
+
   return (
     <div
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"

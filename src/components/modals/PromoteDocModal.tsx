@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, onMount, onCleanup, For, Show } from "solid-js";
 import type { TopicRef } from "../../types/topics";
 
 interface PromoteDocModalProps {
@@ -34,6 +34,18 @@ export function PromoteDocModal(props: PromoteDocModalProps) {
     if (!titleVal) return;
     props.onConfirm(titleVal, Array.from(selectedTopics()));
   }
+
+  onMount(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        props.onClose();
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    onCleanup(() => document.removeEventListener("keydown", onKey, true));
+  });
 
   return (
     <div

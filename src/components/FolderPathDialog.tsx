@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal, onMount, onCleanup } from "solid-js";
 import { FileService } from "../services/FileService";
 
 interface FolderPathDialogProps {
@@ -52,6 +52,18 @@ export function FolderPathDialog(props: FolderPathDialogProps) {
     if (e.target === e.currentTarget) props.onCancel();
   }
 
+  onMount(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        props.onCancel();
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    onCleanup(() => document.removeEventListener("keydown", onKey, true));
+  });
+
   return (
     <div
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
@@ -71,7 +83,6 @@ export function FolderPathDialog(props: FolderPathDialogProps) {
           onInput={(e) => setPath(e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") void handleSubmit();
-            if (e.key === "Escape") props.onCancel();
           }}
           placeholder="/home/user/notes"
           autofocus
