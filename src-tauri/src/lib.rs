@@ -2,8 +2,8 @@ mod commands;
 mod watcher;
 
 use commands::{
-    copy_file, delete_directory, delete_file, ensure_directory, file_exists, get_file_size,
-    list_directory, load_settings, read_file, save_settings, verify_directory,
+    copy_file, create_backup, delete_directory, delete_file, ensure_directory, file_exists,
+    get_file_size, list_directory, load_settings, read_file, save_settings, verify_directory,
     write_binary, write_file,
 };
 use nslnotes_core::settings::AppSettings;
@@ -52,7 +52,8 @@ pub fn run() {
             save_settings,
             copy_file,
             write_binary,
-            get_file_size
+            get_file_size,
+            create_backup
         ])
         .setup(|app| {
             // Log startup info

@@ -1,6 +1,6 @@
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
     Json, Router,
@@ -54,6 +54,13 @@ pub struct BinaryBody {
     base64_data: String,
 }
 
+#[derive(serde::Deserialize)]
+pub struct BackupBody {
+    sources: Vec<nslnotes_core::backup::BackupSource>,
+    #[serde(default)]
+    filename: Option<String>,
+}
+
 fn err_response(status: StatusCode, msg: String) -> Response {
     (status, Json(serde_json::json!({"error": msg}))).into_response()
 }
@@ -72,7 +79,8 @@ pub fn create_router(
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_headers(Any)
+        .expose_headers(Any);
 
     let api = Router::new()
         .route("/files", get(read_file_handler))
@@ -89,6 +97,7 @@ pub fn create_router(
         .route("/assets", get(serve_asset_handler))
         .route("/settings", get(load_settings_handler))
         .route("/settings", put(save_settings_handler))
+        .route("/backup", post(create_backup_handler))
         .route("/watch/start", post(sse::start_watch_handler))
         .route("/watch/stop", post(sse::stop_watch_handler))
         .route("/watch/events", get(sse::events_handler));
@@ -212,6 +221,64 @@ async fn save_settings_handler(
         Ok(()) => StatusCode::OK.into_response(),
         Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, e),
     }
+}
+
+/// Sanitize a client-supplied filename against header injection and path
+/// traversal. Anything non-matching falls back to a unix-timestamp default.
+fn safe_backup_filename(candidate: Option<String>) -> String {
+    fn is_ok(c: char) -> bool {
+        c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-')
+    }
+    if let Some(name) = candidate {
+        if !name.is_empty() && name.len() <= 128 && name.chars().all(is_ok) {
+            return name;
+        }
+    }
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("nslnotes-backup-{}.tar.gz", ts)
+}
+
+async fn create_backup_handler(Json(body): Json<BackupBody>) -> Response {
+    // Build the archive into memory. Acceptable for typical notebook sizes
+    // (markdown + small assets, usually < 100 MB). If this becomes a bottleneck
+    // for multi-GB notebooks, switch to a streaming body backed by a channel
+    // + spawn_blocking producer.
+    let sources = body.sources;
+    let result = tokio::task::spawn_blocking(move || {
+        let mut buf: Vec<u8> = Vec::new();
+        let stats = nslnotes_core::backup::create_backup_to_writer(&sources, &mut buf)?;
+        Ok::<_, String>((stats, buf))
+    })
+    .await;
+
+    let (stats, bytes) = match result {
+        Ok(Ok(v)) => v,
+        Ok(Err(e)) => return err_response(StatusCode::BAD_REQUEST, e),
+        Err(e) => {
+            return err_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Backup task panicked: {}", e),
+            );
+        }
+    };
+
+    let filename = safe_backup_filename(body.filename);
+    let disposition = format!("attachment; filename=\"{}\"", filename);
+    let stats_json = serde_json::to_string(&stats)
+        .unwrap_or_else(|_| "{}".to_string());
+
+    let headers = [
+        (header::CONTENT_TYPE, "application/gzip".to_string()),
+        (header::CONTENT_DISPOSITION, disposition),
+        (
+            header::HeaderName::from_static("x-backup-stats"),
+            stats_json,
+        ),
+    ];
+    (StatusCode::OK, headers, bytes).into_response()
 }
 
 async fn serve_frontend(uri: axum::http::Uri) -> Response {

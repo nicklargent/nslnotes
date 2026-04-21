@@ -1,3 +1,4 @@
+use nslnotes_core::backup::{BackupSource, BackupStats};
 use nslnotes_core::fs_ops::DirectoryStatus;
 use nslnotes_core::settings::AppSettings;
 
@@ -66,4 +67,16 @@ pub async fn load_settings() -> Result<AppSettings, String> {
 pub async fn save_settings(settings: AppSettings) -> Result<(), String> {
     let settings_path = nslnotes_core::settings::default_path();
     nslnotes_core::settings::save_to_path(&settings_path, &settings)
+}
+
+#[tauri::command]
+pub async fn create_backup(
+    sources: Vec<BackupSource>,
+    output_path: String,
+) -> Result<BackupStats, String> {
+    tokio::task::spawn_blocking(move || {
+        nslnotes_core::backup::create_backup(&sources, std::path::Path::new(&output_path))
+    })
+    .await
+    .map_err(|e| format!("Backup task panicked: {}", e))?
 }

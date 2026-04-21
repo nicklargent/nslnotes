@@ -8,6 +8,7 @@ import { runtime } from "../../lib/runtime";
 import { FolderPathDialog } from "../FolderPathDialog";
 import { showToast } from "../Toast";
 import type { Notebook } from "../../services/SettingsService";
+import { BackupService } from "../../services/BackupService";
 import { NotebookTab } from "./NotebookTab";
 
 interface NotebookTabBarProps {
@@ -21,8 +22,28 @@ function clampFontSize(size: number): number {
   return Math.min(24, Math.max(12, size));
 }
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  const kb = n / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  return `${(mb / 1024).toFixed(2)} GB`;
+}
+
+function defaultBackupFilename(now: Date = new Date()): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const y = now.getFullYear();
+  const m = pad(now.getMonth() + 1);
+  const d = pad(now.getDate());
+  const hh = pad(now.getHours());
+  const mm = pad(now.getMinutes());
+  return `nslnotes-backup-${y}-${m}-${d}T${hh}-${mm}.tar.gz`;
+}
+
 export function NotebookTabBar(props: NotebookTabBarProps) {
   const [showFolderDialog, setShowFolderDialog] = createSignal(false);
+  const [isBackingUp, setIsBackingUp] = createSignal(false);
 
   function changeFontSize(delta: number) {
     setUIStore("fontSize", clampFontSize(uiStore.fontSize + delta));
@@ -48,6 +69,56 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
       }
     } else {
       setShowFolderDialog(true);
+    }
+  }
+
+  async function handleBackupClick() {
+    if (notebooksStore.notebooks.length === 0) {
+      showToast("No notebooks to back up", "info");
+      return;
+    }
+    if (isBackingUp()) return;
+    try {
+      let destination: string;
+      if (runtime.isNative()) {
+        const { save } = await import("@tauri-apps/plugin-dialog");
+        const selected = await save({
+          defaultPath: defaultBackupFilename(),
+          filters: [{ name: "Tar gzip archive", extensions: ["tar.gz"] }],
+          title: "Save backup",
+        });
+        if (!selected || typeof selected !== "string") return;
+        destination = selected;
+      } else {
+        // Web mode: the browser handles the save dialog after the response
+        // arrives. `destination` is just the suggested filename.
+        destination = defaultBackupFilename();
+      }
+
+      setIsBackingUp(true);
+      showToast("Creating backup…", "info");
+      const sources = notebooksStore.notebooks.map((nb) => ({
+        name: nb.name,
+        path: nb.path,
+      }));
+      const stats = await BackupService.createBackup(sources, destination);
+      const parts = [
+        `${stats.notebookCount} notebook${stats.notebookCount === 1 ? "" : "s"}`,
+        `${stats.fileCount} files`,
+        formatBytes(stats.bytesWritten),
+      ];
+      let msg = `Backup saved (${parts.join(", ")})`;
+      if (stats.skippedSymlinks > 0) {
+        msg += ` — ${stats.skippedSymlinks} symlink${stats.skippedSymlinks === 1 ? "" : "s"} skipped`;
+      }
+      showToast(msg, "success");
+    } catch (err) {
+      showToast(
+        `Backup failed: ${err instanceof Error ? err.message : String(err)}`,
+        "error"
+      );
+    } finally {
+      setIsBackingUp(false);
     }
   }
 
@@ -133,6 +204,51 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
             </svg>
           </div>
         </Show>
+
+        {/* Backup — download a tar.gz of all notebooks */}
+        <button
+          type="button"
+          class={controlButtonClass}
+          onClick={() => void handleBackupClick()}
+          title={isBackingUp() ? "Creating backup…" : "Backup all notebooks"}
+          disabled={
+            notebooksStore.notebooks.length === 0 ||
+            notebooksStore.switching ||
+            isBackingUp()
+          }
+        >
+          {isBackingUp() ? (
+            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+              />
+            </svg>
+          ) : (
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          )}
+        </button>
 
         {/* Font size — smaller A and bigger A; current size in tooltip */}
         <button

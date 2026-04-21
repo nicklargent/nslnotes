@@ -65,6 +65,22 @@ Source: `src/components/layout/LeftSidebar.tsx`, `src/components/sidebar/`
 - [ ] Dark mode toggle button switches theme
 - [ ] Preference debounce-saved (500ms)
 
+### Backup Button (`NotebookTabBar.tsx`)
+- [ ] Button disabled when no notebooks are registered or a switch is in flight
+- [ ] In the Tauri app: click opens a native save dialog with default filename `nslnotes-backup-<YYYY-MM-DDTHH-MM>.tar.gz`
+- [ ] In the web app (`npm run web:serve`): click triggers a browser download with the same default filename; the server streams the archive via `POST /api/backup`
+- [ ] Cancelling the Tauri save dialog is a no-op (no toast, no file written)
+- [ ] "Creating backup…" info toast appears before the archive operation
+- [ ] Button icon spins and the button is disabled for the full duration of the archive (archiving a real notebook can take 30–45s)
+- [ ] On success, a toast reports notebook count, file count, archive size, and any skipped symlinks
+- [ ] On failure, an error toast surfaces the reason; no `.tar.gz.tmp` file is left behind in native mode
+- [ ] Archive contains one top-level folder per notebook, named after the notebook's display name (disambiguated with `_2`, `_3`, … on collision)
+- [ ] Excludes `.git/`, `node_modules/`, `.Trash/`, `.DS_Store`, `Thumbs.db`, `*.tmp`, `*.swp`
+- [ ] Symlinks are not followed and not archived; count reported in success toast
+- [ ] Native mode refuses to write the backup inside any notebook folder
+- [ ] Not available via the Vite dev server (`npm run dev:web`) — use the Rust web server for browser-mode backups
+- [ ] Not covered by E2E tests (depends on native dialogs + Rust backend)
+
 ### Topics List (`TopicsList.tsx`, `TopicItem.tsx`)
 - [ ] Collapsed view shows top 5 topics
 - [ ] "Show all (N)" button expands to full alphabetical list
