@@ -1,5 +1,9 @@
 [workspace]
 members = ["src-lib", "src-tauri", "src-web"]
+# Exclude src-tauri from default builds so `cargo build` (and Docker image builds)
+# don't pull in Tauri toolchain deps. Use `cargo build -p nslnotes-tauri` or run
+# tauri commands to build the desktop app.
+default-members = ["src-lib", "src-web"]
 resolver = "2"
 
 [workspace.dependencies]

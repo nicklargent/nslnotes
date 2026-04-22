@@ -1,0 +1,21 @@
+services:
+  nslnotes:
+    build: .
+    image: nslnotes:latest
+    container_name: nslnotes
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Required. Generate with: docker run --rm -it nslnotes:latest hash-password
+      NSLNOTES_PASSWORD_HASH: ${NSLNOTES_PASSWORD_HASH:?set NSLNOTES_PASSWORD_HASH (or NSLNOTES_DISABLE_AUTH=1)}
+      # Set to 1 when running behind a TLS-terminating reverse proxy so cookies
+      # get the Secure flag and X-Forwarded-For is honored for login rate limiting.
+      NSLNOTES_TRUST_PROXY: ${NSLNOTES_TRUST_PROXY:-0}
+    volumes:
+      # Notes live here. Point this at the notebook directory you want to serve
+      # (e.g. a bind mount from a host-mounted NAS share, or a named volume for
+      # local-only use).
+      - ./data:/data
+      # settings.json and any future persisted session state.
+      - ./config:/config
