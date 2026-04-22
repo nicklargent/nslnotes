@@ -8,7 +8,9 @@ import {
   batch,
 } from "solid-js";
 import { SetupScreen } from "./components/SetupScreen";
+import { LoginScreen } from "./components/LoginScreen";
 import { AppErrorBoundary } from "./components/ErrorBoundary";
+import { runtime, AUTH_EXPIRED_EVENT } from "./lib/runtime";
 import { ToastContainer, showToast } from "./components/Toast";
 import { SplashScreen, type LoadProgress } from "./components/SplashScreen";
 import { KeyboardShortcutsModal } from "./components/modals/KeyboardShortcutsModal";
@@ -56,7 +58,17 @@ let globalShortcutAbort: AbortController | null = null;
 /**
  * Application state
  */
-type AppState = "loading" | "setup" | "ready";
+type AppState = "loading" | "login" | "setup" | "ready";
+
+async function checkAuthenticated(): Promise<boolean> {
+  if (runtime.isNative()) return true;
+  try {
+    const res = await fetch("/api/auth/me", { credentials: "include" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 function App() {
   const [appState, setAppState] = createSignal<AppState>("loading");
@@ -82,7 +94,15 @@ function App() {
     document.documentElement.classList.toggle("dark", uiStore.darkMode);
   });
 
-  onMount(async () => {
+  async function initialize(opts: { skipAuthCheck?: boolean } = {}) {
+    setAppState("loading");
+    setLoadProgress({ percent: 0, status: "Loading settings..." });
+
+    if (!opts.skipAuthCheck && !(await checkAuthenticated())) {
+      setAppState("login");
+      return;
+    }
+
     try {
       const settings = await SettingsService.loadSettings();
       if (settings.leftColumnWidth != null) {
@@ -142,6 +162,25 @@ function App() {
       );
       setAppState("setup");
     }
+  }
+
+  onMount(() => {
+    void initialize();
+
+    const handleAuthExpired = () => {
+      // Guard against re-entry: stopWatching below fires /api/watch/stop which
+      // also 401s, re-dispatching AUTH_EXPIRED_EVENT. Setting state first makes
+      // that re-entry a no-op.
+      if (appState() === "login") return;
+      setAppState("login");
+      unwatchFn?.();
+      unwatchFn = null;
+      void FileService.stopWatching();
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    onCleanup(() =>
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired)
+    );
   });
 
   onCleanup(() => {
@@ -392,6 +431,12 @@ function App() {
     <AppErrorBoundary>
       <Show when={appState() === "loading"}>
         <SplashScreen progress={loadProgress()} />
+      </Show>
+
+      <Show when={appState() === "login"}>
+        <LoginScreen
+          onSuccess={() => void initialize({ skipAuthCheck: true })}
+        />
       </Show>
 
       <Show when={appState() === "setup"}>

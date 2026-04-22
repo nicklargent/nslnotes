@@ -2,6 +2,28 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 /**
+ * Event name dispatched on `window` whenever a web-mode API call returns 401.
+ * App.tsx listens for this and routes the user back to the login screen.
+ */
+export const AUTH_EXPIRED_EVENT = "nslnotes:auth-expired";
+
+/**
+ * Wrapper around fetch that:
+ * - Sends credentials (cookies) on every request
+ * - Dispatches an auth-expired event on 401 so the app can surface the login screen
+ */
+async function authedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const res = await window.fetch(input, { credentials: "include", ...init });
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+  }
+  return res;
+}
+
+/**
  * File change event types
  */
 export type FileChangeType = "create" | "modify" | "delete";
@@ -69,7 +91,9 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke<string>("read_file", { path });
     }
-    const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+    const res = await authedFetch(
+      `/api/files?path=${encodeURIComponent(path)}`
+    );
     if (!res.ok) {
       throw new Error(`Failed to read file: ${path}`);
     }
@@ -83,7 +107,7 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke("write_file", { path, content });
     }
-    const res = await fetch("/api/files", {
+    const res = await authedFetch("/api/files", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path, content }),
@@ -101,9 +125,12 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke("delete_file", { path });
     }
-    const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`, {
-      method: "DELETE",
-    });
+    const res = await authedFetch(
+      `/api/files?path=${encodeURIComponent(path)}`,
+      {
+        method: "DELETE",
+      }
+    );
     if (!res.ok) {
       throw new Error(`Failed to delete file: ${path}`);
     }
@@ -116,7 +143,7 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke("delete_directory", { path });
     }
-    const res = await fetch(
+    const res = await authedFetch(
       `/api/files/rmdir?path=${encodeURIComponent(path)}`,
       { method: "DELETE" }
     );
@@ -132,7 +159,7 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke<boolean>("file_exists", { path });
     }
-    const res = await fetch(
+    const res = await authedFetch(
       `/api/files/exists?path=${encodeURIComponent(path)}`
     );
     if (!res.ok) {
@@ -149,7 +176,9 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke<string[]>("list_directory", { path: dir });
     }
-    const res = await fetch(`/api/files/list?path=${encodeURIComponent(dir)}`);
+    const res = await authedFetch(
+      `/api/files/list?path=${encodeURIComponent(dir)}`
+    );
     if (!res.ok) {
       throw new Error(`Failed to list directory: ${dir}`);
     }
@@ -165,7 +194,7 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke("verify_directory", { path });
     }
-    const res = await fetch(
+    const res = await authedFetch(
       `/api/files/verify?path=${encodeURIComponent(path)}`
     );
     if (!res.ok) {
@@ -181,7 +210,7 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke("ensure_directory", { path });
     }
-    const res = await fetch("/api/files/mkdir", {
+    const res = await authedFetch("/api/files/mkdir", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path }),
@@ -198,7 +227,7 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke("copy_file", { src, dst });
     }
-    const res = await fetch("/api/files/copy", {
+    const res = await authedFetch("/api/files/copy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ src, dst }),
@@ -215,7 +244,7 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke("write_binary", { path, base64Data });
     }
-    const res = await fetch("/api/files/binary", {
+    const res = await authedFetch("/api/files/binary", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path, base64Data }),
@@ -232,7 +261,9 @@ export const runtime = {
     if (runtime.isNative()) {
       return invoke<number>("get_file_size", { path });
     }
-    const res = await fetch(`/api/files/size?path=${encodeURIComponent(path)}`);
+    const res = await authedFetch(
+      `/api/files/size?path=${encodeURIComponent(path)}`
+    );
     if (!res.ok) {
       throw new Error(`Failed to get file size: ${path}`);
     }
@@ -269,7 +300,7 @@ export const runtime = {
       }
     } else {
       // Web mode: start watcher via HTTP, connect SSE
-      const res = await fetch("/api/watch/start", {
+      const res = await authedFetch("/api/watch/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: dir }),
@@ -281,7 +312,9 @@ export const runtime = {
       sseWatcherState.watchPath = dir;
 
       if (sseWatcherState.eventSource === null) {
-        const es = new EventSource("/api/watch/events");
+        const es = new EventSource("/api/watch/events", {
+          withCredentials: true,
+        });
         es.onmessage = (msg) => {
           try {
             const event = JSON.parse(msg.data) as FileChangeEvent;
@@ -319,7 +352,7 @@ export const runtime = {
       sseWatcherState.watchPath = null;
 
       // Tell server to stop watching
-      await fetch("/api/watch/stop", { method: "POST" }).catch(() => {});
+      await authedFetch("/api/watch/stop", { method: "POST" }).catch(() => {});
     }
   },
 

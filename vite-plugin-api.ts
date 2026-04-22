@@ -63,6 +63,23 @@ async function handleApi(
   try {
     const pathname = new URL(url, "http://localhost").pathname;
 
+    // Auth stubs: dev:web bypasses auth so you can run the app without
+    // configuring a password. Production uses the real Axum backend which
+    // enforces auth.
+    if (pathname === "/api/health") {
+      return sendJson(res, { status: "ok" });
+    }
+    if (pathname === "/api/auth/me") {
+      return sendJson(res, { user: "dev" });
+    }
+    if (pathname === "/api/login") {
+      return sendJson(res, { user: "dev" });
+    }
+    if (pathname === "/api/logout") {
+      res.writeHead(204);
+      return res.end();
+    }
+
     // GET/PUT/DELETE /api/files
     if (pathname === "/api/files") {
       if (req.method === "GET") {

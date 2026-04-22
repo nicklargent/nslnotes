@@ -1,17 +1,19 @@
 use axum::{
     extract::{Query, State},
     http::{header, StatusCode},
+    middleware,
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
-    Json, Router,
+    Extension, Json, Router,
 };
 use nslnotes_core::watcher::WatcherState;
 use rust_embed::Embed;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
-use tower_http::cors::{Any, CorsLayer};
+use tower_sessions::{cookie::SameSite, Expiry, MemoryStore, SessionManagerLayer};
 
+use crate::auth::{self, AuthConfig};
 use crate::sse;
 
 #[derive(Embed)]
@@ -69,6 +71,7 @@ pub fn create_router(
     settings_path: PathBuf,
     watcher_state: Arc<Mutex<WatcherState>>,
     broadcast_tx: broadcast::Sender<nslnotes_core::watcher::FileChangeEvent>,
+    auth_config: AuthConfig,
 ) -> Router {
     let state = AppState {
         settings_path,
@@ -76,13 +79,8 @@ pub fn create_router(
         broadcast_tx,
     };
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any)
-        .expose_headers(Any);
-
-    let api = Router::new()
+    // Auth-gated routes. Every route here requires a valid session.
+    let protected = Router::new()
         .route("/files", get(read_file_handler))
         .route("/files", put(write_file_handler))
         .route("/files", delete(delete_file_handler))
@@ -100,12 +98,34 @@ pub fn create_router(
         .route("/backup", post(create_backup_handler))
         .route("/watch/start", post(sse::start_watch_handler))
         .route("/watch/stop", post(sse::stop_watch_handler))
-        .route("/watch/events", get(sse::events_handler));
+        .route("/watch/events", get(sse::events_handler))
+        .route("/logout", post(auth::logout_handler))
+        .layer(middleware::from_fn(auth::require_auth));
+
+    // Unauthenticated routes. /auth/me returns 401 on its own if unauthenticated
+    // so the frontend can detect login state without triggering the middleware.
+    let public = Router::new()
+        .route("/health", get(auth::health_handler))
+        .route("/login", post(auth::login_handler))
+        .route("/auth/me", get(auth::me_handler));
+
+    let api = public.merge(protected);
+
+    // Session cookie config: HttpOnly, SameSite=Lax, 30-day rolling expiry.
+    // Secure flag is enabled when running behind a TLS-terminating proxy.
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_name("nslnotes_session")
+        .with_secure(auth_config.trust_proxy)
+        .with_http_only(true)
+        .with_same_site(SameSite::Lax)
+        .with_expiry(Expiry::OnInactivity(time::Duration::days(30)));
 
     Router::new()
         .nest("/api", api)
         .fallback(serve_frontend)
-        .layer(cors)
+        .layer(session_layer)
+        .layer(Extension(auth_config))
         .with_state(state)
 }
 
