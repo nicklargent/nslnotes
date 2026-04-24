@@ -101,6 +101,19 @@ body {
 }
 
 /*
+ * iOS PWA safe-area handling. `viewport-fit=cover` in index.html lets the
+ * app paint under the notch and home indicator; this padding keeps fixed UI
+ * (top bar, drawer overlays) clear of those regions. On non-iOS browsers the
+ * env() values resolve to 0 so the rule is a no-op.
+ */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/*
  * Touch-device override for hover-reveal controls.
  * On pointer:fine screens (mice, trackpads) delete/cancel icons fade in on
  * row hover. Touch devices have no hover state — force those icons visible
