@@ -19,18 +19,34 @@
 // Symlinks are not followed and not archived — they are counted and reported
 // via BackupStats.skipped_symlinks so the user knows they exist but were left out.
 
+use crate::fs::{registry, BackupEntry};
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use tar::Builder;
-use walkdir::WalkDir;
+use tar::{Builder, EntryType, Header};
 
 const EXCLUDED_DIR_NAMES: &[&str] = &[".git", "node_modules", ".Trash"];
 const EXCLUDED_FILE_NAMES: &[&str] = &[".DS_Store", "Thumbs.db"];
 const EXCLUDED_SUFFIXES: &[&str] = &[".tmp", ".swp"];
+
+use crate::smb_url::is_smb_url as is_smb;
+
+/// Path-system-agnostic basename: last `/` or `\\` segment.
+fn basename(path: &str) -> &str {
+    path.rsplit(|c| c == '/' || c == '\\').next().unwrap_or(path)
+}
+
+/// Return `path` with leading `prefix` stripped, then any leading separators.
+/// Errors if `path` does not start with `prefix`.
+fn strip_root<'a>(path: &'a str, prefix: &str) -> Result<&'a str, String> {
+    let rel = path
+        .strip_prefix(prefix)
+        .ok_or_else(|| format!("path '{}' is not under root '{}'", path, prefix))?;
+    Ok(rel.trim_start_matches(|c| c == '/' || c == '\\'))
+}
 
 #[derive(Debug, Serialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
@@ -57,9 +73,9 @@ pub fn create_backup_to_writer<W: Write>(
     if sources.is_empty() {
         return Err("No notebooks to back up".to_string());
     }
-    let canonical = validate_and_canonicalize(sources)?;
-    let prefixes = compute_prefixes(&canonical);
-    stream_archive(&canonical, &prefixes, writer)
+    let resolved = validate_sources(sources)?;
+    let prefixes = compute_prefixes(&resolved);
+    stream_archive(&resolved, &prefixes, writer)
 }
 
 /// Write the backup archive to a file path atomically (via .tmp + rename).
@@ -70,8 +86,8 @@ pub fn create_backup(
     if sources.is_empty() {
         return Err("No notebooks to back up".to_string());
     }
-    let canonical = validate_and_canonicalize(sources)?;
-    let prefixes = compute_prefixes(&canonical);
+    let resolved = validate_sources(sources)?;
+    let prefixes = compute_prefixes(&resolved);
 
     // The output file may not yet exist; validate against its *parent*.
     let output_parent = output_path
@@ -91,12 +107,21 @@ pub fn create_backup(
         .file_name()
         .ok_or_else(|| "Output path must include a file name".to_string())?;
     let canon_output = canon_parent.join(output_file_name);
+    let canon_output_str = canon_output.to_string_lossy().into_owned();
 
-    for (_, src) in &canonical {
-        if canon_output == *src || canon_output.starts_with(src) {
+    for src in &resolved {
+        // The output file is on the local filesystem; only local sources can
+        // contain it. SMB sources are in a different namespace and trivially
+        // safe.
+        if src.is_smb {
+            continue;
+        }
+        if canon_output_str == src.root
+            || canon_output_str.starts_with(&format!("{}/", src.root))
+        {
             return Err(format!(
                 "Refusing to write backup inside notebook '{}' — choose a destination outside your notebooks",
-                src.display()
+                src.root
             ));
         }
     }
@@ -131,7 +156,7 @@ pub fn create_backup(
 
     let file = File::create(&tmp_path)
         .map_err(|e| format!("Failed to create archive '{}': {}", tmp_path.display(), e))?;
-    let stats = stream_archive(&canonical, &prefixes, file)?;
+    let stats = stream_archive(&resolved, &prefixes, file)?;
 
     fs::rename(&tmp_path, output_path).map_err(|e| {
         format!(
@@ -146,7 +171,7 @@ pub fn create_backup(
 }
 
 fn stream_archive<W: Write>(
-    canonical: &[(String, PathBuf)],
+    sources: &[ResolvedSource],
     prefixes: &[String],
     writer: W,
 ) -> Result<BackupStats, String> {
@@ -155,7 +180,7 @@ fn stream_archive<W: Write>(
     let mut builder = Builder::new(gz);
     builder.follow_symlinks(false);
 
-    let walk = walk_and_append(&mut builder, canonical, prefixes)?;
+    let walk = walk_and_append(&mut builder, sources, prefixes)?;
 
     let gz = builder
         .into_inner()
@@ -165,59 +190,99 @@ fn stream_archive<W: Write>(
         .map_err(|e| format!("Failed to finalize gzip stream: {}", e))?;
 
     Ok(BackupStats {
-        notebook_count: canonical.len() as u64,
+        notebook_count: sources.len() as u64,
         file_count: walk.file_count,
         bytes_written: counted.bytes_written(),
         skipped_symlinks: walk.skipped_symlinks,
     })
 }
 
-fn validate_and_canonicalize(
-    sources: &[BackupSource],
-) -> Result<Vec<(String, PathBuf)>, String> {
-    let mut canonical: Vec<(String, PathBuf)> = Vec::with_capacity(sources.len());
+/// Resolved notebook source. `root` is the path the backend accepts (canonical
+/// local path, or the original `smb://...` URL). `raw` is what the caller gave
+/// us; kept for error messages.
+struct ResolvedSource {
+    name: String,
+    root: String,
+    is_smb: bool,
+}
+
+fn validate_sources(sources: &[BackupSource]) -> Result<Vec<ResolvedSource>, String> {
+    let mut resolved: Vec<ResolvedSource> = Vec::with_capacity(sources.len());
     for src in sources {
-        let p = Path::new(&src.path);
-        if !p.exists() {
-            return Err(format!("Notebook path does not exist: {}", src.path));
+        if is_smb(&src.path) {
+            // For SMB the URL prefix has to match a registered backend;
+            // verify_directory checks that + that the share is reachable.
+            let backend = registry()
+                .for_path(&src.path)
+                .map_err(|e| format!("Notebook '{}': {}", src.name, e))?;
+            let status = backend
+                .verify_directory(&src.path)
+                .map_err(|e| format!("Notebook '{}': {}", src.name, e))?;
+            if !status.readable {
+                return Err(format!(
+                    "Notebook '{}' is not readable: {}",
+                    src.name, src.path
+                ));
+            }
+            resolved.push(ResolvedSource {
+                name: src.name.clone(),
+                root: src.path.trim_end_matches('/').to_string(),
+                is_smb: true,
+            });
+        } else {
+            let p = Path::new(&src.path);
+            if !p.exists() {
+                return Err(format!("Notebook path does not exist: {}", src.path));
+            }
+            if !p.is_dir() {
+                return Err(format!("Notebook path is not a directory: {}", src.path));
+            }
+            let canon = p
+                .canonicalize()
+                .map_err(|e| format!("Failed to resolve '{}': {}", src.path, e))?;
+            resolved.push(ResolvedSource {
+                name: src.name.clone(),
+                root: canon.to_string_lossy().into_owned(),
+                is_smb: false,
+            });
         }
-        if !p.is_dir() {
-            return Err(format!("Notebook path is not a directory: {}", src.path));
-        }
-        let canon = p
-            .canonicalize()
-            .map_err(|e| format!("Failed to resolve '{}': {}", src.path, e))?;
-        canonical.push((src.name.clone(), canon));
     }
 
-    for i in 0..canonical.len() {
-        for j in 0..canonical.len() {
+    // Overlap check. Paths from different path families (local vs smb://)
+    // can never overlap; skip comparing them.
+    for i in 0..resolved.len() {
+        for j in 0..resolved.len() {
             if i == j {
                 continue;
             }
-            let (_, a) = &canonical[i];
-            let (_, b) = &canonical[j];
-            if a == b || a.starts_with(b) {
+            let a = &resolved[i];
+            let b = &resolved[j];
+            if a.is_smb != b.is_smb {
+                continue;
+            }
+            let prefix = format!("{}/", b.root);
+            if a.root == b.root || a.root.starts_with(&prefix) {
                 return Err(format!(
                     "Notebook paths overlap: '{}' is inside or equal to '{}'",
-                    a.display(),
-                    b.display()
+                    a.root, b.root
                 ));
             }
         }
     }
 
-    Ok(canonical)
+    Ok(resolved)
 }
 
-fn compute_prefixes(canonical: &[(String, PathBuf)]) -> Vec<String> {
-    let mut prefixes: Vec<String> = Vec::with_capacity(canonical.len());
-    for (i, (name, path)) in canonical.iter().enumerate() {
-        let base = sanitize_name(name).unwrap_or_else(|| {
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| format!("notebook_{}", i + 1))
+fn compute_prefixes(sources: &[ResolvedSource]) -> Vec<String> {
+    let mut prefixes: Vec<String> = Vec::with_capacity(sources.len());
+    for (i, src) in sources.iter().enumerate() {
+        let base = sanitize_name(&src.name).unwrap_or_else(|| {
+            let b = basename(&src.root);
+            if b.is_empty() {
+                format!("notebook_{}", i + 1)
+            } else {
+                b.to_string()
+            }
         });
         let mut candidate = base.clone();
         let mut suffix = 2u32;
@@ -237,7 +302,7 @@ struct WalkStats {
 
 fn walk_and_append<W: Write>(
     builder: &mut Builder<W>,
-    sources: &[(String, PathBuf)],
+    sources: &[ResolvedSource],
     prefixes: &[String],
 ) -> Result<WalkStats, String> {
     let mut stats = WalkStats {
@@ -245,69 +310,113 @@ fn walk_and_append<W: Write>(
         skipped_symlinks: 0,
     };
 
-    for ((_, src), prefix) in sources.iter().zip(prefixes.iter()) {
-        let mut it = WalkDir::new(src).follow_links(false).into_iter();
-        loop {
-            let entry = match it.next() {
-                None => break,
-                Some(Err(e)) => return Err(format!("Walk error under '{}': {}", src.display(), e)),
-                Some(Ok(e)) => e,
-            };
+    for (src, prefix) in sources.iter().zip(prefixes.iter()) {
+        let backend = registry()
+            .for_path(&src.root)
+            .map_err(|e| format!("Backup '{}': {}", src.name, e))?;
+        let entries = backend
+            .walk_for_backup(&src.root)
+            .map_err(|e| format!("Walk under '{}': {}", src.root, e))?;
 
-            let ft = entry.file_type();
-            let name = entry.file_name().to_string_lossy().into_owned();
+        // Pruned directory prefixes (ending in `/`) — any descendant is skipped.
+        let mut skipped_prefixes: Vec<String> = Vec::new();
 
-            // Top-level entry: add the prefix dir itself.
-            if entry.depth() == 0 {
-                builder
-                    .append_dir(Path::new(prefix), entry.path())
-                    .map_err(|e| format!("Failed to add prefix dir '{}': {}", prefix, e))?;
-                continue;
-            }
+        // Top-level prefix dir is always present so the archive has the
+        // notebook folder marker even if the tree is empty.
+        append_dir_entry(builder, prefix)
+            .map_err(|e| format!("Failed to add prefix dir '{}': {}", prefix, e))?;
 
-            if ft.is_dir() && EXCLUDED_DIR_NAMES.contains(&name.as_str()) {
-                it.skip_current_dir();
-                continue;
-            }
-            if ft.is_file() {
-                if EXCLUDED_FILE_NAMES.contains(&name.as_str()) {
-                    continue;
-                }
-                if EXCLUDED_SUFFIXES.iter().any(|s| name.ends_with(s)) {
-                    continue;
-                }
-            }
-            if ft.is_symlink() {
-                stats.skipped_symlinks += 1;
-                continue;
-            }
-
-            let rel = entry
-                .path()
-                .strip_prefix(src)
-                .map_err(|e| format!("Path walk invariant broken: {}", e))?;
-            let archive_rel = Path::new(prefix).join(rel);
-
-            if ft.is_dir() {
-                builder
-                    .append_dir(&archive_rel, entry.path())
-                    .map_err(|e| {
-                        format!("Failed to add dir '{}': {}", entry.path().display(), e)
+        for e in entries {
+            match e {
+                BackupEntry::Dir { path } => {
+                    // The root itself is already added above; skip to avoid a
+                    // duplicate entry.
+                    if path == src.root {
+                        continue;
+                    }
+                    if skipped_prefixes.iter().any(|p| path.starts_with(p)) {
+                        continue;
+                    }
+                    let name = basename(&path);
+                    if EXCLUDED_DIR_NAMES.contains(&name) {
+                        skipped_prefixes.push(format!("{}/", path));
+                        continue;
+                    }
+                    let rel = strip_root(&path, &src.root)?;
+                    let archive_path = join_archive(prefix, rel);
+                    append_dir_entry(builder, &archive_path).map_err(|e| {
+                        format!("Failed to add dir '{}': {}", path, e)
                     })?;
-            } else if ft.is_file() {
-                let mut f = File::open(entry.path()).map_err(|e| {
-                    format!("Failed to open '{}': {}", entry.path().display(), e)
-                })?;
-                builder.append_file(&archive_rel, &mut f).map_err(|e| {
-                    format!("Failed to add file '{}': {}", entry.path().display(), e)
-                })?;
-                stats.file_count += 1;
+                }
+                BackupEntry::File { path, size } => {
+                    if skipped_prefixes.iter().any(|p| path.starts_with(p)) {
+                        continue;
+                    }
+                    let name = basename(&path);
+                    if EXCLUDED_FILE_NAMES.contains(&name) {
+                        continue;
+                    }
+                    if EXCLUDED_SUFFIXES.iter().any(|s| name.ends_with(s)) {
+                        continue;
+                    }
+                    let bytes = backend
+                        .read_bytes(&path)
+                        .map_err(|e| format!("Read '{}': {}", path, e))?;
+                    let effective_size = if size > 0 { size } else { bytes.len() as u64 };
+                    let rel = strip_root(&path, &src.root)?;
+                    let archive_path = join_archive(prefix, rel);
+                    append_file_entry(builder, &archive_path, &bytes, effective_size)
+                        .map_err(|e| format!("Failed to add file '{}': {}", path, e))?;
+                    stats.file_count += 1;
+                }
+                BackupEntry::Symlink { path: _ } => {
+                    stats.skipped_symlinks += 1;
+                }
             }
-            // Other file types (fifo, device, socket) are silently skipped.
         }
     }
 
     Ok(stats)
+}
+
+/// Join an archive prefix (sanitized notebook name) with a relative path,
+/// using `/` regardless of host OS for a consistent archive.
+fn join_archive(prefix: &str, rel: &str) -> String {
+    if rel.is_empty() {
+        prefix.to_string()
+    } else {
+        // Normalize Windows separators in case any sneak in from a local path.
+        let norm: String = rel.chars().map(|c| if c == '\\' { '/' } else { c }).collect();
+        format!("{}/{}", prefix, norm)
+    }
+}
+
+fn append_dir_entry<W: Write>(
+    builder: &mut Builder<W>,
+    archive_path: &str,
+) -> io::Result<()> {
+    let mut header = Header::new_gnu();
+    header.set_size(0);
+    header.set_mode(0o755);
+    header.set_entry_type(EntryType::Directory);
+    header.set_mtime(0);
+    header.set_cksum();
+    builder.append_data(&mut header, archive_path, io::empty())
+}
+
+fn append_file_entry<W: Write>(
+    builder: &mut Builder<W>,
+    archive_path: &str,
+    bytes: &[u8],
+    size: u64,
+) -> io::Result<()> {
+    let mut header = Header::new_gnu();
+    header.set_size(size);
+    header.set_mode(0o644);
+    header.set_entry_type(EntryType::Regular);
+    header.set_mtime(0);
+    header.set_cksum();
+    builder.append_data(&mut header, archive_path, bytes)
 }
 
 fn sanitize_name(name: &str) -> Option<String> {

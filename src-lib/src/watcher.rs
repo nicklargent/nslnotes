@@ -46,6 +46,23 @@ pub fn start_watching(
     state: &Arc<Mutex<WatcherState>>,
     event_tx: Sender<FileChangeEvent>,
 ) -> Result<(), String> {
+    // SMB paths need polling; local paths use the native notify backend.
+    if crate::smb_url::is_smb_url(path) {
+        #[cfg(feature = "smb")]
+        {
+            return crate::fs::smb::start_polling_watcher(
+                path,
+                Duration::from_secs(5),
+                Arc::clone(state),
+                event_tx,
+            );
+        }
+        #[cfg(not(feature = "smb"))]
+        {
+            return Err("SMB watcher requires the `smb` feature".into());
+        }
+    }
+
     let watch_path = path.to_string();
 
     // Check if already watching

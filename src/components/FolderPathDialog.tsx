@@ -1,17 +1,32 @@
-import { createSignal, onMount, onCleanup } from "solid-js";
+import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { FileService } from "../services/FileService";
+import type { NotebookCredentials } from "../services/SettingsService";
+import {
+  SmbCredentialInput,
+  buildSmbCredentials,
+  isSmbPath,
+} from "./SmbCredentialInput";
 
 interface FolderPathDialogProps {
   heading?: string;
   currentPath?: string | undefined;
-  onSelect: (path: string) => void;
+  onSelect: (path: string, creds?: NotebookCredentials) => void;
   onCancel: () => void;
 }
 
+const isSmb = isSmbPath;
+
 export function FolderPathDialog(props: FolderPathDialogProps) {
   const [path, setPath] = createSignal(props.currentPath ?? "");
+  const [smbUser, setSmbUser] = createSignal("");
+  const [smbPass, setSmbPass] = createSignal("");
+  const [smbDomain, setSmbDomain] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   const [validating, setValidating] = createSignal(false);
+
+  function credsFromInputs(): NotebookCredentials | undefined {
+    return buildSmbCredentials(path(), smbUser(), smbPass(), smbDomain());
+  }
 
   async function handleSubmit() {
     const trimmed = path().trim();
@@ -19,26 +34,35 @@ export function FolderPathDialog(props: FolderPathDialogProps) {
       setError("Please enter a folder path");
       return;
     }
+    if (isSmb(trimmed) && !smbUser()) {
+      setError("Enter the SMB username");
+      return;
+    }
 
     setValidating(true);
     setError(null);
 
     try {
-      const status = await FileService.verifyDirectory(trimmed);
-      if (!status.readable) {
-        setError(
-          "Cannot read the selected folder. Please choose a different location."
-        );
-        return;
+      // SMB paths can't be verified until the backend has credentials
+      // registered, which only happens after the notebook is saved.
+      // Local paths go through the existing read/write probe.
+      if (!isSmb(trimmed)) {
+        const status = await FileService.verifyDirectory(trimmed);
+        if (!status.readable) {
+          setError(
+            "Cannot read the selected folder. Please choose a different location."
+          );
+          return;
+        }
+        if (!status.writable) {
+          setError(
+            "Cannot write to the selected folder. Please choose a different location."
+          );
+          return;
+        }
+        await FileService.ensureDirectory(trimmed);
       }
-      if (!status.writable) {
-        setError(
-          "Cannot write to the selected folder. Please choose a different location."
-        );
-        return;
-      }
-      await FileService.ensureDirectory(trimmed);
-      props.onSelect(trimmed);
+      props.onSelect(trimmed, credsFromInputs());
     } catch (err) {
       setError(
         `Failed to validate folder: ${err instanceof Error ? err.message : err}`
@@ -84,10 +108,21 @@ export function FolderPathDialog(props: FolderPathDialogProps) {
           onKeyDown={(e) => {
             if (e.key === "Enter") void handleSubmit();
           }}
-          placeholder="/home/user/notes"
+          placeholder="/home/user/notes or smb://nas.local/share/path"
           autofocus
           class="mb-3 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
         />
+
+        <Show when={isSmb(path())}>
+          <SmbCredentialInput
+            username={smbUser()}
+            password={smbPass()}
+            domain={smbDomain()}
+            onUsernameChange={setSmbUser}
+            onPasswordChange={setSmbPass}
+            onDomainChange={setSmbDomain}
+          />
+        </Show>
 
         {error() && (
           <div class="mb-3 rounded border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/30">

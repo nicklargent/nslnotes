@@ -3,6 +3,7 @@ import {
   SettingsService,
   type AppSettings,
   type Notebook,
+  type NotebookCredentials,
 } from "../services/SettingsService";
 
 interface NotebooksState {
@@ -42,10 +43,15 @@ export const notebooksApi = {
   setSwitching(v: boolean) {
     setNotebooksStore("switching", v);
   },
-  async add(path: string, name?: string): Promise<Notebook> {
+  async add(
+    path: string,
+    name?: string,
+    creds?: NotebookCredentials
+  ): Promise<Notebook> {
     const { notebook, settings } = await SettingsService.addNotebook(
       path,
-      name
+      name,
+      creds
     );
     publish(settings);
     return notebook;

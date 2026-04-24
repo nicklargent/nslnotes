@@ -7,13 +7,16 @@ import { debouncedSave } from "./Layout";
 import { runtime } from "../../lib/runtime";
 import { FolderPathDialog } from "../FolderPathDialog";
 import { showToast } from "../Toast";
-import type { Notebook } from "../../services/SettingsService";
+import type {
+  Notebook,
+  NotebookCredentials,
+} from "../../services/SettingsService";
 import { BackupService } from "../../services/BackupService";
 import { NotebookTab } from "./NotebookTab";
 
 interface NotebookTabBarProps {
   onSelect: (nb: Notebook) => void | Promise<void>;
-  onAdd: (path: string) => void | Promise<void>;
+  onAdd: (path: string, creds?: NotebookCredentials) => void | Promise<void>;
   onRemove: (id: string) => void | Promise<void>;
   onRename: (id: string, name: string) => void | Promise<void>;
 }
@@ -318,9 +321,9 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
       <Show when={showFolderDialog()}>
         <FolderPathDialog
           heading="Add Notebook"
-          onSelect={(path) => {
+          onSelect={(path, creds) => {
             setShowFolderDialog(false);
-            void props.onAdd(path);
+            void props.onAdd(path, creds);
           }}
           onCancel={() => setShowFolderDialog(false)}
         />

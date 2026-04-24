@@ -285,9 +285,23 @@ function App() {
     void FileService.startWatching(path);
   }
 
-  async function handleSetupComplete(path: string) {
-    const nb = await notebooksApi.add(path);
-    await IndexService.buildIndex(path, nb.id);
+  async function handleSetupComplete(
+    path: string,
+    creds?: import("./services/SettingsService").NotebookCredentials
+  ) {
+    const nb = await notebooksApi.add(path, undefined, creds);
+    try {
+      await IndexService.buildIndex(path, nb.id);
+    } catch (e) {
+      showToast(
+        `Notebook saved, but index build failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+        "error"
+      );
+      setAppState("ready");
+      return;
+    }
     startFileWatcher(path);
     setAppState("ready");
     showToast("Notes folder configured successfully", "success");
@@ -332,14 +346,22 @@ function App() {
     }
   }
 
-  async function handleAddNotebook(path: string) {
-    const status = await FileService.verifyDirectory(path);
-    if (!status.readable || !status.writable) {
-      showToast("Selected folder is not readable/writable", "error");
-      return;
+  async function handleAddNotebook(
+    path: string,
+    creds?: import("./services/SettingsService").NotebookCredentials
+  ) {
+    // Local paths get verified before save. SMB paths skip pre-verification
+    // because the backend only registers credentials on settings save; any
+    // auth problems surface during the subsequent index build.
+    if (!path.startsWith("smb://")) {
+      const status = await FileService.verifyDirectory(path);
+      if (!status.readable || !status.writable) {
+        showToast("Selected folder is not readable/writable", "error");
+        return;
+      }
+      await FileService.ensureDirectory(path);
     }
-    await FileService.ensureDirectory(path);
-    const nb = await notebooksApi.add(path);
+    const nb = await notebooksApi.add(path, undefined, creds);
     await switchToNotebook(nb);
   }
 

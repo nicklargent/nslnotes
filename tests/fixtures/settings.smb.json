@@ -1,0 +1,13 @@
+{
+  "notebooks": [
+    {
+      "id": "nb-smb-test",
+      "name": "Samba Test",
+      "path": "smb://samba/notebooks",
+      "smbUsername": "alice",
+      "smbPassword": "secret123",
+      "smbDomain": "WORKGROUP"
+    }
+  ],
+  "activeNotebookId": "nb-smb-test"
+}

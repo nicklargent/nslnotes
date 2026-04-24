@@ -7,15 +7,21 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Required. Generate with: docker run --rm -it nslnotes:latest hash-password
+      # Required. Generate with: docker compose run --rm -i nslnotes hash-password
       NSLNOTES_PASSWORD_HASH: ${NSLNOTES_PASSWORD_HASH:?set NSLNOTES_PASSWORD_HASH (or NSLNOTES_DISABLE_AUTH=1)}
       # Set to 1 when running behind a TLS-terminating reverse proxy so cookies
       # get the Secure flag and X-Forwarded-For is honored for login rate limiting.
       NSLNOTES_TRUST_PROXY: ${NSLNOTES_TRUST_PROXY:-0}
     volumes:
-      # Notes live here. Point this at the notebook directory you want to serve
-      # (e.g. a bind mount from a host-mounted NAS share, or a named volume for
-      # local-only use).
-      - ./data:/data
-      # settings.json and any future persisted session state.
+      # settings.json and session state. Ensure the host dir is owned by
+      # uid 1000 (the container user): `sudo chown 1000:1000 config` before
+      # first boot. Delete this line and switch to a named volume if you
+      # don't care about inspecting settings.json from the host.
       - ./config:/config
+      # Uncomment if you want a local-FS notebook. The folder path you'll
+      # enter in the UI should match the in-container path (e.g. `/notes`).
+      # Don't forget `sudo chown 1000:1000 ./notes` first.
+      # - ./notes:/notes
+    # Notebooks (local paths and/or SMB URLs with credentials) are configured
+    # through the web UI and stored in /config/settings.json. No notes-dir
+    # flag is needed for normal operation.

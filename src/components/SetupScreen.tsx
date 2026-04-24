@@ -1,28 +1,41 @@
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { runtime } from "../lib/runtime";
 import { FileService } from "../services/FileService";
+import type { NotebookCredentials } from "../services/SettingsService";
+import {
+  SmbCredentialInput,
+  buildSmbCredentials,
+  isSmbPath,
+} from "./SmbCredentialInput";
 
 export interface SetupScreenProps {
-  onComplete: (rootPath: string) => void;
+  onComplete: (rootPath: string, creds?: NotebookCredentials) => void;
 }
 
 /**
  * SetupScreen displays on first launch when no root directory is configured.
- * Guides the user to select a folder for storing notes.
+ * Guides the user to select a folder for storing notes. When the path is an
+ * `smb://` URL the form also collects credentials that get persisted in the
+ * notebook's settings entry.
  */
 export function SetupScreen(props: SetupScreenProps) {
   const [error, setError] = createSignal<string | null>(null);
   const [isValidating, setIsValidating] = createSignal(false);
   const [selectedPath, setSelectedPath] = createSignal<string | null>(null);
   const [manualPath, setManualPath] = createSignal("");
+  const [smbUser, setSmbUser] = createSignal("");
+  const [smbPass, setSmbPass] = createSignal("");
+  const [smbDomain, setSmbDomain] = createSignal("");
   const isWeb = !runtime.isNative();
 
-  /**
-   * Open the native folder picker dialog
-   */
+  const isSmb = isSmbPath;
+
+  function credsFromInputs(): NotebookCredentials | undefined {
+    return buildSmbCredentials(manualPath(), smbUser(), smbPass(), smbDomain());
+  }
+
   async function selectFolder() {
     setError(null);
-
     try {
       const { open } = await import("@tauri-apps/plugin-dialog");
       const selected = await open({
@@ -40,51 +53,48 @@ export function SetupScreen(props: SetupScreenProps) {
     }
   }
 
-  /**
-   * Handle manual path submission (web mode)
-   */
   async function handleManualPath() {
     const path = manualPath().trim();
     if (!path) {
       setError("Please enter a folder path");
       return;
     }
+    if (isSmb(path) && !smbUser()) {
+      setError("Enter the SMB username");
+      return;
+    }
     setSelectedPath(path);
-    await validateAndSetup(path);
+    await validateAndSetup(path, credsFromInputs());
   }
 
-  /**
-   * Validate the selected folder and set up the directory structure
-   */
-  async function validateAndSetup(path: string) {
+  async function validateAndSetup(path: string, creds?: NotebookCredentials) {
     setIsValidating(true);
     setError(null);
 
     try {
-      // Verify the directory is accessible and writable
-      const status = await FileService.verifyDirectory(path);
-
-      if (!status.readable) {
-        setError(
-          "Cannot read the selected folder. Please choose a different location."
-        );
-        setIsValidating(false);
-        return;
+      // For SMB paths the backend won't recognize the URL until the notebook
+      // is saved (registration happens on settings save). Let the caller
+      // persist first and discover credential errors during index build.
+      if (!isSmb(path)) {
+        const status = await FileService.verifyDirectory(path);
+        if (!status.readable) {
+          setError(
+            "Cannot read the selected folder. Please choose a different location."
+          );
+          setIsValidating(false);
+          return;
+        }
+        if (!status.writable) {
+          setError(
+            "Cannot write to the selected folder. Please choose a different location."
+          );
+          setIsValidating(false);
+          return;
+        }
+        await FileService.ensureDirectory(path);
       }
 
-      if (!status.writable) {
-        setError(
-          "Cannot write to the selected folder. Please choose a different location."
-        );
-        setIsValidating(false);
-        return;
-      }
-
-      // Create the required subdirectories
-      await FileService.ensureDirectory(path);
-
-      // Notify parent — it registers the notebook and persists settings.
-      props.onComplete(path);
+      props.onComplete(path, creds);
     } catch (err) {
       setError(`Failed to set up folder: ${err}`);
     } finally {
@@ -99,11 +109,11 @@ export function SetupScreen(props: SetupScreenProps) {
           Welcome to NslNotes
         </h1>
         <p class="mb-6 text-gray-600 dark:text-gray-300">
-          Choose a folder where your notes, tasks, and documents will be stored.
-          All files are plain markdown, so you always own your data.
+          Point NslNotes at a folder for your notes, tasks, and documents. Local
+          paths and <code>smb://</code> URLs both work.
         </p>
 
-        {selectedPath() && (
+        <Show when={selectedPath()}>
           <div class="mb-4 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3">
             <p class="text-sm text-gray-500 dark:text-gray-400">
               Selected folder:
@@ -112,13 +122,13 @@ export function SetupScreen(props: SetupScreenProps) {
               {selectedPath()}
             </p>
           </div>
-        )}
+        </Show>
 
-        {error() && (
+        <Show when={error()}>
           <div class="mb-4 rounded border border-red-200 bg-red-50 dark:bg-red-900/30 p-3">
             <p class="text-sm text-red-700">{error()}</p>
           </div>
-        )}
+        </Show>
 
         {isWeb ? (
           <div>
@@ -132,9 +142,21 @@ export function SetupScreen(props: SetupScreenProps) {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void handleManualPath();
               }}
-              placeholder="/home/user/notes"
+              placeholder="/home/user/notes or smb://nas.local/share/path"
               class="mb-3 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+
+            <Show when={isSmb(manualPath())}>
+              <SmbCredentialInput
+                username={smbUser()}
+                password={smbPass()}
+                domain={smbDomain()}
+                onUsernameChange={setSmbUser}
+                onPasswordChange={setSmbPass}
+                onDomainChange={setSmbDomain}
+              />
+            </Show>
+
             <button
               type="button"
               onClick={() => void handleManualPath()}

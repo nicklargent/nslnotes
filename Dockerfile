@@ -17,9 +17,13 @@ RUN npm run build
 FROM rust:1.90-bookworm AS backend
 WORKDIR /build
 
-# System deps for building
+# System deps for building. libsmbclient-dev provides the headers pavao needs
+# to link against (transitively via pavao-sys).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
+        libsmbclient-dev \
+        libclang-dev \
+        clang \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace. `default-members` in the root Cargo.toml skips src-tauri so
@@ -41,6 +45,7 @@ FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
+        libsmbclient \
         tini \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -u 1000 -d /home/nslnotes -m nslnotes \
@@ -58,4 +63,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -fsS http://localhost:3000/api/health || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/nslnotes-web"]
-CMD ["--port", "3000", "--settings-path", "/config/settings.json", "--notes-dir", "/data"]
+CMD ["--port", "3000", "--settings-path", "/config/settings.json"]

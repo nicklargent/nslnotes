@@ -1,0 +1,30 @@
+# Overlay compose file: adds a samba server for exercising the SMB backend
+# without a real NAS. Pre-seeds a notebook into settings.json so you go
+# straight to the app on first launch.
+#
+# Usage:
+#   export NSLNOTES_PASSWORD_HASH="$(echo 'smbpass' | docker compose run --rm -i nslnotes hash-password)"
+#   # Make the config dir writable by the container user
+#   sudo chown 1000:1000 config
+#   # Seed settings.json with the test SMB notebook
+#   cp tests/fixtures/settings.smb.json config/settings.json
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
+services:
+  samba:
+    image: ghcr.io/servercontainers/samba:latest
+    container_name: nslnotes-samba
+    restart: unless-stopped
+    environment:
+      ACCOUNT_alice: secret123
+      SAMBA_VOLUME_CONFIG_notebooks: "[notebooks]; path=/shares/notebooks; valid users = alice; writable = yes; browseable = yes; create mask = 0644; directory mask = 0755"
+    volumes:
+      - samba_notebooks:/shares/notebooks
+    command: >
+      sh -c "mkdir -p /shares/notebooks && chown -R 1000:1000 /shares/notebooks && chmod 0777 /shares/notebooks && exec /container/scripts/entrypoint.sh"
+
+  nslnotes:
+    depends_on:
+      - samba
+
+volumes:
+  samba_notebooks:

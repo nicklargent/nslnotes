@@ -5,6 +5,27 @@ export interface Notebook {
   id: string;
   name: string;
   path: string;
+  /** SMB username, stored plaintext (non-secret). */
+  smbUsername?: string;
+  /**
+   * Transient plaintext SMB password used when the user enters or changes a
+   * password in the UI. The server encrypts it and clears this field before
+   * returning settings; persisted state should only ever have `smbPasswordEnc`.
+   */
+  smbPassword?: string;
+  /**
+   * Encrypted form of the SMB password (ChaCha20-Poly1305, keyed off the
+   * login-derived KEK). Opaque to the frontend; preserved when re-saving
+   * settings so passwords survive round trips without the UI knowing them.
+   */
+  smbPasswordEnc?: string;
+  smbDomain?: string;
+}
+
+export interface NotebookCredentials {
+  smbUsername?: string;
+  smbPassword?: string;
+  smbDomain?: string;
 }
 
 export interface AppSettings {
@@ -49,12 +70,20 @@ function generateId(): string {
   return `nb_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function makeNotebook(path: string, name?: string): Notebook {
-  return {
+function makeNotebook(
+  path: string,
+  name?: string,
+  creds?: NotebookCredentials
+): Notebook {
+  const nb: Notebook = {
     id: generateId(),
     name: name?.trim() || basenameOf(path),
     path,
   };
+  if (creds?.smbUsername) nb.smbUsername = creds.smbUsername;
+  if (creds?.smbPassword) nb.smbPassword = creds.smbPassword;
+  if (creds?.smbDomain) nb.smbDomain = creds.smbDomain;
+  return nb;
 }
 
 /**
@@ -135,10 +164,11 @@ export const SettingsService = {
    */
   addNotebook: async (
     path: string,
-    name?: string
+    name?: string,
+    creds?: NotebookCredentials
   ): Promise<{ notebook: Notebook; settings: AppSettings }> => {
     const settings = await SettingsService.loadSettings();
-    const nb = makeNotebook(path, name);
+    const nb = makeNotebook(path, name, creds);
     settings.notebooks = [...settings.notebooks, nb];
     if (!settings.activeNotebookId) {
       settings.activeNotebookId = nb.id;

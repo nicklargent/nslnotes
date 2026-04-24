@@ -228,19 +228,94 @@ async fn serve_asset_handler(Query(q): Query<PathQuery>) -> Response {
 
 async fn load_settings_handler(State(state): State<AppState>) -> Response {
     match nslnotes_core::settings::load_from_path(&state.settings_path) {
-        Ok(settings) => Json(settings).into_response(),
+        Ok(mut settings) => {
+            // Never let a plaintext SMB password reach the browser even if one
+            // slipped into the file (legacy format, disabled-auth mode that
+            // later switched to enabled, etc.).
+            for nb in &mut settings.notebooks {
+                nb.smb_password = None;
+            }
+            Json(settings).into_response()
+        }
         Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, e),
     }
 }
 
 async fn save_settings_handler(
     State(state): State<AppState>,
-    Json(settings): Json<nslnotes_core::settings::AppSettings>,
+    Json(mut settings): Json<nslnotes_core::settings::AppSettings>,
 ) -> Response {
+    // Load the prior state so we can tell whether anything the SMB registry
+    // cares about actually changed — avoids disconnect/reconnect churn when a
+    // save is just for column widths, font size, etc.
+    let prior_smb = nslnotes_core::settings::load_from_path(&state.settings_path)
+        .map(|s| smb_registry_fingerprint(&s))
+        .unwrap_or_default();
+
+    // Encrypt any plaintext smbPassword the frontend just sent us so we never
+    // persist SMB credentials in the clear (unless auth is disabled, in which
+    // case we have no key and the legacy plaintext path stays).
+    let kek = crate::auth::current_kek();
+    let mut cred_change = false;
+    for nb in &mut settings.notebooks {
+        if !nslnotes_core::smb_url::is_smb_url(&nb.path) {
+            continue;
+        }
+        if let Some(plain) = nb.smb_password.take() {
+            if plain.is_empty() {
+                continue;
+            }
+            cred_change = true;
+            match kek.as_ref() {
+                Some(k) => match nslnotes_core::crypto::encrypt_str(k, &plain) {
+                    Ok(enc) => nb.smb_password_enc = Some(enc),
+                    Err(e) => {
+                        return err_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("encrypt smb password: {e}"),
+                        );
+                    }
+                },
+                None => {
+                    // No KEK (disabled-auth mode). Keep plaintext so the
+                    // notebook still works; persistence will reflect that.
+                    nb.smb_password = Some(plain);
+                }
+            }
+        }
+    }
+
     match nslnotes_core::settings::save_to_path(&state.settings_path, &settings) {
-        Ok(()) => StatusCode::OK.into_response(),
+        Ok(()) => {
+            let new_smb = smb_registry_fingerprint(&settings);
+            if cred_change || new_smb != prior_smb {
+                crate::reconcile_smb_backends(&settings, kek);
+            }
+            StatusCode::OK.into_response()
+        }
         Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, e),
     }
+}
+
+/// Identity of every SMB notebook for registry-reconcile purposes. Two
+/// settings files with equal fingerprints produce the same registry, so we
+/// can skip `clear_smb` + re-register when they match.
+fn smb_registry_fingerprint(
+    settings: &nslnotes_core::settings::AppSettings,
+) -> Vec<(String, String, String, String)> {
+    settings
+        .notebooks
+        .iter()
+        .filter(|nb| nslnotes_core::smb_url::is_smb_url(&nb.path))
+        .map(|nb| {
+            (
+                nb.path.clone(),
+                nb.smb_username.clone().unwrap_or_default(),
+                nb.smb_password_enc.clone().unwrap_or_default(),
+                nb.smb_domain.clone().unwrap_or_default(),
+            )
+        })
+        .collect()
 }
 
 /// Sanitize a client-supplied filename against header injection and path

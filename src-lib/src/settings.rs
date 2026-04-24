@@ -14,12 +14,33 @@ pub fn default_path() -> PathBuf {
         .join("settings.json")
 }
 
-/// A registered notebook (a root folder that holds notes/tasks/docs)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/// A registered notebook (a root folder that holds notes/tasks/docs).
+///
+/// For `smb://` paths:
+/// - `smb_username` / `smb_domain` are stored as-is (non-secret).
+/// - `smb_password` is a transient field: the frontend sends it plaintext
+///   when the user enters a new password, and the server immediately
+///   re-writes the notebook with only `smb_password_enc` set (ChaCha20-
+///   Poly1305 ciphertext keyed off the login-derived KEK). Persisted
+///   settings files should never contain `smb_password`.
+/// - `smb_password_enc` is the encrypted form; opaque to the frontend.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Notebook {
     pub id: String,
     pub name: String,
     pub path: String,
+    #[serde(rename = "smbUsername", default, skip_serializing_if = "Option::is_none")]
+    pub smb_username: Option<String>,
+    #[serde(rename = "smbPassword", default, skip_serializing_if = "Option::is_none")]
+    pub smb_password: Option<String>,
+    #[serde(
+        rename = "smbPasswordEnc",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub smb_password_enc: Option<String>,
+    #[serde(rename = "smbDomain", default, skip_serializing_if = "Option::is_none")]
+    pub smb_domain: Option<String>,
 }
 
 /// Application settings
@@ -96,8 +117,8 @@ mod tests {
         let s = AppSettings {
             root_path: Some("/a".into()),
             notebooks: vec![
-                Notebook { id: "n1".into(), name: "Work".into(), path: "/a".into() },
-                Notebook { id: "n2".into(), name: "Home".into(), path: "/b".into() },
+                Notebook { id: "n1".into(), name: "Work".into(), path: "/a".into(), ..Default::default() },
+                Notebook { id: "n2".into(), name: "Home".into(), path: "/b".into(), ..Default::default() },
             ],
             active_notebook_id: Some("n1".into()),
             ..Default::default()

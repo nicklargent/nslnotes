@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-nslnotes-core = { path = "../src-lib" }
+nslnotes-core = { path = "../src-lib", features = ["smb"] }
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"

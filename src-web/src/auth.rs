@@ -2,6 +2,7 @@ use argon2::{
     password_hash::{PasswordHash, PasswordVerifier, SaltString},
     Argon2, PasswordHasher,
 };
+use nslnotes_core::crypto::{self, Kek};
 use axum::{
     extract::ConnectInfo,
     http::{HeaderMap, Request, StatusCode},
@@ -26,6 +27,26 @@ use tower_sessions::Session;
 pub const SESSION_USER_KEY: &str = "user";
 pub const DEFAULT_USER: &str = "default";
 
+/// Process-global KEK set on first successful login. `None` until then; all
+/// SMB backend registrations depend on this being populated.
+static KEK: std::sync::OnceLock<std::sync::Mutex<Option<Kek>>> = std::sync::OnceLock::new();
+
+fn kek_cell() -> &'static std::sync::Mutex<Option<Kek>> {
+    KEK.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+/// Return a copy of the current KEK, or `None` if nobody has logged in yet
+/// since the process started.
+pub fn current_kek() -> Option<Kek> {
+    kek_cell().lock().ok().and_then(|g| *g)
+}
+
+fn set_kek(kek: Kek) {
+    if let Ok(mut g) = kek_cell().lock() {
+        *g = Some(kek);
+    }
+}
+
 type LoginLimiter = RateLimiter<
     IpAddr,
     DefaultKeyedStateStore<IpAddr>,
@@ -45,10 +66,13 @@ pub struct AuthConfig {
     pub trust_proxy: bool,
     /// Per-IP login rate limiter: 5 attempts / 15 minutes.
     pub login_limiter: Arc<LoginLimiter>,
+    /// Path to settings.json — login uses this to reconcile SMB backends once
+    /// the KEK is available.
+    pub settings_path: std::path::PathBuf,
 }
 
 impl AuthConfig {
-    pub fn from_env() -> Result<Self, String> {
+    pub fn from_env(settings_path: std::path::PathBuf) -> Result<Self, String> {
         let disabled = std::env::var("NSLNOTES_DISABLE_AUTH")
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
             .unwrap_or(false);
@@ -70,6 +94,7 @@ impl AuthConfig {
                 password_hash: Arc::new(String::new()),
                 trust_proxy,
                 login_limiter,
+                settings_path,
             });
         }
 
@@ -89,6 +114,7 @@ impl AuthConfig {
             password_hash: Arc::new(password_hash),
             trust_proxy,
             login_limiter,
+            settings_path,
         })
     }
 }
@@ -103,13 +129,15 @@ pub fn hash_password(plaintext: &str) -> Result<String, String> {
         .map_err(|e| format!("Failed to hash password: {e}"))
 }
 
-fn verify_password(plaintext: &str, phc: &str) -> bool {
-    match PasswordHash::new(phc) {
-        Ok(parsed) => Argon2::default()
-            .verify_password(plaintext.as_bytes(), &parsed)
-            .is_ok(),
-        Err(_) => false,
-    }
+/// Verify `plaintext` against the PHC hash and, on success, extract the
+/// argon2 hash output as the [`Kek`]. Returns `None` on any mismatch or
+/// parse failure so callers can't distinguish causes (avoids timing oracle).
+fn verify_and_derive(plaintext: &str, phc: &str) -> Option<Kek> {
+    let parsed = PasswordHash::new(phc).ok()?;
+    Argon2::default()
+        .verify_password(plaintext.as_bytes(), &parsed)
+        .ok()?;
+    crypto::kek_from_hash(&parsed).ok()
 }
 
 #[derive(Deserialize)]
@@ -161,13 +189,20 @@ pub async fn login_handler(
             .into_response();
     }
 
-    if !verify_password(&body.password, &auth.password_hash) {
+    let Some(kek) = verify_and_derive(&body.password, &auth.password_hash) else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({ "error": "Invalid password" })),
         )
             .into_response();
-    }
+    };
+
+    // Stash the KEK globally so SMB credential decryption works for this and
+    // subsequent sessions until the process exits. Then reload settings and
+    // (re)register any SMB notebooks with the just-derived key. Migration of
+    // any legacy plaintext `smbPassword` entries happens here.
+    set_kek(kek);
+    crate::reconcile_after_login(&auth.settings_path);
 
     // Rotate the session ID on successful login to prevent fixation.
     if let Err(e) = session.cycle_id().await {
