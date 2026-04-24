@@ -33,7 +33,12 @@ import {
   setContextStore,
   resetContextStore,
 } from "./stores/contextStore";
-import { uiStore, setUIStore } from "./stores/uiStore";
+import {
+  uiStore,
+  setUIStore,
+  installViewportTracking,
+  closeDrawers,
+} from "./stores/uiStore";
 import {
   editorStore,
   setEditorStore,
@@ -92,6 +97,17 @@ function App() {
   // Apply dark mode class reactively
   createEffect(() => {
     document.documentElement.classList.toggle("dark", uiStore.darkMode);
+  });
+
+  // Close mobile/tablet drawers when the user navigates — otherwise the
+  // drawer stays on top of the content they just picked.
+  createEffect(() => {
+    // Track reactive dependencies; return value is discarded.
+    void contextStore.activeEntity;
+    void contextStore.activeView;
+    if (uiStore.viewport !== "desktop") {
+      closeDrawers();
+    }
   });
 
   async function initialize(opts: { skipAuthCheck?: boolean } = {}) {
@@ -166,6 +182,9 @@ function App() {
 
   onMount(() => {
     void initialize();
+
+    const uninstallViewport = installViewportTracking();
+    onCleanup(uninstallViewport);
 
     const handleAuthExpired = () => {
       // Guard against re-entry: stopWatching below fires /api/watch/stop which

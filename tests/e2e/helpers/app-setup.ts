@@ -52,8 +52,9 @@ export async function setupApp(
 
   await page.goto("/");
 
-  // Wait for sidebar content to be visible (indicates app is ready)
-  await expect(page.locator("aside").first()).toBeVisible({ timeout: 10_000 });
+  // Wait for the main pane to mount. An <aside> is a stronger signal but not
+  // present in the mobile layout where both sidebars live behind drawers.
+  await expect(page.locator("main").first()).toBeVisible({ timeout: 10_000 });
 
   // Wait a bit for the index to finish building
   await page.waitForTimeout(500);

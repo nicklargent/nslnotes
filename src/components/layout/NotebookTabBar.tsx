@@ -2,7 +2,7 @@ import { For, createSignal, Show } from "solid-js";
 import logoUrl from "../../assets/logo.svg";
 import { notebooksStore } from "../../stores/notebooksStore";
 import { indexStore } from "../../stores/indexStore";
-import { uiStore, setUIStore } from "../../stores/uiStore";
+import { uiStore, setUIStore, openDrawer } from "../../stores/uiStore";
 import { debouncedSave } from "./Layout";
 import { runtime } from "../../lib/runtime";
 import { FolderPathDialog } from "../FolderPathDialog";
@@ -13,6 +13,7 @@ import type {
 } from "../../services/SettingsService";
 import { BackupService } from "../../services/BackupService";
 import { NotebookTab } from "./NotebookTab";
+import { NotebookSwitcher } from "./NotebookSwitcher";
 
 interface NotebookTabBarProps {
   onSelect: (nb: Notebook) => void | Promise<void>;
@@ -146,44 +147,107 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
 
   return (
     <div class="flex h-10 flex-shrink-0 items-center gap-1 border-b border-gray-200 bg-white px-2 dark:border-gray-700 dark:bg-gray-900">
-      <img src={logoUrl} alt="NslNotes" class="h-6 w-6 flex-shrink-0 mr-2" />
-
-      <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        <For each={notebooksStore.notebooks}>
-          {(nb) => (
-            <NotebookTab
-              notebook={nb}
-              active={nb.id === notebooksStore.activeNotebookId}
-              disabled={notebooksStore.switching}
-              onSelect={() => void props.onSelect(nb)}
-              onRemove={() => void props.onRemove(nb.id)}
-              onRename={(name) => void props.onRename(nb.id, name)}
-              onReveal={() => void revealInFiles(nb)}
-            />
-          )}
-        </For>
+      {/* Hamburger — opens the left drawer on mobile/tablet. */}
+      <Show when={uiStore.viewport !== "desktop"}>
         <button
           type="button"
           class={controlButtonClass}
-          onClick={() => void handleAddClick()}
-          title="Add notebook"
-          disabled={notebooksStore.switching}
+          onClick={() => openDrawer("left")}
+          title="Open navigation"
+          data-testid="open-left-drawer"
         >
           <svg
-            class="h-4 w-4"
+            class="h-5 w-5"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
             stroke-width="2"
           >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-      </div>
+      </Show>
+
+      <img src={logoUrl} alt="NslNotes" class="h-6 w-6 flex-shrink-0 mr-2" />
+
+      <Show
+        when={uiStore.viewport === "desktop"}
+        fallback={
+          <NotebookSwitcher
+            notebooks={notebooksStore.notebooks}
+            activeNotebookId={notebooksStore.activeNotebookId}
+            disabled={notebooksStore.switching}
+            onSelect={(nb) => void props.onSelect(nb)}
+            onAdd={() => void handleAddClick()}
+            onRemove={(id) => void props.onRemove(id)}
+            onRename={(id, name) => void props.onRename(id, name)}
+            onReveal={
+              runtime.isNative() ? (nb) => void revealInFiles(nb) : undefined
+            }
+          />
+        }
+      >
+        <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          <For each={notebooksStore.notebooks}>
+            {(nb) => (
+              <NotebookTab
+                notebook={nb}
+                active={nb.id === notebooksStore.activeNotebookId}
+                disabled={notebooksStore.switching}
+                onSelect={() => void props.onSelect(nb)}
+                onRemove={() => void props.onRemove(nb.id)}
+                onRename={(name) => void props.onRename(nb.id, name)}
+                onReveal={() => void revealInFiles(nb)}
+              />
+            )}
+          </For>
+          <button
+            type="button"
+            class={controlButtonClass}
+            onClick={() => void handleAddClick()}
+            title="Add notebook"
+            disabled={notebooksStore.switching}
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        </div>
+      </Show>
 
       {/* Trailing controls */}
       <div class="flex flex-shrink-0 items-center gap-0.5 pl-2">
+        {/* Tasks drawer trigger — only on mobile, where the right panel is hidden. */}
+        <Show when={uiStore.viewport === "mobile"}>
+          <button
+            type="button"
+            class={controlButtonClass}
+            onClick={() => openDrawer("right")}
+            title="Open tasks"
+            data-testid="open-right-drawer"
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+            </svg>
+          </button>
+        </Show>
+
         {/* Indexing spinner — only visible during background rebuild */}
         <Show when={indexStore.indexing}>
           <div
@@ -208,50 +272,53 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
           </div>
         </Show>
 
-        {/* Backup — download a tar.gz of all notebooks */}
-        <button
-          type="button"
-          class={controlButtonClass}
-          onClick={() => void handleBackupClick()}
-          title={isBackingUp() ? "Creating backup…" : "Backup all notebooks"}
-          disabled={
-            notebooksStore.notebooks.length === 0 ||
-            notebooksStore.switching ||
-            isBackingUp()
-          }
-        >
-          {isBackingUp() ? (
-            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
+        {/* Backup — desktop only; mobile/tablet browsers handle large downloads
+            awkwardly and the action is rare enough to live off the top bar. */}
+        <Show when={uiStore.viewport === "desktop"}>
+          <button
+            type="button"
+            class={controlButtonClass}
+            onClick={() => void handleBackupClick()}
+            title={isBackingUp() ? "Creating backup…" : "Backup all notebooks"}
+            disabled={
+              notebooksStore.notebooks.length === 0 ||
+              notebooksStore.switching ||
+              isBackingUp()
+            }
+          >
+            {isBackingUp() ? (
+              <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                />
+              </svg>
+            ) : (
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
                 stroke="currentColor"
-                stroke-width="4"
-              />
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-              />
-            </svg>
-          ) : (
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          )}
-        </button>
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            )}
+          </button>
+        </Show>
 
         {/* Font size — smaller A and bigger A; current size in tooltip */}
         <button

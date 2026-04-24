@@ -30,6 +30,26 @@ export function NotebookTab(props: NotebookTabProps) {
     setMenuOpen(true);
   }
 
+  let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+  function cancelLongPress() {
+    if (longPressTimer !== undefined) {
+      clearTimeout(longPressTimer);
+      longPressTimer = undefined;
+    }
+  }
+
+  // Touch devices have no right-click, so hold for 600ms to open the same menu.
+  function handlePointerDown(e: PointerEvent) {
+    if (e.pointerType !== "touch") return;
+    const x = e.clientX;
+    const y = e.clientY;
+    longPressTimer = setTimeout(() => {
+      longPressTimer = undefined;
+      setMenuPos({ x, y });
+      setMenuOpen(true);
+    }, 600);
+  }
+
   function startRename() {
     setDraftName(props.notebook.name);
     setRenaming(true);
@@ -53,6 +73,10 @@ export function NotebookTab(props: NotebookTabProps) {
             : "border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
         } ${props.disabled ? "pointer-events-none opacity-50" : ""}`}
         onContextMenu={openMenu}
+        onPointerDown={handlePointerDown}
+        onPointerUp={cancelLongPress}
+        onPointerCancel={cancelLongPress}
+        onPointerLeave={cancelLongPress}
       >
         <Show
           when={!renaming()}

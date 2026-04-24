@@ -99,3 +99,17 @@ body {
 .dark body {
   color: #e5e7eb;
 }
+
+/*
+ * Touch-device override for hover-reveal controls.
+ * On pointer:fine screens (mice, trackpads) delete/cancel icons fade in on
+ * row hover. Touch devices have no hover state — force those icons visible
+ * so the controls aren't unreachable.
+ */
+@media (hover: none) {
+  .group:hover .group-hover\:opacity-100,
+  .group .group-hover\:opacity-100,
+  .group-hover\:opacity-100 {
+    opacity: 1;
+  }
+}
