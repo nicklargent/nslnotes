@@ -7,8 +7,13 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Required. Generate with: docker compose run --rm -i nslnotes hash-password
-      NSLNOTES_PASSWORD_HASH: ${NSLNOTES_PASSWORD_HASH:?set NSLNOTES_PASSWORD_HASH (or NSLNOTES_DISABLE_AUTH=1)}
+      # Required. Bootstrap:
+      #   docker compose build
+      #   echo 'yourpassword' | docker compose run --rm -T nslnotes hash-password
+      # Put the resulting $argon2id$... string in a .env next to this file.
+      # The server will refuse to start without it (or NSLNOTES_DISABLE_AUTH=1).
+      NSLNOTES_PASSWORD_HASH: ${NSLNOTES_PASSWORD_HASH:-}
+      NSLNOTES_DISABLE_AUTH: ${NSLNOTES_DISABLE_AUTH:-}
       # Set to 1 when running behind a TLS-terminating reverse proxy so cookies
       # get the Secure flag and X-Forwarded-For is honored for login rate limiting.
       NSLNOTES_TRUST_PROXY: ${NSLNOTES_TRUST_PROXY:-0}

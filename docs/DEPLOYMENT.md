@@ -9,10 +9,11 @@ Self-host the NslNotes web backend in a container. Notebooks can live on a local
 
 ## Initial setup
 
-Generate a password hash:
+Build the image, then generate a password hash:
 
 ```sh
-docker compose run --rm -i nslnotes hash-password <<< 'your-password-here'
+docker compose build
+echo 'your-password-here' | docker compose run --rm -T nslnotes hash-password
 ```
 
 Put the result in a `.env` next to `docker-compose.yml`:
