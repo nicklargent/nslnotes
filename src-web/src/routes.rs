@@ -208,16 +208,19 @@ async fn get_file_size_handler(Query(q): Query<PathQuery>) -> Response {
 
 async fn serve_asset_handler(Query(q): Query<PathQuery>) -> Response {
     let path = &q.path;
-    match std::fs::read(path) {
+    // Dispatch through the backend registry so smb:// asset paths work the
+    // same as local ones — the previous `std::fs::read` only handled local
+    // files and silently failed for SMB-backed notebooks.
+    let backend = match nslnotes_core::fs::registry().for_path(path) {
+        Ok(b) => b,
+        Err(e) => return err_response(StatusCode::NOT_FOUND, e),
+    };
+    match backend.read_bytes(path) {
         Ok(bytes) => {
             let mime = mime_guess::from_path(path)
                 .first_or_octet_stream()
                 .to_string();
-            (
-                [(axum::http::header::CONTENT_TYPE, mime)],
-                bytes,
-            )
-                .into_response()
+            ([(axum::http::header::CONTENT_TYPE, mime)], bytes).into_response()
         }
         Err(e) => err_response(
             StatusCode::NOT_FOUND,
