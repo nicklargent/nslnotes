@@ -11,9 +11,10 @@ use rust_embed::Embed;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
-use tower_sessions::{cookie::SameSite, Expiry, MemoryStore, SessionManagerLayer};
+use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
 
 use crate::auth::{self, AuthConfig};
+use crate::session_store::{sessions_dir_for, FileSessionStore};
 use crate::sse;
 
 #[derive(Embed)]
@@ -113,7 +114,9 @@ pub fn create_router(
 
     // Session cookie config: HttpOnly, SameSite=Lax, 30-day rolling expiry.
     // Secure flag is enabled when running behind a TLS-terminating proxy.
-    let session_store = MemoryStore::default();
+    // Sessions persist to disk under settings_dir/sessions/ so a container
+    // restart doesn't bounce every logged-in user back to the login screen.
+    let session_store = FileSessionStore::new(sessions_dir_for(&state.settings_path));
     let session_layer = SessionManagerLayer::new(session_store)
         .with_name("nslnotes_session")
         .with_secure(auth_config.trust_proxy)

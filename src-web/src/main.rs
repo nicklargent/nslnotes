@@ -1,5 +1,6 @@
 mod auth;
 mod routes;
+mod session_store;
 mod sse;
 
 use clap::{Parser, Subcommand};
