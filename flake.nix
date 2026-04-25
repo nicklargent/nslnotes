@@ -18,6 +18,10 @@
           inherit system overlays;
         };
 
+        # Single source of truth: read version from package.json so a single
+        # `npm version` bump propagates to nix store paths and `nix profile list`.
+        version = (builtins.fromJSON (builtins.readFile ./package.json)).version;
+
         # Rust toolchain - stable with additional components
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
@@ -60,7 +64,7 @@
         # Prefetch npm dependencies for offline build
         npmDeps = pkgs.fetchNpmDeps {
           src = ./.;
-          hash = "sha256-s5A7/KuSmI0EC9b7bmj0I9OAMiuMEkN/C0FPa0MC8S4=";
+          hash = "sha256-iamdysxFCzGKZrW3Cy5C8klDpWp4HSSAKlfJJZyph2E=";
         };
 
       in
@@ -120,7 +124,7 @@
         # Package definition
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "nslnotes";
-          version = "0.1.0";
+          inherit version;
           src = ./.;
 
           cargoHash = "sha256-blTDj1jQs0CQVVdAOMSELkOI+dspWSPIA000SDC0lT8=";
@@ -189,7 +193,7 @@ DESKTOP
         # Web server package
         packages.web = pkgs.rustPlatform.buildRustPackage {
           pname = "nslnotes-web";
-          version = "0.1.0";
+          inherit version;
           src = ./.;
 
           cargoHash = "sha256-blTDj1jQs0CQVVdAOMSELkOI+dspWSPIA000SDC0lT8=";

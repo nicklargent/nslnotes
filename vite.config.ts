@@ -3,6 +3,8 @@ import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import apiPlugin from "./vite-plugin-api";
+import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -11,8 +13,27 @@ const host = process.env.TAURI_DEV_HOST;
 // @ts-expect-error process is a nodejs global
 const isWebMode = !!process.env.WEB_MODE;
 
+const pkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf-8"),
+) as { version: string };
+
+let commit = "dev";
+try {
+  commit = execSync("git rev-parse --short HEAD", {
+    stdio: ["ignore", "pipe", "ignore"],
+  })
+    .toString()
+    .trim();
+} catch {
+  // .git unavailable (e.g., nix build sandbox) — fall back to "dev"
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_COMMIT__: JSON.stringify(commit),
+  },
   plugins: [
     solid(),
     tailwindcss(),

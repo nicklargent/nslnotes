@@ -116,6 +116,16 @@ export function RightPanel(props: RightPanelProps) {
           />
         </Show>
       </div>
+
+      <div
+        class="border-t border-gray-200 px-3 py-1.5 text-right text-xs text-gray-400 select-text dark:border-gray-700 dark:text-gray-500"
+        title={`NslNotes v${__APP_VERSION__} (${__APP_COMMIT__})`}
+      >
+        v{__APP_VERSION__}
+        <span class="ml-1 text-gray-300 dark:text-gray-600">
+          ({__APP_COMMIT__})
+        </span>
+      </div>
     </div>
   );
 }

@@ -16,6 +16,8 @@ export default [
       },
       globals: {
         ...globals.browser,
+        __APP_VERSION__: "readonly",
+        __APP_COMMIT__: "readonly",
       },
     },
     plugins: {
