@@ -1,6 +1,7 @@
 import { createSignal, Show } from "solid-js";
 import { TaskGroup } from "../tasks/TaskGroup";
 import { ClosedTaskItem } from "../tasks/ClosedTaskItem";
+import { APP_VERSION, APP_COMMIT } from "virtual:app-version";
 import type { Task } from "../../types/entities";
 import type { GroupedTasks, GroupedClosedTasks } from "../../types/task-groups";
 
@@ -119,11 +120,11 @@ export function RightPanel(props: RightPanelProps) {
 
       <div
         class="border-t border-gray-200 px-3 py-1.5 text-right text-xs text-gray-400 select-text dark:border-gray-700 dark:text-gray-500"
-        title={`NslNotes v${__APP_VERSION__} (${__APP_COMMIT__})`}
+        title={`NslNotes v${APP_VERSION} (${APP_COMMIT})`}
       >
-        v{__APP_VERSION__}
+        v{APP_VERSION}
         <span class="ml-1 text-gray-300 dark:text-gray-600">
-          ({__APP_COMMIT__})
+          ({APP_COMMIT})
         </span>
       </div>
     </div>

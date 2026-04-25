@@ -28,13 +28,36 @@ try {
   // .git unavailable (e.g., nix build sandbox) — fall back to "dev"
 }
 
+// Expose version/commit to client code via a virtual module:
+//   import { APP_VERSION, APP_COMMIT } from "virtual:app-version"
+//
+// Why a virtual module instead of `define` or `import.meta.env.VITE_*`?
+// vite-plugin-solid does its own JSX compile and returns plain JS, which
+// bypasses both the esbuild `define` step and the env-replacement step.
+// A virtual module is resolved/loaded as a regular import that Solid's
+// transform doesn't touch, so the values survive the pipeline.
+const virtualAppVersion = "virtual:app-version";
+const resolvedAppVersion = "\0" + virtualAppVersion;
+function appVersionPlugin() {
+  return {
+    name: "app-version",
+    resolveId(id: string) {
+      if (id === virtualAppVersion) return resolvedAppVersion;
+      return null;
+    },
+    load(id: string) {
+      if (id !== resolvedAppVersion) return null;
+      return `export const APP_VERSION = ${JSON.stringify(pkg.version)};
+export const APP_COMMIT = ${JSON.stringify(commit)};
+`;
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
-    __APP_COMMIT__: JSON.stringify(commit),
-  },
   plugins: [
+    appVersionPlugin(),
     solid(),
     tailwindcss(),
     ...(isWebMode ? [apiPlugin()] : []),
