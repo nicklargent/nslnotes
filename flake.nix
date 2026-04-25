@@ -60,7 +60,7 @@
         # Prefetch npm dependencies for offline build
         npmDeps = pkgs.fetchNpmDeps {
           src = ./.;
-          hash = "sha256-sF1hZ+toDDfu8ES7Xl9QofiMPGWFj5rZyrrK24a4WVE=";
+          hash = "sha256-s5A7/KuSmI0EC9b7bmj0I9OAMiuMEkN/C0FPa0MC8S4=";
         };
 
       in
@@ -123,7 +123,7 @@
           version = "0.1.0";
           src = ./.;
 
-          cargoHash = "sha256-kDNXRKjV4hE8kdidLjcj1hZb9dZqAyKkXixAq81xU1s=";
+          cargoHash = "sha256-blTDj1jQs0CQVVdAOMSELkOI+dspWSPIA000SDC0lT8=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
@@ -192,7 +192,7 @@ DESKTOP
           version = "0.1.0";
           src = ./.;
 
-          cargoHash = "sha256-kDNXRKjV4hE8kdidLjcj1hZb9dZqAyKkXixAq81xU1s=";
+          cargoHash = "sha256-blTDj1jQs0CQVVdAOMSELkOI+dspWSPIA000SDC0lT8=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
