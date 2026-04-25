@@ -151,11 +151,18 @@ async fn main() {
 /// legacy settings files still work until the next save migrates them.
 /// When `kek` is `None` (disabled-auth mode, or before login), only plaintext
 /// credentials are honored and encrypted entries are skipped with a warning.
+///
+/// Notebooks pointing at the same `(host, share)` with the same user share
+/// one backend instead of being registered twice — the registry is keyed on
+/// `(host, share)`, so a second `register_smb` would just overwrite the first
+/// while spinning up a redundant libsmbclient session.
 pub fn reconcile_smb_backends(
     settings: &AppSettings,
     kek: Option<nslnotes_core::crypto::Kek>,
 ) {
     nslnotes_core::fs::registry().clear_smb();
+    let mut seen: std::collections::HashSet<(String, String, String, String)> =
+        std::collections::HashSet::new();
     for nb in &settings.notebooks {
         if !nslnotes_core::smb_url::is_smb_url(&nb.path) {
             continue;
@@ -170,6 +177,15 @@ pub fn reconcile_smb_backends(
                 continue;
             }
         };
+        let dedupe_key = (
+            cred.host.clone(),
+            cred.share.clone(),
+            cred.username.clone(),
+            cred.domain.clone(),
+        );
+        if !seen.insert(dedupe_key) {
+            continue;
+        }
         if let Err(e) = nslnotes_core::fs::registry().register_smb(cred) {
             eprintln!(
                 "nslnotes-web: failed to register SMB notebook '{}' ({}): {e}",
