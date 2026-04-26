@@ -362,6 +362,20 @@ export const IndexService = {
    * @param rootPath - Root directory path (for topic recomputation)
    */
   invalidate: async (path: string, rootPath: string): Promise<void> => {
+    // Bail if the active notebook has changed since this save was
+    // queued — otherwise a debounced save that fires after a notebook
+    // switch would leak the previous notebook's note into the new
+    // notebook's `indexStore` (its date matches today's daily note
+    // lookup, so it would render briefly until `_rebuildFresh` sweeps
+    // it away).
+    const activeRoot = notebooksApi.activeRoot();
+    if (
+      !activeRoot ||
+      activeRoot.replace(/\/+$/, "") !== rootPath.replace(/\/+$/, "")
+    ) {
+      return;
+    }
+
     // Determine which subdirectory the file is in
     const notesDir = joinPath(rootPath, "notes");
     const tasksDir = joinPath(rootPath, "tasks");

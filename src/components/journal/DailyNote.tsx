@@ -38,13 +38,29 @@ export function DailyNote(props: DailyNoteProps) {
       () => props.note?.path,
       () => {
         const noteContent = props.note?.content ?? "";
-        // Skip if this is feedback from our own save (the file content
-        // matches what the user just typed). When we DO sync, keep
-        // `lastLocalContent` in lockstep with `content()` — otherwise a
-        // notebook-switch reset cycle (note becomes undefined → ""
-        // restored from cache) leaves them desynced and the editor stays
-        // empty even when the cache holds the saved content.
-        if (noteContent !== lastLocalContent) {
+        // Skip echoes of our own save. When we DO sync, keep
+        // `lastLocalContent` in lockstep with `content()` so a
+        // notebook-switch reset cycle doesn't leave them desynced.
+        //
+        // Also skip if the user has typed strictly past what's in the
+        // file: that happens during the create-and-invalidate race —
+        // `createDailyNoteFile` lands with body = first keystroke, but
+        // by the time the resulting `props.note` arrives the user has
+        // typed more. Letting `setContent` run here would reset the
+        // editor under their cursor; the in-flight debounced save will
+        // catch the file up shortly.
+        //
+        // Require `noteContent` to be non-empty so a notebook-switch
+        // reset (props.note → undefined → noteContent="") still clears
+        // the editor — otherwise the previous notebook's typing would
+        // bleed into the new notebook and the next keystroke would
+        // create a file there with the carried-over content.
+        const userHasTypedPast =
+          lastLocalContent !== undefined &&
+          noteContent.length > 0 &&
+          lastLocalContent.length > noteContent.length &&
+          lastLocalContent.startsWith(noteContent);
+        if (noteContent !== lastLocalContent && !userHasTypedPast) {
           setContent(noteContent);
           lastLocalContent = noteContent;
         }
@@ -172,7 +188,12 @@ export function DailyNote(props: DailyNoteProps) {
               <Editor
                 content={content()}
                 placeholder="Start writing..."
-                entityPath={props.note?.path}
+                // Pass the resolved path even before the file exists, so
+                // the editor's `entityPath` doesn't flip when
+                // `createDailyNoteFile` finally lands. Otherwise its
+                // path-changed branch bypasses the focus guard and
+                // resets the doc under the user's cursor mid-typing.
+                entityPath={resolveDailyNotePath()?.path ?? props.note?.path}
                 embedded={true}
                 onUpdate={handleUpdate}
                 onFlushSave={flushPendingSave}
