@@ -71,6 +71,50 @@ pub trait Backend: Send + Sync {
         self.read_file(path).map(|s| s.into_bytes())
     }
 
+    /// Read every `.md` file directly under `dir` (non-recursive) and return
+    /// `(absolute_path, content, mtime_unix_seconds)` triples. Used by index
+    /// builds, where the per-file pattern of `list_directory` + N×`read_file`
+    /// is fine for local disks but pathological over SMB (each call is a
+    /// worker-thread round-trip). Backends that benefit override this with
+    /// a single-job implementation; the default is the obvious sequential
+    /// fallback so LocalBackend stays simple. mtime comes back alongside
+    /// content so the cache freshness check has a snapshot to compare
+    /// against on the next build.
+    fn read_md_dir(&self, dir: &str) -> Result<Vec<(String, String, i64)>, String> {
+        let metas = self.list_md_dir_meta(dir).unwrap_or_default();
+        let mut mtime_for: std::collections::HashMap<String, i64> =
+            std::collections::HashMap::with_capacity(metas.len());
+        for (p, m) in metas {
+            mtime_for.insert(p, m);
+        }
+        let entries = self.list_directory(dir)?;
+        let mut out = Vec::new();
+        for path in entries {
+            if !path.ends_with(".md") {
+                continue;
+            }
+            match self.read_file(&path) {
+                Ok(c) => {
+                    let mtime = mtime_for.get(&path).copied().unwrap_or(0);
+                    out.push((path, c, mtime));
+                }
+                Err(_) => continue,
+            }
+        }
+        Ok(out)
+    }
+
+    /// Return `(absolute_path, mtime_unix_seconds)` for every `.md` file
+    /// directly under `dir`. Used by the index-cache freshness check: if
+    /// the cached mtimes match what the backend reports, the rebuild can
+    /// be skipped entirely. Cheap for SMB (one `list_dirplus` call returns
+    /// metadata for every entry) and basically free for local disks.
+    /// Default impl returns `Err` so callers can detect "this backend
+    /// doesn't expose mtimes" and fall back to a full rebuild.
+    fn list_md_dir_meta(&self, _dir: &str) -> Result<Vec<(String, i64)>, String> {
+        Err("list_md_dir_meta not supported by this backend".into())
+    }
+
     /// Walk `root` returning every directory, file, and symlink encountered.
     /// Used by the backup path. Returned in a stable order (pre-order,
     /// lexicographic within a directory) so archives are reproducible.

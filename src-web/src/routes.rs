@@ -88,6 +88,8 @@ pub fn create_router(
         .route("/files/rmdir", delete(delete_directory_handler))
         .route("/files/exists", get(file_exists_handler))
         .route("/files/list", get(list_directory_handler))
+        .route("/files/read-md-dir", get(read_md_dir_handler))
+        .route("/files/list-md-meta", get(list_md_dir_meta_handler))
         .route("/files/verify", get(verify_directory_handler))
         .route("/files/mkdir", post(ensure_directory_handler))
         .route("/files/copy", post(copy_file_handler))
@@ -174,6 +176,55 @@ async fn list_directory_handler(Query(q): Query<PathQuery>) -> Response {
     }
 }
 
+/// Return `(path, mtime_seconds)` for every `.md` file directly under `path`.
+/// One round-trip per directory; the frontend uses this to cheaply confirm a
+/// cached index is still up to date before re-reading any file contents.
+async fn list_md_dir_meta_handler(Query(q): Query<PathQuery>) -> Response {
+    let path = q.path.clone();
+    let result = tokio::task::spawn_blocking(move || nslnotes_core::fs_ops::list_md_dir_meta(&path))
+        .await;
+    match result {
+        Ok(Ok(entries)) => {
+            let body: Vec<serde_json::Value> = entries
+                .into_iter()
+                .map(|(p, m)| serde_json::json!({ "path": p, "mtime": m }))
+                .collect();
+            Json(body).into_response()
+        }
+        Ok(Err(e)) => err_response(StatusCode::INTERNAL_SERVER_ERROR, e),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("list_md_dir_meta join error: {e}"),
+        ),
+    }
+}
+
+/// Bulk read every `.md` file directly under `path` and return their contents.
+/// One HTTP round-trip per directory replaces N+1 round-trips (list + each
+/// read) — a meaningful speedup when the backend is SMB and every file op
+/// queues on a single worker thread.
+async fn read_md_dir_handler(Query(q): Query<PathQuery>) -> Response {
+    let path = q.path.clone();
+    let result = tokio::task::spawn_blocking(move || nslnotes_core::fs_ops::read_md_dir(&path))
+        .await;
+    match result {
+        Ok(Ok(entries)) => {
+            let body: Vec<serde_json::Value> = entries
+                .into_iter()
+                .map(|(p, c, m)| {
+                    serde_json::json!({ "path": p, "content": c, "mtime": m })
+                })
+                .collect();
+            Json(body).into_response()
+        }
+        Ok(Err(e)) => err_response(StatusCode::INTERNAL_SERVER_ERROR, e),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("read_md_dir join error: {e}"),
+        ),
+    }
+}
+
 async fn verify_directory_handler(Query(q): Query<PathQuery>) -> Response {
     match nslnotes_core::fs_ops::verify_directory(&q.path) {
         Ok(status) => Json(status).into_response(),
@@ -251,11 +302,15 @@ async fn save_settings_handler(
     State(state): State<AppState>,
     Json(mut settings): Json<nslnotes_core::settings::AppSettings>,
 ) -> Response {
-    // Load the prior state so we can tell whether anything the SMB registry
-    // cares about actually changed — avoids disconnect/reconnect churn when a
-    // save is just for column widths, font size, etc.
-    let prior_smb = nslnotes_core::settings::load_from_path(&state.settings_path)
-        .map(|s| smb_registry_fingerprint(&s))
+    // Used for two things: (1) the SMB-registry fingerprint diff so a
+    // pure UI-state save doesn't churn the SMB session; (2) preserving
+    // credentials the browser doesn't have — `load_settings_handler`
+    // strips `smbPassword` from the response, so without merging from
+    // disk a routine save would wipe on-disk creds.
+    let prior_settings = nslnotes_core::settings::load_from_path(&state.settings_path).ok();
+    let prior_smb = prior_settings
+        .as_ref()
+        .map(smb_registry_fingerprint)
         .unwrap_or_default();
 
     // Encrypt any plaintext smbPassword the frontend just sent us so we never
@@ -286,6 +341,22 @@ async fn save_settings_handler(
                     // No KEK (disabled-auth mode). Keep plaintext so the
                     // notebook still works; persistence will reflect that.
                     nb.smb_password = Some(plain);
+                }
+            }
+        }
+
+        // Merge in any credentials the client didn't send. This is the
+        // "load_settings stripped them, browser saved settings without
+        // re-supplying them" case — match by id to find the on-disk
+        // notebook and preserve its password material.
+        if nb.smb_password.is_none() && nb.smb_password_enc.is_none() {
+            if let Some(prior) = prior_settings.as_ref() {
+                if let Some(prior_nb) = prior.notebooks.iter().find(|p| p.id == nb.id) {
+                    if prior_nb.smb_password_enc.is_some() {
+                        nb.smb_password_enc = prior_nb.smb_password_enc.clone();
+                    } else if prior_nb.smb_password.is_some() {
+                        nb.smb_password = prior_nb.smb_password.clone();
+                    }
                 }
             }
         }

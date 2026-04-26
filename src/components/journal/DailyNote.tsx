@@ -6,9 +6,9 @@ import { serialize } from "../../lib/frontmatter";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
 import { EntityService } from "../../services/EntityService";
-import { SettingsService } from "../../services/SettingsService";
 import { parse } from "../../lib/frontmatter";
 import { DeleteIconButton } from "../buttons/DeleteIconButton";
+import { notebooksApi } from "../../stores/notebooksStore";
 import type { Note } from "../../types/entities";
 
 interface DailyNoteProps {
@@ -38,38 +38,60 @@ export function DailyNote(props: DailyNoteProps) {
       () => props.note?.path,
       () => {
         const noteContent = props.note?.content ?? "";
-        // Skip if this is feedback from our own save
+        // Skip if this is feedback from our own save (the file content
+        // matches what the user just typed). When we DO sync, keep
+        // `lastLocalContent` in lockstep with `content()` — otherwise a
+        // notebook-switch reset cycle (note becomes undefined → ""
+        // restored from cache) leaves them desynced and the editor stays
+        // empty even when the cache holds the saved content.
         if (noteContent !== lastLocalContent) {
           setContent(noteContent);
+          lastLocalContent = noteContent;
         }
         setCreated(!!props.note);
       }
     )
   );
 
-  let pendingSave: { date: string; body: string } | null = null;
+  // Path is captured at edit time so a notebook switch between keystroke
+  // and debounced save can't route the write to the wrong notebook.
+  let pendingSave: { path: string; rootPath: string; body: string } | null =
+    null;
+
+  function resolveDailyNotePath(): { path: string; rootPath: string } | null {
+    const root = notebooksApi.activeRoot();
+    if (!root) return null;
+    const rootPath = root.replace(/\/+$/, "");
+    return { path: `${rootPath}/notes/${props.date}.md`, rootPath };
+  }
 
   function handleUpdate(value: string) {
     lastLocalContent = value;
     setContent(value);
-    const date = props.date;
+
+    const resolved = resolveDailyNotePath();
+    if (!resolved) return;
+    const { path, rootPath } = resolved;
 
     // Lazy creation: first keystroke creates the file
     if (!created() && value.trim() !== "") {
       setCreated(true);
-      void createDailyNoteFile(date, value);
+      void createDailyNoteFile(path, rootPath, props.date, value);
       return;
     }
 
     // Debounced save for subsequent edits (T5.12)
     if (created()) {
-      pendingSave = { date, body: value };
+      pendingSave = { path, rootPath, body: value };
       window.clearTimeout(saveTimeout);
       saveTimeout = window.setTimeout(() => {
+        // Clear so `hasPendingChanges()` (used by beforeunload) doesn't
+        // report `true` for the expired timer.
+        saveTimeout = undefined;
         if (pendingSave) {
-          const { date: d, body: b } = pendingSave;
+          const { path: p, rootPath: r, body: b } = pendingSave;
           pendingSave = null;
-          savingPromise = saveDailyNote(d, b).finally(() => {
+          savingPromise = saveDailyNote(p, r, b).finally(() => {
             savingPromise = null;
           });
         }
@@ -83,8 +105,9 @@ export function DailyNote(props: DailyNoteProps) {
       saveTimeout = undefined;
     }
     if (pendingSave) {
-      await saveDailyNote(pendingSave.date, pendingSave.body);
+      const { path, rootPath, body } = pendingSave;
       pendingSave = null;
+      await saveDailyNote(path, rootPath, body);
     }
     if (savingPromise) {
       await savingPromise;
@@ -110,18 +133,17 @@ export function DailyNote(props: DailyNoteProps) {
   });
 
   async function handleDelete() {
-    const rootPath = await SettingsService.getRootPath();
-    if (!rootPath) return;
-    const path = `${rootPath}/notes/${props.date}.md`;
-    await EntityService.deleteEntity(path);
+    const resolved = resolveDailyNotePath();
+    if (!resolved) return;
+    await EntityService.deleteEntity(resolved.path);
     setCreated(false);
     setContent("");
   }
 
   async function toggleRawMode() {
-    const rootPath = await SettingsService.getRootPath();
-    if (!rootPath) return;
-    const path = `${rootPath}/notes/${props.date}.md`;
+    const resolved = resolveDailyNotePath();
+    if (!resolved) return;
+    const { path } = resolved;
 
     if (rawMode()) {
       // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
@@ -185,26 +207,28 @@ export function DailyNote(props: DailyNoteProps) {
   );
 }
 
-async function createDailyNoteFile(date: string, body: string) {
-  const rootPath = await SettingsService.getRootPath();
-  if (!rootPath) return;
-
-  const path = `${rootPath}/notes/${date}.md`;
+async function createDailyNoteFile(
+  path: string,
+  rootPath: string,
+  date: string,
+  body: string
+) {
   const frontmatter = { type: "note", date };
   const fileContent = serialize(frontmatter, body);
   await FileService.write(path, fileContent);
   await IndexService.invalidate(path, rootPath);
 }
 
-async function saveDailyNote(date: string, body: string) {
-  const rootPath = await SettingsService.getRootPath();
-  if (!rootPath) return;
-
-  const path = `${rootPath}/notes/${date}.md`;
-  const exists = await FileService.exists(path);
-  if (!exists) return;
-
-  const fileContent = await FileService.read(path);
+async function saveDailyNote(path: string, rootPath: string, body: string) {
+  // Skip the upfront `FileService.exists` check — `read` will throw if
+  // the file vanished between edit and debounced save, and we just bail
+  // either way. One fewer SMB round-trip per debounced keystroke.
+  let fileContent: string;
+  try {
+    fileContent = await FileService.read(path);
+  } catch {
+    return;
+  }
   const parsed = parse(fileContent);
   if (!parsed) return;
 

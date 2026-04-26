@@ -10,8 +10,8 @@ import { RawEditor } from "../editor/RawEditor";
 import { RawModeToggle } from "../editor/RawModeToggle";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
-import { SettingsService } from "../../services/SettingsService";
 import { EntityService } from "../../services/EntityService";
+import { notebooksApi } from "../../stores/notebooksStore";
 import { parse, serialize } from "../../lib/frontmatter";
 import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
@@ -48,16 +48,29 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
 
   createEffect(() => {
     const noteContent = liveNote().content;
-    // Skip feedback from our own edits to avoid unnecessary re-renders
+    // Skip own-save echoes; keep `lastLocalContent` in sync on real
+    // resyncs so a notebook-switch reset cycle doesn't leave the editor
+    // empty (see DailyNote.tsx for the full rationale).
     if (noteContent !== lastLocalContent) {
       setContent(noteContent);
+      lastLocalContent = noteContent;
     }
   });
+
+  // Pending save snapshot. We capture the path at edit time and reuse it
+  // on cleanup so a notebook switch (which can cause `props.note` to
+  // stop being current) never routes the write to the wrong notebook.
+  let pendingSave: { path: string; body: string } | null = null;
 
   onCleanup(() => {
     if (saveTimeout) {
       window.clearTimeout(saveTimeout);
-      void saveNamedNote(props.note.path, content());
+      saveTimeout = undefined;
+    }
+    if (pendingSave) {
+      const { path, body } = pendingSave;
+      pendingSave = null;
+      void saveNamedNote(path, body);
     }
   });
 
@@ -65,10 +78,15 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
     lastLocalContent = newContent;
     setContent(newContent);
     const notePath = props.note.path;
+    pendingSave = { path: notePath, body: newContent };
 
     window.clearTimeout(saveTimeout);
     saveTimeout = window.setTimeout(() => {
-      void saveNamedNote(notePath, newContent);
+      if (pendingSave) {
+        const { path, body } = pendingSave;
+        pendingSave = null;
+        void saveNamedNote(path, body);
+      }
     }, 300);
   }
 
@@ -186,7 +204,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
 }
 
 async function saveNamedNote(path: string, body: string) {
-  const rootPath = await SettingsService.getRootPath();
+  const rootPath = notebooksApi.activeRoot();
   if (!rootPath) return;
 
   const fileContent = await FileService.read(path);

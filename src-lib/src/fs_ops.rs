@@ -59,3 +59,11 @@ pub fn write_binary(path: &str, base64_data: &str) -> Result<(), String> {
 pub fn get_file_size(path: &str) -> Result<u64, String> {
     registry().for_path(path)?.get_file_size(path)
 }
+
+pub fn read_md_dir(path: &str) -> Result<Vec<(String, String, i64)>, String> {
+    registry().for_path(path)?.read_md_dir(path)
+}
+
+pub fn list_md_dir_meta(path: &str) -> Result<Vec<(String, i64)>, String> {
+    registry().for_path(path)?.list_md_dir_meta(path)
+}

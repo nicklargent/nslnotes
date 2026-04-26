@@ -37,9 +37,21 @@ function activeNotebook(): Notebook | null {
   return notebooksStore.notebooks.find((n) => n.id === id) ?? null;
 }
 
+/**
+ * Active notebook's root path, resolved synchronously from the store.
+ * Use this instead of `await SettingsService.getRootPath()` from any
+ * code path that may run after a notebook switch (debounced saves, file
+ * watchers, etc.) — the awaited form races the optimistic
+ * `setActive` and can route writes to the wrong notebook.
+ */
+function activeRoot(): string | null {
+  return activeNotebook()?.path ?? null;
+}
+
 export const notebooksApi = {
   hydrateFrom,
   activeNotebook,
+  activeRoot,
   setSwitching(v: boolean) {
     setNotebooksStore("switching", v);
   },
@@ -63,10 +75,13 @@ export const notebooksApi = {
     publish(await SettingsService.renameNotebook(id, name));
   },
   /**
-   * Persist the active notebook. Does NOT trigger index teardown/rebuild —
-   * the caller owns that side effect.
+   * Persist the active notebook. Optimistically writes the store so the
+   * tab indicator flips on the next frame; the settings save reconciles
+   * after. Does NOT trigger index teardown/rebuild — the caller owns
+   * that side effect.
    */
   async setActive(id: string): Promise<void> {
+    setNotebooksStore("activeNotebookId", id);
     publish(await SettingsService.setActiveNotebook(id));
   },
 };

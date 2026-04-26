@@ -128,6 +128,27 @@ impl Backend for LocalBackend {
         fs::read(path).map_err(|e| format!("Failed to read '{}': {}", path, e))
     }
 
+    fn list_md_dir_meta(&self, dir: &str) -> Result<Vec<(String, i64)>, String> {
+        let entries = self.list_directory(dir)?;
+        let mut out = Vec::with_capacity(entries.len());
+        for path in entries {
+            if !path.ends_with(".md") {
+                continue;
+            }
+            let Ok(meta) = fs::metadata(&path) else {
+                continue;
+            };
+            let mtime = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            out.push((path, mtime));
+        }
+        Ok(out)
+    }
+
     fn walk_for_backup(&self, root: &str) -> Result<Vec<BackupEntry>, String> {
         let mut out: Vec<BackupEntry> = Vec::new();
         for res in WalkDir::new(root)

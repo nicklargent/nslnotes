@@ -59,6 +59,11 @@
           # Development utilities
           jq
           curl
+
+          # libsmbclient for the `smb` feature in nslnotes-web. pavao-sys
+          # uses pkg-config to find the headers; without this `cargo build
+          # -p nslnotes-web` fails with "smbclient.h not found" on NixOS.
+          samba
         ] ++ linuxBuildInputs;
 
         # Prefetch npm dependencies for offline build

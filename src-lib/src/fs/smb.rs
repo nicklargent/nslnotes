@@ -142,15 +142,19 @@ impl SmbBackend {
         })
     }
 
-    /// Submit a closure to the SMB worker, reconnecting once on failure.
+    /// Submit a closure to the SMB worker. Single attempt — earlier code
+    /// here did "rebuild context and retry once" on error, but pavao 0.2's
+    /// `Drop` frees and nulls the global `SMBCTX`, so the retry path can
+    /// segfault and, when it doesn't, snowballs transient errors into
+    /// cascading failures. Errors now propagate to the caller; lazy
+    /// reconnect happens on the next job via the `slot.is_none()` branch.
     fn run<T, F>(&self, op: F) -> Result<T, String>
     where
         T: Send + 'static,
-        F: FnOnce(&SmbClient) -> Result<T, String> + Send + Clone + 'static,
+        F: FnOnce(&SmbClient) -> Result<T, String> + Send + 'static,
     {
         let config = self.config.clone();
         let (reply_tx, reply_rx) = mpsc::channel::<Result<T, String>>();
-        let op_for_job = op.clone();
         let job: Job = Box::new(move |slot| {
             if slot.is_none() {
                 match build_client(&config) {
@@ -162,20 +166,7 @@ impl SmbBackend {
                 }
             }
             let client = slot.as_ref().expect("present by construction");
-            let first = op_for_job(client);
-            let result = match first {
-                Ok(v) => Ok(v),
-                Err(_first_err) => {
-                    // Rebuild and retry once.
-                    match build_client(&config) {
-                        Ok(new) => {
-                            *slot = Some(new);
-                            op(slot.as_ref().unwrap())
-                        }
-                        Err(e) => Err(format!("SMB reconnect failed: {e}")),
-                    }
-                }
-            };
+            let result = op(client);
             let _ = reply_tx.send(result);
         });
         self.tx
@@ -402,6 +393,98 @@ impl Backend for SmbBackend {
         })
     }
 
+    /// One worker job that lists `dir` with metadata. `list_dirplus` returns
+    /// every entry's `mtime` in the same SMB call, so this is essentially
+    /// free — much cheaper than a directory walk and lets the frontend
+    /// cheaply confirm "nothing changed" before launching a rebuild.
+    fn list_md_dir_meta(&self, dir: &str) -> Result<Vec<(String, i64)>, String> {
+        let rel_dir = self.resolve(dir)?;
+        let prefix = dir.trim_end_matches('/').to_string();
+        self.run(move |client| {
+            let entries = client
+                .list_dirplus(&rel_dir)
+                .map_err(|e| format!("list_dirplus '{rel_dir}': {e}"))?;
+            let mut out: Vec<(String, i64)> = Vec::with_capacity(entries.len());
+            for e in entries {
+                let name = e.name().to_string();
+                if name == "." || name == ".." {
+                    continue;
+                }
+                if !matches!(e.get_type(), SmbDirentType::File) {
+                    continue;
+                }
+                if !name.ends_with(".md") {
+                    continue;
+                }
+                let mtime = e
+                    .mtime
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+                let abs = format!("{prefix}/{name}");
+                out.push((abs, mtime));
+            }
+            out.sort_by(|a, b| a.0.cmp(&b.0));
+            Ok(out)
+        })
+    }
+
+    /// Whole list+read in one worker job so we don't pay a channel
+    /// round-trip per file. `list_dirplus` returns mtimes alongside names
+    /// in the same SMB call, which we hand back so the cache freshness
+    /// check on the next switch can skip the rebuild.
+    fn read_md_dir(&self, dir: &str) -> Result<Vec<(String, String, i64)>, String> {
+        let rel_dir = self.resolve(dir)?;
+        let prefix = dir.trim_end_matches('/').to_string();
+        self.run(move |client| {
+            let entries = client
+                .list_dirplus(&rel_dir)
+                .map_err(|e| format!("list_dirplus '{rel_dir}': {e}"))?;
+            let mut targets: Vec<(String, String, i64)> = Vec::new();
+            for e in entries {
+                let name = e.name().to_string();
+                if name == "." || name == ".." {
+                    continue;
+                }
+                if !matches!(e.get_type(), SmbDirentType::File) {
+                    continue;
+                }
+                if !name.ends_with(".md") {
+                    continue;
+                }
+                let child_rel = if rel_dir == "/" {
+                    format!("/{name}")
+                } else {
+                    format!("{}/{name}", rel_dir.trim_end_matches('/'))
+                };
+                let child_abs = format!("{prefix}/{name}");
+                let mtime = e
+                    .mtime
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+                targets.push((child_rel, child_abs, mtime));
+            }
+
+            let mut out: Vec<(String, String, i64)> = Vec::with_capacity(targets.len());
+            for (child_rel, child_abs, mtime) in targets {
+                let mut file = match client
+                    .open_with(&child_rel, SmbOpenOptions::default().read(true))
+                {
+                    Ok(f) => f,
+                    Err(_) => continue,
+                };
+                let mut content = String::new();
+                if file.read_to_string(&mut content).is_err() {
+                    continue;
+                }
+                out.push((child_abs, content, mtime));
+            }
+            out.sort_by(|a, b| a.0.cmp(&b.0));
+            Ok(out)
+        })
+    }
+
     fn walk_for_backup(&self, root: &str) -> Result<Vec<BackupEntry>, String> {
         let rel_root = self.resolve(root)?;
         let root_prefix = root.trim_end_matches('/').to_string();
@@ -466,8 +549,9 @@ impl Backend for SmbBackend {
     }
 
     fn walk_meta(&self, root: &str) -> Result<Vec<super::FileMeta>, String> {
-        // Whole walk runs inside one SMB worker job so we don't pay channel
-        // round-trips per directory.
+        // `list_dirplus` returns metadata in the same call, avoiding a
+        // per-file `stat` round trip. `.assets/` subdirectories hold
+        // images we don't index, so we skip recursing into them.
         let rel_root = self.resolve(root)?;
         let root_prefix = root.trim_end_matches('/').to_string();
         self.run(move |client| {
@@ -477,7 +561,7 @@ impl Backend for SmbBackend {
             let mut stack: Vec<(String, String)> =
                 vec![(rel_root.clone(), root_prefix.clone())];
             while let Some((rel_dir, abs_prefix)) = stack.pop() {
-                let entries = match client.list_dir(&rel_dir) {
+                let entries = match client.list_dirplus(&rel_dir) {
                     Ok(e) => e,
                     Err(_) => continue,
                 };
@@ -494,24 +578,27 @@ impl Backend for SmbBackend {
                     let child_abs = format!("{abs_prefix}/{name}");
                     match e.get_type() {
                         SmbDirentType::Dir => {
+                            // Skip asset bundles — they only hold images
+                            // and other binaries the index doesn't track.
+                            if name.ends_with(".assets") {
+                                continue;
+                            }
                             stack.push((child_rel, child_abs));
                         }
                         SmbDirentType::File => {
                             if !(name.ends_with(".md") || name.ends_with(".yaml")) {
                                 continue;
                             }
-                            if let Ok(st) = client.stat(&child_rel) {
-                                let mtime = st
-                                    .modified
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .map(|d| d.as_secs() as i64)
-                                    .unwrap_or(0);
-                                out.push(super::FileMeta {
-                                    path: child_abs,
-                                    size: st.size as u64,
-                                    mtime,
-                                });
-                            }
+                            let mtime = e
+                                .mtime
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs() as i64)
+                                .unwrap_or(0);
+                            out.push(super::FileMeta {
+                                path: child_abs,
+                                size: e.size,
+                                mtime,
+                            });
                         }
                         _ => {}
                     }

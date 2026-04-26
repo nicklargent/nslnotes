@@ -2,11 +2,14 @@ import type { Note, Task, Doc } from "../types/entities";
 import type { TopicRef, TopicDecoration } from "../types/topics";
 
 const CACHE_PREFIX = "nslnotes-index-cache:";
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 function cacheKey(notebookId: string): string {
   return `${CACHE_PREFIX}${notebookId}`;
 }
+
+/** Map of absolute path → mtime (Unix seconds), used by the freshness check. */
+export type MtimeMap = Record<string, number>;
 
 interface CachedIndex {
   version: number;
@@ -15,17 +18,22 @@ interface CachedIndex {
   tasks: [string, Task][];
   docs: [string, Doc][];
   topicsYaml: [TopicRef, TopicDecoration][];
+  mtimes?: MtimeMap | undefined;
 }
 
 /**
- * Save index to localStorage for faster cold starts (T7.2).
+ * Save index to localStorage for faster cold starts (T7.2). `mtimes` is the
+ * snapshot of every indexed file's mtime; on the next load,
+ * `_rebuildFresh` compares it against fresh metadata and skips work
+ * entirely when everything matches.
  */
 export function saveIndexCache(
   notebookId: string,
   notes: Map<string, Note>,
   tasks: Map<string, Task>,
   docs: Map<string, Doc>,
-  topicsYaml: Map<TopicRef, TopicDecoration>
+  topicsYaml: Map<TopicRef, TopicDecoration>,
+  mtimes?: MtimeMap
 ): void {
   if (!notebookId) return;
   try {
@@ -36,6 +44,7 @@ export function saveIndexCache(
       tasks: Array.from(tasks.entries()),
       docs: Array.from(docs.entries()),
       topicsYaml: Array.from(topicsYaml.entries()),
+      mtimes,
     };
     localStorage.setItem(
       cacheKey(notebookId),
@@ -55,6 +64,7 @@ export function loadIndexCache(notebookId: string): {
   tasks: Map<string, Task>;
   docs: Map<string, Doc>;
   topicsYaml: Map<TopicRef, TopicDecoration>;
+  mtimes: MtimeMap;
 } | null {
   if (!notebookId) return null;
   try {
@@ -88,6 +98,7 @@ export function loadIndexCache(notebookId: string): {
       tasks: new Map(rehydrateDate(cache.tasks)),
       docs: new Map(rehydrateDate(cache.docs)),
       topicsYaml: new Map(cache.topicsYaml),
+      mtimes: cache.mtimes ?? {},
     };
   } catch {
     return null;

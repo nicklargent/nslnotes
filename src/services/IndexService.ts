@@ -15,7 +15,12 @@ import {
   getToday,
   addDays,
 } from "../lib/dates";
-import { saveIndexCache, loadIndexCache } from "../lib/indexCache";
+import {
+  saveIndexCache,
+  loadIndexCache,
+  type MtimeMap,
+} from "../lib/indexCache";
+import { notebooksApi } from "../stores/notebooksStore";
 import type { Note, Task, Doc, Entity } from "../types/entities";
 import type { TopicRef, Topic, EntityReference } from "../types/topics";
 import type { GroupedTasks, GroupedClosedTasks } from "../types/task-groups";
@@ -40,6 +45,80 @@ function joinPath(...segments: string[]): string {
     })
     .filter((s) => s.length > 0)
     .join("/");
+}
+
+/**
+ * Materialize `(path, content, mtime?)` triples for a directory. Uses the
+ * bulk response when present; otherwise falls back to list + per-file read
+ * so Tauri/native callers (which don't expose a bulk endpoint) keep
+ * working. The fallback path doesn't have mtimes, so the freshness check
+ * naturally degrades to "always rebuild" for those backends.
+ */
+async function loadDir(
+  dir: string,
+  bulk: { path: string; content: string; mtime: number }[] | null
+): Promise<{ path: string; content: string; mtime?: number }[]> {
+  if (bulk) return bulk;
+  const entries = await FileService.listMarkdownFiles(dir).catch(() => []);
+  return Promise.all(
+    entries.map(async (e) => ({
+      path: e.path,
+      content: await FileService.read(e.path),
+    }))
+  );
+}
+
+/**
+ * Fetch fresh mtimes for the three notebook subdirectories in parallel.
+ * Used by `_rebuildFresh` as a cheap "is the cache still valid?" probe.
+ * Returns `null` when the runtime can't expose mtimes (Tauri) so the
+ * caller can fall through to a full rebuild.
+ */
+async function fetchNotebookMtimes(rootPath: string): Promise<MtimeMap | null> {
+  const notesDir = joinPath(rootPath, "notes");
+  const tasksDir = joinPath(rootPath, "tasks");
+  const docsDir = joinPath(rootPath, "docs");
+  const [n, t, d] = await Promise.all([
+    FileService.listMarkdownDirMeta(notesDir).catch(() => null),
+    FileService.listMarkdownDirMeta(tasksDir).catch(() => null),
+    FileService.listMarkdownDirMeta(docsDir).catch(() => null),
+  ]);
+  if (n === null && t === null && d === null) return null;
+  const out: MtimeMap = {};
+  for (const e of n ?? []) out[e.path] = e.mtime;
+  for (const e of t ?? []) out[e.path] = e.mtime;
+  for (const e of d ?? []) out[e.path] = e.mtime;
+  return out;
+}
+
+/** Two mtime maps are equal if they have identical key sets and values. */
+function mtimesEqual(a: MtimeMap, b: MtimeMap): boolean {
+  const ak = Object.keys(a);
+  if (ak.length !== Object.keys(b).length) return false;
+  for (const k of ak) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
+
+/**
+ * In-memory mirror of the cached mtime map for the active notebook.
+ * Held here so `invalidate` doesn't have to re-parse the entire cached
+ * index JSON every time a single file changes.
+ */
+let currentMtimes: MtimeMap = {};
+
+/** Build a fresh `MtimeMap` from bulk-read entries (mtime present per item). */
+function mtimesFromEntries(
+  entriesByDir: { path: string; mtime?: number }[][]
+): MtimeMap {
+  const out: MtimeMap = {};
+  for (const list of entriesByDir) {
+    for (const e of list) {
+      if (typeof e.mtime === "number") out[e.path] = e.mtime;
+    }
+  }
+  return out;
 }
 
 /**
@@ -80,6 +159,7 @@ export const IndexService = {
         topicsYaml: cached.topicsYaml,
         lastIndexed: new Date(),
       });
+      currentMtimes = cached.mtimes;
       buildBacklinks();
       const cachedTotal =
         cached.notes.size + cached.tasks.size + cached.docs.size;
@@ -101,47 +181,43 @@ export const IndexService = {
     const tasksDir = joinPath(rootPath, "tasks");
     const docsDir = joinPath(rootPath, "docs");
 
-    // Read all markdown files from each directory in parallel
-    const [noteFiles, taskFiles, docFiles] = await Promise.all([
-      FileService.listMarkdownFiles(notesDir).catch(() => []),
-      FileService.listMarkdownFiles(tasksDir).catch(() => []),
-      FileService.listMarkdownFiles(docsDir).catch(() => []),
+    // One bulk request per directory when the runtime supports it (web mode);
+    // each becomes a single backend job, which is the difference between
+    // "snappy" and "tens of seconds" over SMB. Tauri returns null and we fall
+    // back to the per-file path, which is fine on a local FS.
+    const [noteBulk, taskBulk, docBulk] = await Promise.all([
+      FileService.readMarkdownDir(notesDir).catch(() => null),
+      FileService.readMarkdownDir(tasksDir).catch(() => null),
+      FileService.readMarkdownDir(docsDir).catch(() => null),
     ]);
 
-    // Parse all files in parallel, reporting progress as each completes
-    const totalFiles = noteFiles.length + taskFiles.length + docFiles.length;
+    const noteEntries = await loadDir(notesDir, noteBulk);
+    const taskEntries = await loadDir(tasksDir, taskBulk);
+    const docEntries = await loadDir(docsDir, docBulk);
+
+    const totalFiles =
+      noteEntries.length + taskEntries.length + docEntries.length;
     let completedFiles = 0;
     onProgress?.(0, totalFiles);
 
-    function tracked<T>(promise: Promise<T>): Promise<T> {
-      return promise.then((result) => {
-        completedFiles++;
-        onProgress?.(completedFiles, totalFiles);
-        return result;
-      });
-    }
-
-    const notePromises = noteFiles.map((entry) =>
-      tracked(
-        FileService.read(entry.path).then((c) => parseNote(entry.path, c))
-      )
-    );
-
-    const taskPromises = taskFiles.map((entry) =>
-      tracked(
-        FileService.read(entry.path).then((c) => parseTask(entry.path, c))
-      )
-    );
-
-    const docPromises = docFiles.map((entry) =>
-      tracked(FileService.read(entry.path).then((c) => parseDoc(entry.path, c)))
-    );
-
-    const [noteResults, taskResults, docResults] = await Promise.all([
-      Promise.all(notePromises),
-      Promise.all(taskPromises),
-      Promise.all(docPromises),
-    ]);
+    const noteResults = noteEntries.map((e) => {
+      const r = parseNote(e.path, e.content);
+      completedFiles++;
+      onProgress?.(completedFiles, totalFiles);
+      return r;
+    });
+    const taskResults = taskEntries.map((e) => {
+      const r = parseTask(e.path, e.content);
+      completedFiles++;
+      onProgress?.(completedFiles, totalFiles);
+      return r;
+    });
+    const docResults = docEntries.map((e) => {
+      const r = parseDoc(e.path, e.content);
+      completedFiles++;
+      onProgress?.(completedFiles, totalFiles);
+      return r;
+    });
 
     // Build maps (filter out invalid files)
     const notes = new Map<string, Note>();
@@ -176,8 +252,11 @@ export const IndexService = {
       lastIndexed: new Date(),
     });
 
-    // Save to cache (T7.2)
-    saveIndexCache(notebookId, notes, tasks, docs, topicsYaml);
+    // Save to cache (T7.2). mtimes go in alongside so the next switch can
+    // run a freshness check and skip a rebuild when nothing has changed.
+    const mtimes = mtimesFromEntries([noteEntries, taskEntries, docEntries]);
+    currentMtimes = mtimes;
+    saveIndexCache(notebookId, notes, tasks, docs, topicsYaml, mtimes);
 
     // Build image index (T6.4)
     void IndexService.buildImageIndex(rootPath);
@@ -200,36 +279,40 @@ export const IndexService = {
     rootPath: string,
     notebookId: string
   ): Promise<void> => {
+    // Freshness check: if the cache has mtimes and the backend reports the
+    // same set of paths with the same mtimes, nothing has changed since
+    // the cache was written. Skip the rebuild entirely — no spinner, no
+    // refetch, no parse. This is the common case on a notebook switch.
+    const cached = loadIndexCache(notebookId);
+    const cachedMtimes = cached?.mtimes;
+    if (cachedMtimes && Object.keys(cachedMtimes).length > 0) {
+      const fresh = await fetchNotebookMtimes(rootPath);
+      if (fresh && mtimesEqual(cachedMtimes, fresh)) {
+        return;
+      }
+    }
+
     setIndexStore("indexing", true);
     try {
       const notesDir = joinPath(rootPath, "notes");
       const tasksDir = joinPath(rootPath, "tasks");
       const docsDir = joinPath(rootPath, "docs");
 
-      const [noteFiles, taskFiles, docFiles] = await Promise.all([
-        FileService.listMarkdownFiles(notesDir).catch(() => []),
-        FileService.listMarkdownFiles(tasksDir).catch(() => []),
-        FileService.listMarkdownFiles(docsDir).catch(() => []),
+      const [noteBulk, taskBulk, docBulk] = await Promise.all([
+        FileService.readMarkdownDir(notesDir).catch(() => null),
+        FileService.readMarkdownDir(tasksDir).catch(() => null),
+        FileService.readMarkdownDir(docsDir).catch(() => null),
       ]);
 
-      const notePromises = noteFiles.map(async (entry) => {
-        const content = await FileService.read(entry.path);
-        return parseNote(entry.path, content);
-      });
-      const taskPromises = taskFiles.map(async (entry) => {
-        const content = await FileService.read(entry.path);
-        return parseTask(entry.path, content);
-      });
-      const docPromises = docFiles.map(async (entry) => {
-        const content = await FileService.read(entry.path);
-        return parseDoc(entry.path, content);
-      });
-
-      const [noteResults, taskResults, docResults] = await Promise.all([
-        Promise.all(notePromises),
-        Promise.all(taskPromises),
-        Promise.all(docPromises),
+      const [noteEntries, taskEntries, docEntries] = await Promise.all([
+        loadDir(notesDir, noteBulk),
+        loadDir(tasksDir, taskBulk),
+        loadDir(docsDir, docBulk),
       ]);
+
+      const noteResults = noteEntries.map((e) => parseNote(e.path, e.content));
+      const taskResults = taskEntries.map((e) => parseTask(e.path, e.content));
+      const docResults = docEntries.map((e) => parseDoc(e.path, e.content));
 
       const notes = new Map<string, Note>();
       for (const note of noteResults) {
@@ -257,7 +340,9 @@ export const IndexService = {
         lastIndexed: new Date(),
       });
 
-      saveIndexCache(notebookId, notes, tasks, docs, topicsYaml);
+      const mtimes = mtimesFromEntries([noteEntries, taskEntries, docEntries]);
+      currentMtimes = mtimes;
+      saveIndexCache(notebookId, notes, tasks, docs, topicsYaml, mtimes);
 
       // Build image index (T6.4)
       void IndexService.buildImageIndex(rootPath);
@@ -348,6 +433,33 @@ export const IndexService = {
 
     // Rebuild backlinks
     buildBacklinks();
+
+    // Keep the localStorage cache in sync so the next notebook switch
+    // loads the new content from cache instead of waiting for a rebuild.
+    // mtime is stamped to "now" (or dropped on delete); local clock skew
+    // against the SMB server may still trip a freshness rebuild on the
+    // next switch, but the cache itself is correct so the UI doesn't
+    // flash empty.
+    const activeId = notebooksApi.activeNotebook()?.id;
+    if (activeId) {
+      const fileExistsInIndex =
+        indexStore.notes.has(path) ||
+        indexStore.tasks.has(path) ||
+        indexStore.docs.has(path);
+      if (fileExistsInIndex) {
+        currentMtimes[path] = Math.floor(Date.now() / 1000);
+      } else {
+        delete currentMtimes[path];
+      }
+      saveIndexCache(
+        activeId,
+        indexStore.notes,
+        indexStore.tasks,
+        indexStore.docs,
+        indexStore.topicsYaml,
+        currentMtimes
+      );
+    }
   },
 
   /**

@@ -247,13 +247,21 @@ fn smb_credential_from_notebook(
     let password = match (kek, nb.smb_password_enc.as_deref(), nb.smb_password.as_deref()) {
         (Some(k), Some(enc), _) => nslnotes_core::crypto::decrypt_str(k, enc)
             .map_err(|e| format!("decrypt smbPasswordEnc: {e}"))?,
-        (_, _, Some(plain)) => plain.to_string(),
+        (_, _, Some(plain)) if !plain.is_empty() => plain.to_string(),
         (_, Some(_), None) => {
             return Err(
                 "smbPasswordEnc present but no login-derived key available yet".into(),
             );
         }
-        _ => String::new(),
+        _ => {
+            // No password material at all (or only an empty string). Fail
+            // loud rather than registering with `password = ""` — that
+            // path connects to the SMB context fine but every real op
+            // (`opendir`, `open`, …) returns NULL → "bad file descriptor"
+            // 500s, which is misleading enough to chew through hours of
+            // debugging. Caller logs the message via `eprintln!`.
+            return Err("no SMB password configured (set smbPassword or smbPasswordEnc)".into());
+        }
     };
 
     Ok(nslnotes_core::fs::SmbCredential {

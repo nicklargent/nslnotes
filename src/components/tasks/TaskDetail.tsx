@@ -4,7 +4,7 @@ import { RawEditor } from "../editor/RawEditor";
 import { RawModeToggle } from "../editor/RawModeToggle";
 import { FileService } from "../../services/FileService";
 import { IndexService } from "../../services/IndexService";
-import { SettingsService } from "../../services/SettingsService";
+import { notebooksApi } from "../../stores/notebooksStore";
 import { EntityService } from "../../services/EntityService";
 import { parse, serialize } from "../../lib/frontmatter";
 import { editorStore, setEditorStore } from "../../stores/editorStore";
@@ -228,7 +228,7 @@ export function TaskDetail(props: TaskDetailProps) {
 }
 
 async function saveTask(path: string, body: string) {
-  const rootPath = await SettingsService.getRootPath();
+  const rootPath = notebooksApi.activeRoot();
   if (!rootPath) return;
 
   const fileContent = await FileService.read(path);

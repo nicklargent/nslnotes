@@ -186,6 +186,50 @@ export const runtime = {
   },
 
   /**
+   * Read every `.md` file directly under `dir` in a single request.
+   * Web mode only — Tauri callers fall back to the per-file path. The web
+   * server reads them all in one storage-backend job, which collapses
+   * notebook-index builds over SMB from N+1 round-trips to 1.
+   */
+  readMarkdownDir: async (
+    dir: string
+  ): Promise<{ path: string; content: string; mtime: number }[] | null> => {
+    if (runtime.isNative()) {
+      return null;
+    }
+    const res = await authedFetch(
+      `/api/files/read-md-dir?path=${encodeURIComponent(dir)}`
+    );
+    if (!res.ok) {
+      throw new Error(`Failed to bulk-read markdown dir: ${dir}`);
+    }
+    return res.json() as Promise<
+      { path: string; content: string; mtime: number }[]
+    >;
+  },
+
+  /**
+   * List `(path, mtime)` for every `.md` file directly under `dir`. Used as
+   * a cheap "is the cached index still valid?" check before any rebuild.
+   * Web mode only — Tauri returns null and the caller falls back to a full
+   * rebuild. mtimes are Unix seconds.
+   */
+  listMarkdownDirMeta: async (
+    dir: string
+  ): Promise<{ path: string; mtime: number }[] | null> => {
+    if (runtime.isNative()) {
+      return null;
+    }
+    const res = await authedFetch(
+      `/api/files/list-md-meta?path=${encodeURIComponent(dir)}`
+    );
+    if (!res.ok) {
+      return null;
+    }
+    return res.json() as Promise<{ path: string; mtime: number }[]>;
+  },
+
+  /**
    * Verify directory is accessible and writable
    */
   verifyDirectory: async (

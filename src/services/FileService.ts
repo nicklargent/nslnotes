@@ -163,6 +163,18 @@ export const FileService = {
     return FileService.list(dir, "*.md");
   },
 
+  readMarkdownDir: async (
+    dir: string
+  ): Promise<{ path: string; content: string; mtime: number }[] | null> => {
+    return runtime.readMarkdownDir(dir);
+  },
+
+  listMarkdownDirMeta: async (
+    dir: string
+  ): Promise<{ path: string; mtime: number }[] | null> => {
+    return runtime.listMarkdownDirMeta(dir);
+  },
+
   /**
    * Get file metadata.
    * Note: Currently limited - full stat requires backend support.
