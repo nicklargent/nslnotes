@@ -67,4 +67,18 @@ test.describe("Topic view", () => {
       centerPanel(page).locator("code", { hasText: "[[doc:project-plan]]" }),
     ).toBeVisible({ timeout: 5000 });
   });
+
+  test("shows closed tasks section with strikethrough title", async ({ page }) => {
+    // "Closed Tasks (N)" heading
+    await expect(
+      centerPanel(page).getByText("Closed Tasks", { exact: false }),
+    ).toBeVisible({ timeout: 5000 });
+    // The closed task title span should carry the line-through class
+    const closedTitle = centerPanel(page)
+      .locator("button", { hasText: "Old Feature" })
+      .locator("span", { hasText: "Old Feature" })
+      .first();
+    await expect(closedTitle).toBeVisible({ timeout: 5000 });
+    await expect(closedTitle).toHaveClass(/line-through/);
+  });
 });

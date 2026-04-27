@@ -66,6 +66,8 @@ function populateFull(root: string): void {
     title: "Old Feature",
     status: "done",
     created: "2026-02-01",
+    topics: ["#project"],
+    body: "Closed task referencing [[doc:project-plan]].",
   });
   writeFile(root, "tasks", task3.filename, task3.content);
 

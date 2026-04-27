@@ -33,13 +33,15 @@ export interface Note extends BaseEntity {
   isDaily: boolean;
 }
 
+export type TaskStatus = "open" | "done" | "cancelled";
+
 /**
  * Task entity
  */
 export interface Task extends BaseEntity {
   type: "task";
   /** Current status */
-  status: "open" | "done" | "cancelled";
+  status: TaskStatus;
   /** ISO date when task was created */
   created: string;
   /** Optional ISO due date */

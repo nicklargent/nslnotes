@@ -17,6 +17,10 @@ import { ImageGrid } from "./ImageGrid";
 import { TodoList } from "./TodoList";
 import { UncheckedIndicator } from "../metadata/UncheckedIndicator";
 import {
+  isClosedStatus,
+  CLOSED_TASK_TITLE_CLASS,
+} from "../shared/closedTaskStyle";
+import {
   TYPE_BADGES,
   getEntityTitle,
   getEntityDate,
@@ -173,7 +177,14 @@ export function SearchView() {
                                   {TYPE_BADGES[result.entity.type]?.label ??
                                     result.entity.type}
                                 </span>
-                                <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                                <span
+                                  class={`truncate text-sm font-medium ${
+                                    result.entity.type === "task" &&
+                                    isClosedStatus(result.entity.status)
+                                      ? CLOSED_TASK_TITLE_CLASS
+                                      : "text-gray-900 dark:text-gray-100"
+                                  }`}
+                                >
                                   {getEntityTitle(result.entity)}
                                 </span>
                                 <UncheckedIndicator

@@ -465,6 +465,14 @@ Source: `src/components/topics/TopicView.tsx`
 - [ ] Context lines shown (lines containing topic ref, max 3, stripped of markdown)
 - [ ] Due date shown if present
 
+### Closed Tasks Section
+- [ ] List of related tasks with status `done` or `cancelled`, shown below Open Tasks
+- [ ] Section appears only when at least one closed task matches
+- [ ] Title rendered with strikethrough + muted color (`line-through text-gray-400 dark:text-gray-500`)
+- [ ] Click task navigates to task detail
+- [ ] Context lines shown
+- [ ] Due date intentionally not shown (closed)
+
 ### Notes Section
 - [ ] Reverse chronological order
 - [ ] Click note navigates to note
@@ -491,6 +499,7 @@ Source: `src/components/search/SearchView.tsx`
 - [ ] "Images" filter shows image grid instead of text results
 - [ ] Result click navigates to entity
 - [ ] Result shows type badge (color-coded), title, date, first matched line
+- [ ] Closed task results render the title with strikethrough + muted color (`line-through text-gray-400 dark:text-gray-500`)
 - [ ] Results divided by `border-gray-100`
 
 ---
@@ -548,6 +557,7 @@ Source: `src/components/layout/RightPanel.tsx`
 - [ ] Backlinks section shown in right panel for non-note entities (docs, tasks, topics)
 - [ ] Each backlink shows source entity info
 - [ ] Click backlink navigates to source entity
+- [ ] Backlink whose source is a closed task renders the source title with strikethrough + muted color (`line-through text-gray-400 dark:text-gray-500`)
 
 ---
 

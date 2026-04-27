@@ -47,4 +47,27 @@ test.describe("Backlinks", () => {
       await expect(centerPanel(page)).toBeVisible();
     }
   });
+
+  test("closed task as backlink source has strikethrough title", async ({
+    page,
+  }) => {
+    // Project Plan is referenced by closed task "Old Feature" (status: done)
+    await sidebar(page)
+      .locator("button", { hasText: "Project Plan" })
+      .first()
+      .click();
+    await page.waitForTimeout(500);
+    // The Backlinks heading is rendered in DocView's center panel
+    await expect(
+      centerPanel(page).getByText("Backlinks", { exact: false }),
+    ).toBeVisible({ timeout: 5000 });
+    // Closed-task source title carries the strikethrough class
+    const closedSource = centerPanel(page)
+      .locator("button")
+      .filter({ hasText: "Old Feature" })
+      .locator("div", { hasText: "Old Feature" })
+      .first();
+    await expect(closedSource).toBeVisible({ timeout: 5000 });
+    await expect(closedSource).toHaveClass(/line-through/);
+  });
 });

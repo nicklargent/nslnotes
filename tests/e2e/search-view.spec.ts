@@ -83,4 +83,30 @@ test.describe("Search view", () => {
     const results = centerPanel(page).locator("button").filter({ hasText: "Project Plan" });
     await expect(results).not.toBeVisible({ timeout: 1000 });
   });
+
+  test("closed tasks appear with strikethrough title", async ({ page }) => {
+    const input = centerPanel(page).locator("input[placeholder*='Search']");
+    await input.fill("Old Feature");
+    await page.waitForTimeout(600);
+    const titleSpan = centerPanel(page)
+      .locator("button")
+      .filter({ hasText: "Old Feature" })
+      .locator("span", { hasText: "Old Feature" })
+      .first();
+    await expect(titleSpan).toBeVisible({ timeout: 5000 });
+    await expect(titleSpan).toHaveClass(/line-through/);
+  });
+
+  test("open tasks do not get strikethrough", async ({ page }) => {
+    const input = centerPanel(page).locator("input[placeholder*='Search']");
+    await input.fill("Fix Login Bug");
+    await page.waitForTimeout(600);
+    const titleSpan = centerPanel(page)
+      .locator("button")
+      .filter({ hasText: "Fix Login Bug" })
+      .locator("span", { hasText: "Fix Login Bug" })
+      .first();
+    await expect(titleSpan).toBeVisible({ timeout: 5000 });
+    await expect(titleSpan).not.toHaveClass(/line-through/);
+  });
 });

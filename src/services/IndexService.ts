@@ -1051,6 +1051,9 @@ function buildBacklinks(): void {
         sourceDate,
         contextLines: contextByRaw.get(link.raw) ?? [],
       };
+      if (entity.type === "task") {
+        entry.sourceStatus = entity.status;
+      }
 
       const existing = backlinkIndex.get(resolved.path);
       if (existing) {

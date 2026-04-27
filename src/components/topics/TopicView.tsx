@@ -5,6 +5,7 @@ import { NavigationService } from "../../services/NavigationService";
 import { registerContainer, unregisterContainer } from "../../stores/findStore";
 import type { Note, Doc, Task } from "../../types/entities";
 import type { TopicRef } from "../../types/topics";
+import { CLOSED_TASK_TITLE_CLASS } from "../shared/closedTaskStyle";
 
 /** Strip common markdown prefixes for cleaner display. */
 function stripMarkdown(line: string): string {
@@ -92,21 +93,25 @@ export function TopicView() {
     );
   });
 
-  /** Tasks with this topic. */
-  const relatedTasks = createMemo((): Task[] => {
+  /** Tasks with this topic, partitioned by status. */
+  const partitionedTasks = createMemo((): { open: Task[]; closed: Task[] } => {
     const ref = topicRef();
-    if (!ref) return [];
-    const tasks: Task[] = [];
+    if (!ref) return { open: [], closed: [] };
+    const open: Task[] = [];
+    const closed: Task[] = [];
     for (const task of indexStore.tasks.values()) {
       if (
-        task.status === "open" &&
-        (task.topics.includes(ref) || task.content.toLowerCase().includes(ref))
+        task.topics.includes(ref) ||
+        task.content.toLowerCase().includes(ref)
       ) {
-        tasks.push(task);
+        if (task.status === "open") open.push(task);
+        else closed.push(task);
       }
     }
-    return tasks;
+    return { open, closed };
   });
+  const openTasks = () => partitionedTasks().open;
+  const closedTasks = () => partitionedTasks().closed;
 
   let containerRef: HTMLDivElement | undefined;
 
@@ -150,13 +155,13 @@ export function TopicView() {
               </div>
 
               {/* Open tasks */}
-              <Show when={relatedTasks().length > 0}>
+              <Show when={openTasks().length > 0}>
                 <div class="mb-6">
                   <h2 class="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                    Open Tasks ({relatedTasks().length})
+                    Open Tasks ({openTasks().length})
                   </h2>
                   <div class="space-y-1">
-                    <For each={relatedTasks()}>
+                    <For each={openTasks()}>
                       {(task) => (
                         <div>
                           <button
@@ -171,6 +176,37 @@ export function TopicView() {
                                 Due: {task.due}
                               </span>
                             </Show>
+                            <ContextLines
+                              content={task.content}
+                              topicRef={topicRef()!}
+                            />
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
+
+              {/* Closed tasks */}
+              <Show when={closedTasks().length > 0}>
+                <div class="mb-6">
+                  <h2 class="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    Closed Tasks ({closedTasks().length})
+                  </h2>
+                  <div class="space-y-1">
+                    <For each={closedTasks()}>
+                      {(task) => (
+                        <div>
+                          <button
+                            class="w-full rounded px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
+                            onClick={() => NavigationService.navigateTo(task)}
+                          >
+                            <span
+                              class={`text-sm font-medium ${CLOSED_TASK_TITLE_CLASS}`}
+                            >
+                              {task.title}
+                            </span>
                             <ContextLines
                               content={task.content}
                               topicRef={topicRef()!}
@@ -256,7 +292,8 @@ export function TopicView() {
                 when={
                   referencingNotes().length === 0 &&
                   referencingDocs().length === 0 &&
-                  relatedTasks().length === 0
+                  openTasks().length === 0 &&
+                  closedTasks().length === 0
                 }
               >
                 <p class="text-sm text-gray-400 dark:text-gray-500">

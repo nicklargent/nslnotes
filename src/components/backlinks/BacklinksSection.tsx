@@ -1,6 +1,10 @@
 import { createMemo, For, Show } from "solid-js";
 import type { BacklinkEntry } from "../../types/backlinks";
 import type { EntityType } from "../../types/entities";
+import {
+  isClosedStatus,
+  CLOSED_TASK_TITLE_CLASS,
+} from "../shared/closedTaskStyle";
 
 interface BacklinksSectionProps {
   backlinks: BacklinkEntry[];
@@ -49,7 +53,13 @@ export function BacklinksSection(props: BacklinksSectionProps) {
                     class="group block w-full text-left rounded px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700"
                     onClick={() => props.onBacklinkClick(entry.sourcePath)}
                   >
-                    <div class="text-sm text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
+                    <div
+                      class={`text-sm truncate ${
+                        isClosedStatus(entry.sourceStatus)
+                          ? CLOSED_TASK_TITLE_CLASS
+                          : "text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400"
+                      }`}
+                    >
                       {entry.sourceTitle}
                     </div>
                     <For each={entry.contextLines}>
