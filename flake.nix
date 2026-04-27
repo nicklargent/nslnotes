@@ -43,6 +43,13 @@
           gcc
           gnumake
           xdg-utils
+
+          # libsmbclient for the `smb` feature in nslnotes-web. pavao-sys
+          # uses pkg-config to find the headers; without this `cargo build
+          # -p nslnotes-web` fails with "smbclient.h not found" on NixOS.
+          # Linux-only: nixpkgs samba currently fails to build on Darwin,
+          # and the smb feature isn't used on macOS.
+          samba
         ];
 
         # Common build inputs for both shell and package
@@ -59,11 +66,6 @@
           # Development utilities
           jq
           curl
-
-          # libsmbclient for the `smb` feature in nslnotes-web. pavao-sys
-          # uses pkg-config to find the headers; without this `cargo build
-          # -p nslnotes-web` fails with "smbclient.h not found" on NixOS.
-          samba
         ] ++ linuxBuildInputs;
 
         # Prefetch npm dependencies for offline build
