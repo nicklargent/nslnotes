@@ -1,4 +1,4 @@
-import { For, createSignal, Show } from "solid-js";
+import { For, createSignal, onMount, onCleanup, Show } from "solid-js";
 import logoUrl from "../../assets/logo.svg";
 import { notebooksStore } from "../../stores/notebooksStore";
 import { indexStore } from "../../stores/indexStore";
@@ -45,9 +45,54 @@ function defaultBackupFilename(now: Date = new Date()): string {
   return `nslnotes-backup-${y}-${m}-${d}T${hh}-${mm}.tar.gz`;
 }
 
+// Native Linux disables WM decorations (see lib.rs); this bar substitutes.
+const linuxTitlebar = runtime.isNative() && runtime.isLinux();
+
 export function NotebookTabBar(props: NotebookTabBarProps) {
   const [showFolderDialog, setShowFolderDialog] = createSignal(false);
   const [isBackingUp, setIsBackingUp] = createSignal(false);
+  const [isMaximized, setIsMaximized] = createSignal(false);
+
+  if (linuxTitlebar) {
+    onMount(() => {
+      // Register cleanup synchronously: Solid's owner context isn't reliably
+      // preserved across awaits, so a post-await onCleanup may silently no-op.
+      let unlisten: (() => void) | undefined;
+      let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+      onCleanup(() => {
+        if (resizeTimer !== null) clearTimeout(resizeTimer);
+        unlisten?.();
+      });
+
+      void (async () => {
+        try {
+          const { getCurrentWindow } = await import("@tauri-apps/api/window");
+          const win = getCurrentWindow();
+          setIsMaximized(await win.isMaximized());
+          // onResized fires on every pixel during edge-drag; coalesce to one
+          // IPC call per ~200ms.
+          unlisten = await win.onResized(() => {
+            if (resizeTimer !== null) return;
+            resizeTimer = setTimeout(() => {
+              resizeTimer = null;
+              void win.isMaximized().then(setIsMaximized);
+            }, 200);
+          });
+        } catch (err) {
+          console.error("Titlebar maximize-state init failed:", err);
+        }
+      })();
+    });
+  }
+
+  async function windowAction(method: "minimize" | "toggleMaximize" | "close") {
+    try {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow()[method]();
+    } catch (err) {
+      console.error(`Window ${method} failed:`, err);
+    }
+  }
 
   function changeFontSize(delta: number) {
     setUIStore("fontSize", clampFontSize(uiStore.fontSize + delta));
@@ -146,7 +191,10 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
     "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700";
 
   return (
-    <div class="flex h-10 flex-shrink-0 items-center gap-1 border-b border-gray-200 bg-white px-2 dark:border-gray-700 dark:bg-gray-900">
+    <div
+      class="flex h-10 flex-shrink-0 items-center gap-1 border-b border-gray-200 bg-white px-2 dark:border-gray-700 dark:bg-gray-900"
+      data-tauri-drag-region={linuxTitlebar ? "" : undefined}
+    >
       {/* Hamburger — opens the left drawer on mobile/tablet. */}
       <Show when={uiStore.viewport !== "desktop"}>
         <button
@@ -170,7 +218,12 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
         </button>
       </Show>
 
-      <img src={logoUrl} alt="NslNotes" class="h-6 w-6 flex-shrink-0 mr-2" />
+      <img
+        src={logoUrl}
+        alt="NslNotes"
+        class="h-6 w-6 flex-shrink-0 mr-2"
+        data-tauri-drag-region={linuxTitlebar ? "" : undefined}
+      />
 
       <Show
         when={uiStore.viewport === "desktop"}
@@ -189,7 +242,10 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
           />
         }
       >
-        <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        <div
+          class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+          data-tauri-drag-region={linuxTitlebar ? "" : undefined}
+        >
           <For each={notebooksStore.notebooks}>
             {(nb) => (
               <NotebookTab
@@ -225,7 +281,10 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
       </Show>
 
       {/* Trailing controls */}
-      <div class="flex flex-shrink-0 items-center gap-0.5 pl-2">
+      <div
+        class="flex flex-shrink-0 items-center gap-0.5 pl-2"
+        data-tauri-drag-region={linuxTitlebar ? "" : undefined}
+      >
         {/* Tasks drawer trigger — only on mobile, where the right panel is hidden. */}
         <Show when={uiStore.viewport === "mobile"}>
           <button
@@ -383,6 +442,76 @@ export function NotebookTabBar(props: NotebookTabBarProps) {
             </svg>
           )}
         </button>
+
+        {/* Linux-only window controls — match KDE's right-side convention. */}
+        <Show when={linuxTitlebar}>
+          <div class="ml-1 flex items-center gap-0.5 border-l border-gray-200 pl-1 dark:border-gray-700">
+            <button
+              type="button"
+              class={controlButtonClass}
+              onClick={() => void windowAction("minimize")}
+              title="Minimize"
+            >
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <line x1="5" y1="18" x2="19" y2="18" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class={controlButtonClass}
+              onClick={() => void windowAction("toggleMaximize")}
+              title={isMaximized() ? "Restore" : "Maximize"}
+            >
+              {isMaximized() ? (
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="7" y="3" width="14" height="14" rx="1" />
+                  <path d="M3 7h4v14h14v-4" />
+                </svg>
+              ) : (
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="4" y="4" width="16" height="16" rx="1" />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
+              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-red-500 hover:text-white dark:text-gray-400"
+              onClick={() => void windowAction("close")}
+              title="Close"
+            >
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="18" y1="6" x2="6" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </Show>
       </div>
 
       <Show when={showFolderDialog()}>

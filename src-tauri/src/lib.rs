@@ -74,6 +74,10 @@ pub fn run() {
                     }
                 }
             }
+            #[cfg(target_os = "linux")]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_decorations(false);
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

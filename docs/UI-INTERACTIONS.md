@@ -65,6 +65,15 @@ Source: `src/components/layout/LeftSidebar.tsx`, `src/components/sidebar/`
 - [ ] Dark mode toggle button switches theme
 - [ ] Preference debounce-saved (500ms)
 
+### Linux Custom Titlebar (`NotebookTabBar.tsx`, `src-tauri/src/lib.rs`)
+- [ ] Linux native build only: KDE/GNOME native window decorations are disabled (`set_decorations(false)` in setup hook)
+- [ ] The top bar acts as the window drag region (`data-tauri-drag-region`); empty bar areas and the logo can be used to drag the window, with WM-managed snap-to-edge / double-click-to-maximize behavior
+- [ ] Three window controls render at the right end (after dark mode toggle), separated by a vertical divider: Minimize, Maximize/Restore (icon swaps based on state), Close
+- [ ] Close button shows red hover background to match KDE convention
+- [ ] Maximize icon updates reactively via `onResized` listener
+- [ ] Not rendered on macOS or Windows native, or in any web mode
+- [ ] Not covered by E2E tests (Playwright runs against web mode where titlebar is hidden)
+
 ### Backup Button (`NotebookTabBar.tsx`)
 - [ ] Button disabled when no notebooks are registered or a switch is in flight
 - [ ] In the Tauri app: click opens a native save dialog with default filename `nslnotes-backup-<YYYY-MM-DDTHH-MM>.tar.gz`

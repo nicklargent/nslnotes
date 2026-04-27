@@ -84,6 +84,14 @@ export const runtime = {
   },
 
   /**
+   * Check if the host OS is Linux. Used to gate the custom titlebar — on
+   * macOS/Windows we keep native decorations.
+   */
+  isLinux: (): boolean => {
+    return /Linux/i.test(navigator.userAgent);
+  },
+
+  /**
    * Read file contents from disk
    * @throws Error if file doesn't exist or is inaccessible
    */
