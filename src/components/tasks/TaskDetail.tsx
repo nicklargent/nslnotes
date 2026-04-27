@@ -211,12 +211,13 @@ export function TaskDetail(props: TaskDetailProps) {
           </Show>
         </div>
 
-        {/* Dirty indicator */}
-        <Show when={editorStore.isDirty}>
-          <div class="mt-2 text-right text-xs text-gray-300 dark:text-gray-600">
-            Saving...
-          </div>
-        </Show>
+        <div
+          class="mt-2 text-right text-xs text-gray-300 transition-opacity dark:text-gray-600"
+          classList={{ "opacity-0": !editorStore.isDirty }}
+          aria-hidden={!editorStore.isDirty}
+        >
+          Saving...
+        </div>
 
         <BacklinksSection
           backlinks={indexStore.backlinkIndex.get(props.task.path) ?? []}
