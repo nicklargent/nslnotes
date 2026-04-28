@@ -1,6 +1,6 @@
 {
   "name": "nslnotes",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Local-first, plain-text knowledge tool",
   "type": "module",
   "scripts": {
