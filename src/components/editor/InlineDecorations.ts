@@ -153,8 +153,14 @@ export const InlineDecorations = Extension.create({
 
           newState.doc.descendants((node, pos, parent) => {
             if (!node.isTextblock) return;
-            // Only match TODO keywords inside list items
-            if (parent?.type.name !== "listItem") return;
+            // Auto-replace inside list items (`- TODO foo`) and top-level
+            // paragraphs (standalone `TODO foo`). Skip headings, table
+            // cells, blockquotes, etc.
+            const parentName = parent?.type.name;
+            const inListItem = parentName === "listItem";
+            const inTopLevelParagraph =
+              parentName === "doc" && node.type.name === "paragraph";
+            if (!inListItem && !inTopLevelParagraph) return;
             const text = node.textContent;
 
             // Match TODO/DOING/WAITING/LATER/DONE text that needs replacing with Unicode

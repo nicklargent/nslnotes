@@ -2,10 +2,11 @@ import type { TodoItem, TodoState, WikiLink } from "../types/inline";
 import type { TopicRef } from "../types/topics";
 
 /**
- * Regex for TODO items: "- TODO|DOING|DONE text"
- * Captures indentation, state, and text.
+ * Regex for TODO items: optional "- " prefix, then "TODO|DOING|...|DONE text".
+ * Captures indentation, state, and text. Standalone lines (without a bullet)
+ * are also matched to support free-standing TODO paragraphs.
  */
-const TODO_PATTERN = /^(\s*)- (TODO|DOING|WAITING|LATER|DONE)\s+(.*)/;
+const TODO_PATTERN = /^(\s*)(?:- )?(TODO|DOING|WAITING|LATER|DONE)\s+(.*)/;
 
 /**
  * Regex for wikilinks: [[type:target]]

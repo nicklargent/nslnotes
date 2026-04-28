@@ -260,14 +260,13 @@ function todoMarkerSpan(kw: TodoKeyword): string {
 function todoMarkersPlugin(md: MarkdownIt): void {
   md.core.ruler.push("todo_markers", (state) => {
     const tokens = state.tokens;
-    let listDepth = 0;
     for (let i = 0; i < tokens.length; i++) {
       const tok = tokens[i]!;
-      if (tok.type === "list_item_open") listDepth++;
-      else if (tok.type === "list_item_close") listDepth--;
-
       if (tok.type !== "inline" || !tok.children) continue;
-      if (listDepth <= 0) continue;
+      // Only inline content inside paragraphs gets the marker treatment —
+      // skips headings, table cells, etc. List items wrap their content
+      // in paragraph tokens, so this still covers `- TODO foo`.
+      if (tokens[i - 1]?.type !== "paragraph_open") continue;
 
       // Walk children tokens looking for text tokens starting with a keyword
       const children = tok.children;

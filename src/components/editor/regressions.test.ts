@@ -101,6 +101,32 @@ describe("round-trip: regression guards", () => {
     expect(rt("- DONE old task")).toBe("- DONE old task");
   });
 
+  it("standalone TODO paragraph (no bullet) renders as a marker and round-trips", () => {
+    // Bug: post-markdown-it refactor, free-standing TODO lines stopped
+    // rendering as markers — only `- TODO` was recognized.
+    const md = "TODO item 1";
+    const html = htmlFromMarkdown(md);
+    expect(html).toContain('data-todo="TODO"');
+    expect(rt(md)).toBe(md);
+  });
+
+  it("standalone DOING and DONE paragraphs round-trip", () => {
+    expect(rt("DOING ship feature")).toBe("DOING ship feature");
+    expect(rt("DONE archive notes")).toBe("DONE archive notes");
+  });
+
+  it("two standalone TODO paragraphs separated by a blank line round-trip", () => {
+    const md = "TODO item 1\n\nTODO item 2";
+    expect(rt(md)).toBe(md);
+  });
+
+  it("TODO inside a heading is not converted to a marker", () => {
+    // Only paragraph-context TODOs become markers; `# TODO foo` should
+    // remain plain text inside the heading.
+    const html = htmlFromMarkdown("# TODO foo");
+    expect(html).not.toContain('data-todo="TODO"');
+  });
+
   it("image as direct child of a list item is preserved", () => {
     // Bug: <img> has no children, so convert(imgElement) returned "" and the
     // image was silently dropped from the li.

@@ -26,6 +26,7 @@ import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { DOMSerializer, Slice } from "@tiptap/pm/model";
 import { Plugin, PluginKey, Selection, TextSelection } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 import {
   clearPointerWikilinkDrag,
   clearWikilinkDragActive,
@@ -61,6 +62,35 @@ function readFileAsBase64(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+const TODO_MARKER_RE = /[☐▣⊡⊟☑]/;
+
+// Click cycles TODO→DOING→DONE→TODO; WAITING and LATER both jump to DONE.
+const NEXT_TODO_MARKER: Record<string, string> = {
+  "☐": "▣",
+  "▣": "☑",
+  "☑": "☐",
+  "⊡": "☑",
+  "⊟": "☑",
+};
+
+/**
+ * Find a TODO marker character at or adjacent to the given doc position.
+ * Returns the marker char and its position, or empty string + -1 if none.
+ */
+function findTodoMarker(
+  view: EditorView,
+  pos: number
+): { markerChar: string; markerPos: number } {
+  const docSize = view.state.doc.content.size;
+  const charAt = pos < docSize ? view.state.doc.textBetween(pos, pos + 1) : "";
+  const charBefore = pos > 0 ? view.state.doc.textBetween(pos - 1, pos) : "";
+  if (TODO_MARKER_RE.test(charAt))
+    return { markerChar: charAt, markerPos: pos };
+  if (TODO_MARKER_RE.test(charBefore))
+    return { markerChar: charBefore, markerPos: pos - 1 };
+  return { markerChar: "", markerPos: -1 };
 }
 
 interface ProseEditorProps {
@@ -104,6 +134,26 @@ export function ProseEditor(props: ProseEditorProps) {
   let lastEntityPath: string | undefined;
   const rootPath = () =>
     props.entityPath ? rootPathFromEntity(props.entityPath) : undefined;
+
+  /**
+   * Cycle a TODO marker if the click position has one. Returns true if a
+   * cycle happened. Used by all three click handlers (single, double,
+   * triple) so rapid clicks keep cycling instead of selecting text.
+   */
+  const cycleTodoIfMarker = (view: EditorView, pos: number): boolean => {
+    const { markerChar, markerPos } = findTodoMarker(view, pos);
+    if (!markerChar) return false;
+    const nextChar = NEXT_TODO_MARKER[markerChar] ?? "☐";
+    editor!
+      .chain()
+      .focus()
+      .command(({ tr }) => {
+        tr.insertText(nextChar, markerPos, markerPos + 1);
+        return true;
+      })
+      .run();
+    return true;
+  };
 
   onMount(() => {
     if (!containerRef) return;
@@ -406,32 +456,11 @@ export function ProseEditor(props: ProseEditorProps) {
             }
           }
 
-          // Check for TODO marker click (Unicode chars ☐◣⌛▷☑)
-          const todoMatch = /^([\u2610\u25a3\u22A1\u229F\u2611])\s/.exec(
-            nodeText
-          );
-          if (todoMatch && clickOffset <= 1) {
+          // Cycle a TODO marker if the click landed on or next to one.
+          // Works for multi-line paragraphs (hard breaks) too because we
+          // inspect the click position directly, not the parent's start.
+          if (cycleTodoIfMarker(view, pos)) {
             event.preventDefault();
-            const markerChar = todoMatch[1]!;
-            // Cycle: TODO→DOING→DONE→TODO. WAITING/LATER click→DONE.
-            const nextChar =
-              markerChar === "\u2610"
-                ? "\u25a3"
-                : markerChar === "\u25a3"
-                  ? "\u2611"
-                  : markerChar === "\u22A1" || markerChar === "\u229F"
-                    ? "\u2611"
-                    : "\u2610";
-            // Replace just the marker character at the exact position
-            const markerPos = $pos.start();
-            editor!
-              .chain()
-              .focus()
-              .command(({ tr }) => {
-                tr.insertText(nextChar, markerPos, markerPos + 1);
-                return true;
-              })
-              .run();
             return true;
           }
 
@@ -467,6 +496,11 @@ export function ProseEditor(props: ProseEditorProps) {
 
           return false;
         },
+        // On rapid clicks, keep cycling instead of letting the browser
+        // select the word/paragraph. Returning true also suppresses the
+        // default selection behavior.
+        handleDoubleClick: (view, pos) => cycleTodoIfMarker(view, pos),
+        handleTripleClick: (view, pos) => cycleTodoIfMarker(view, pos),
         handleDrop: (view, event, _slice, moved) => {
           if (moved) return false;
 

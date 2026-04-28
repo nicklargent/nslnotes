@@ -54,6 +54,36 @@ describe("parseTodos", () => {
     const content = "regular text\n- normal list item";
     expect(parseTodos(content)).toHaveLength(0);
   });
+
+  it("parses standalone TODO lines (no bullet prefix)", () => {
+    const content = "TODO buy milk\nTODO walk dog";
+    const todos = parseTodos(content);
+    expect(todos).toHaveLength(2);
+    expect(todos[0]?.state).toBe("TODO");
+    expect(todos[0]?.text).toBe("buy milk");
+    expect(todos[0]?.indent).toBe(0);
+    expect(todos[1]?.text).toBe("walk dog");
+  });
+
+  it("parses indented standalone TODO lines", () => {
+    const todos = parseTodos("  TODO nested standalone");
+    expect(todos).toHaveLength(1);
+    expect(todos[0]?.indent).toBe(2);
+    expect(todos[0]?.text).toBe("nested standalone");
+  });
+
+  it("still parses bulleted TODO items the same as before", () => {
+    const todos = parseTodos("- TODO buy milk");
+    expect(todos).toHaveLength(1);
+    expect(todos[0]?.state).toBe("TODO");
+    expect(todos[0]?.text).toBe("buy milk");
+    expect(todos[0]?.indent).toBe(0);
+  });
+
+  it("ignores plain text that doesn't start with a TODO keyword", () => {
+    expect(parseTodos("This is a TODO list")).toHaveLength(0);
+    expect(parseTodos("TODOing something")).toHaveLength(0);
+  });
 });
 
 describe("hasUncheckedItems", () => {
@@ -86,6 +116,14 @@ describe("hasUncheckedItems", () => {
 
   it("returns true when an unchecked item appears after DONE items", () => {
     expect(hasUncheckedItems("- DONE old\n- TODO new")).toBe(true);
+  });
+
+  it("returns true for a standalone TODO paragraph", () => {
+    expect(hasUncheckedItems("TODO standalone")).toBe(true);
+  });
+
+  it("returns false for a standalone DONE paragraph", () => {
+    expect(hasUncheckedItems("DONE standalone")).toBe(false);
   });
 });
 

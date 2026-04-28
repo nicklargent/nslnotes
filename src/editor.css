@@ -338,7 +338,7 @@
   margin-left: 0.125rem;
   margin-right: 0.25rem;
   user-select: none;
-  pointer-events: none;
+  cursor: pointer;
 }
 
 .todo-label.todo-open {

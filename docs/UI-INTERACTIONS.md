@@ -296,6 +296,8 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Click: `preventDefault`, `stopPropagation`, fires `onCycle`
 - [ ] Unicode icons: ☐ (TODO), ▣ (DOING), ⊡ (WAITING), ▢ (LATER), ☑ (DONE)
 - [ ] Colors: gray-400 (TODO), blue-500 (DOING), amber-500 (WAITING), purple-500 (LATER), green-500 (DONE)
+- [ ] Markers render in both bulleted list items (`- TODO foo`) and standalone paragraphs (`TODO foo`)
+- [ ] Typing `TODO ` (or other keyword + space) at the start of a paragraph or list item auto-replaces the keyword with the marker glyph
 
 ### Wikilinks (InlineDecorations)
 - [ ] Wikilink renders as inline widget when cursor is not inside it
