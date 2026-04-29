@@ -30,7 +30,11 @@ export function BubbleMenu(props: BubbleMenuProps) {
     if (from === to) return;
 
     const startCoords = view.coordsAtPos(from);
-    const endCoords = view.coordsAtPos(to);
+    // -1 bias: when `to` lands at the start of a new line (after a paragraph
+    // break), coordsAtPos(to) returns coords on the line below the visible
+    // selection. -1 keeps the end coords on the line of the last selected
+    // character. Matches @tiptap/core's posToDOMRect.
+    const endCoords = view.coordsAtPos(to, -1);
 
     // Center horizontally between selection start and end
     const centerX = (startCoords.left + endCoords.right) / 2;
@@ -42,10 +46,19 @@ export function BubbleMenu(props: BubbleMenuProps) {
   onMount(() => {
     updatePosition();
 
+    const handleSelectionUpdate = () => updatePosition();
+    props.editor.on("selectionUpdate", handleSelectionUpdate);
+
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef && !menuRef.contains(e.target as Node)) {
-        props.onClose();
-      }
+      const target = e.target as Node;
+      if (!menuRef || menuRef.contains(target)) return;
+      // Editor-internal clicks: let the editor's selection-driven visibility
+      // (Editor.tsx onSelectionChange) decide. Dismissing here breaks the
+      // third click of a triple-click — the selection extends, but the menu
+      // would already be torn down before it can reposition.
+      const editorDom = props.editor?.view?.dom;
+      if (editorDom && editorDom.contains(target)) return;
+      props.onClose();
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -57,6 +70,7 @@ export function BubbleMenu(props: BubbleMenuProps) {
     document.addEventListener("keydown", handleKeyDown, true);
 
     onCleanup(() => {
+      props.editor.off("selectionUpdate", handleSelectionUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown, true);
     });

@@ -209,7 +209,10 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Code button toggles code
 - [ ] H1/H2/H3 buttons toggle heading levels
 - [ ] Extract button triggers promote flow and closes menu
-- [ ] Click outside closes bubble menu
+- [ ] Click outside the editor closes bubble menu (in-editor clicks are governed by selection state, not click-outside)
+- [ ] Triple-click to select a line keeps the menu visible and re-centers above the line
+- [ ] Selection ending at the start of the next line is positioned above the visible selection (uses `coordsAtPos(to, -1)` to keep end coords on the selected line)
+- [ ] Repositions when the selection changes while the menu is open
 - [ ] `Escape` closes bubble menu (capture phase)
 - [ ] 200ms blur delay allows click-through to bubble menu buttons
 
