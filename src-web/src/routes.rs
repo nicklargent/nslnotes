@@ -26,6 +26,7 @@ pub struct AppState {
     pub settings_path: PathBuf,
     pub watcher_state: Arc<Mutex<WatcherState>>,
     pub broadcast_tx: broadcast::Sender<nslnotes_core::watcher::FileChangeEvent>,
+    pub auth_config: AuthConfig,
 }
 
 #[derive(serde::Deserialize)]
@@ -78,6 +79,7 @@ pub fn create_router(
         settings_path,
         watcher_state,
         broadcast_tx,
+        auth_config: auth_config.clone(),
     };
 
     // Auth-gated routes. Every route here requires a valid session.
@@ -367,6 +369,13 @@ async fn save_settings_handler(
             let new_smb = smb_registry_fingerprint(&settings);
             if cred_change || new_smb != prior_smb {
                 crate::reconcile_smb_backends(&settings, kek);
+                // SMB topology just changed — refresh the cached flag the
+                // auth gate uses to detect "session valid but KEK missing"
+                // so the next process restart bounces correctly.
+                state.auth_config.kek_required.store(
+                    crate::settings_require_kek(&settings),
+                    std::sync::atomic::Ordering::Relaxed,
+                );
             }
             StatusCode::OK.into_response()
         }

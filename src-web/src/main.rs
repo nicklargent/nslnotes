@@ -101,6 +101,14 @@ async fn main() {
         }
     };
 
+    // Seed the cached "is the KEK required for this configuration" flag from
+    // the settings we just loaded. The auth gate reads this on every request
+    // (one relaxed atomic load) to detect sessions that survived a process
+    // restart but can no longer decrypt SMB creds.
+    auth_config
+        .kek_required
+        .store(settings_require_kek(&settings), std::sync::atomic::Ordering::Relaxed);
+
     // SMB backend registration is deferred until login — credentials in
     // settings.json are encrypted with a key derived from the login password,
     // which isn't available at boot. The one exception is disabled-auth mode,
@@ -143,6 +151,21 @@ async fn main() {
     )
     .await
     .expect("Server error");
+}
+
+/// True iff at least one notebook in `settings` is SMB-backed *and* has an
+/// encrypted password. Such notebooks need the login-derived KEK to be
+/// usable; a session that pre-dates the current process restart will pass
+/// the cookie check but cannot actually access SMB until the user logs in
+/// again. Plaintext-only entries (legacy / disabled-auth) don't count.
+pub fn settings_require_kek(settings: &AppSettings) -> bool {
+    settings.notebooks.iter().any(|nb| {
+        nslnotes_core::smb_url::is_smb_url(&nb.path)
+            && nb
+                .smb_password_enc
+                .as_deref()
+                .is_some_and(|s| !s.is_empty())
+    })
 }
 
 /// Flush the SMB backend registry and re-register one entry per SMB notebook

@@ -20,6 +20,7 @@ use rand::rngs::OsRng;
 use serde::Deserialize;
 use std::net::{IpAddr, SocketAddr};
 use std::num::NonZeroU32;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tower_sessions::Session;
@@ -69,6 +70,13 @@ pub struct AuthConfig {
     /// Path to settings.json — login uses this to reconcile SMB backends once
     /// the KEK is available.
     pub settings_path: std::path::PathBuf,
+    /// True when at least one SMB notebook has an encrypted password — i.e.
+    /// the login-derived KEK must be present in this process for SMB to
+    /// work. Seeded at boot from settings.json and refreshed by
+    /// `save_settings_handler` whenever SMB topology changes. The auth
+    /// hot path reads this with a relaxed atomic load to decide whether a
+    /// session that survived a process restart is actually usable.
+    pub kek_required: Arc<AtomicBool>,
 }
 
 impl AuthConfig {
@@ -95,6 +103,7 @@ impl AuthConfig {
                 trust_proxy,
                 login_limiter,
                 settings_path,
+                kek_required: Arc::new(AtomicBool::new(false)),
             });
         }
 
@@ -115,6 +124,7 @@ impl AuthConfig {
             trust_proxy,
             login_limiter,
             settings_path,
+            kek_required: Arc::new(AtomicBool::new(false)),
         })
     }
 }
@@ -241,7 +251,20 @@ pub async fn me_handler(
         return Json(serde_json::json!({ "user": DEFAULT_USER })).into_response();
     }
     match session.get::<String>(SESSION_USER_KEY).await {
-        Ok(Some(user)) => Json(serde_json::json!({ "user": user })).into_response(),
+        Ok(Some(user)) => {
+            // Session cookie is valid, but if SMB notebooks rely on the
+            // login-derived KEK and this process doesn't have it (typically
+            // after a restart), report unauthenticated so the frontend
+            // shows the login screen instead of an empty notebook.
+            if auth.kek_required.load(Ordering::Relaxed) && current_kek().is_none() {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(serde_json::json!({ "error": "Re-authentication required" })),
+                )
+                    .into_response();
+            }
+            Json(serde_json::json!({ "user": user })).into_response()
+        }
         _ => (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({ "error": "Not authenticated" })),
@@ -266,7 +289,22 @@ pub async fn require_auth(
         return next.run(req).await;
     }
     match session.get::<String>(SESSION_USER_KEY).await {
-        Ok(Some(_)) => next.run(req).await,
+        Ok(Some(_)) => {
+            // Same gate as `me_handler`: a session that survived a process
+            // restart still passes the cookie check, but without the KEK
+            // we cannot decrypt SMB credentials, so any protected call
+            // would fail with a 500 from the registry. Return 401 instead
+            // so `authedFetch` fires `AUTH_EXPIRED_EVENT` and the user is
+            // bounced to the login screen.
+            if auth.kek_required.load(Ordering::Relaxed) && current_kek().is_none() {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(serde_json::json!({ "error": "Re-authentication required" })),
+                )
+                    .into_response();
+            }
+            next.run(req).await
+        }
         _ => (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({ "error": "Authentication required" })),
