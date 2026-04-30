@@ -1,4 +1,4 @@
-import type { Note, Task, Doc, Entity } from "./entities";
+import type { Note, Task, Doc, Entity, Template } from "./entities";
 import type { TopicRef, Topic, TopicDecoration } from "./topics";
 import type { SearchState } from "./search";
 import type { ImageFile } from "./images";
@@ -14,6 +14,8 @@ export interface IndexState {
   tasks: Map<string, Task>;
   /** All docs indexed by path */
   docs: Map<string, Doc>;
+  /** Task templates indexed by id (slug) */
+  templates: Map<string, Template>;
   /** Computed topics with references */
   topics: Map<TopicRef, Topic>;
   /** Parsed topics.yaml entries */
@@ -35,7 +37,13 @@ export interface IndexState {
 /**
  * View types for center panel
  */
-export type ViewType = "journal" | "task" | "doc" | "topic" | "search";
+export type ViewType =
+  | "journal"
+  | "task"
+  | "doc"
+  | "topic"
+  | "search"
+  | "templates";
 
 /**
  * Draft state for inline entity creation

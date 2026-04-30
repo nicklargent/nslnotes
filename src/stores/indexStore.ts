@@ -1,5 +1,5 @@
 import { createStore } from "solid-js/store";
-import type { Note, Task, Doc } from "../types/entities";
+import type { Note, Task, Doc, Template } from "../types/entities";
 import type { TopicRef, Topic, TopicDecoration } from "../types/topics";
 import type { ImageFile } from "../types/images";
 import type { BacklinkEntry } from "../types/backlinks";
@@ -10,6 +10,7 @@ function initialIndexState(): IndexState {
     notes: new Map<string, Note>(),
     tasks: new Map<string, Task>(),
     docs: new Map<string, Doc>(),
+    templates: new Map<string, Template>(),
     topics: new Map<TopicRef, Topic>(),
     topicsYaml: new Map<TopicRef, TopicDecoration>(),
     lastIndexed: null,

@@ -530,6 +530,42 @@ Source: `src/components/draft/DraftView.tsx`
 - [ ] Empty title on commit is rejected (no-op)
 - [ ] Error on creation resets committed flag for retry
 
+### Task Template Slash Menu (task drafts only)
+- [ ] Hint "· Type / for templates" appears in the help line under the title for `type === "task"` drafts
+- [ ] Typing `/` while editing the title opens an inline slash menu below the title input (`[data-slash-menu]`)
+- [ ] Menu lists existing templates (sorted by display name) plus a "Manage templates…" entry at the bottom
+- [ ] Characters typed after `/` filter the template list by display-name substring match (case-insensitive)
+- [ ] A space after `/`, backspacing past the `/`, or moving the caret before the `/` closes the menu
+- [ ] ArrowUp / ArrowDown moves the highlighted item; Enter or Tab selects it
+- [ ] Escape closes the menu without cancelling the draft (a second Escape cancels)
+- [ ] Click on a menu item selects it; click outside (other than on the input itself) closes the menu
+- [ ] Selecting a template strips the `/<filter>` token from the title and shows a "Template: <name> ✕" chip below the input
+- [ ] Chip's ✕ button (aria-label "Clear template") clears the applied template
+- [ ] On commit, the applied template's body is used as the new task's content
+- [ ] Selecting "Manage templates…" cancels the draft and navigates to the templates view
+- [ ] Slash menu is not rendered for doc drafts
+
+---
+
+## 12.5. Templates
+
+Source: `src/components/templates/TemplatesView.tsx`, `src/services/TemplateService.ts`
+
+Storage: markdown files at `${rootPath}/.templates/tasks/<slug>.md`. Filename slug is the template id; display name is derived from it (`meeting-prep` → "Meeting prep"). Templates are not entities — they're loaded into `indexStore.templates` separately and never appear in the main task/note/doc lists, search, or topics.
+
+- [ ] Reached only via the "Manage templates…" entry in the new-task slash menu (no sidebar/header button)
+- [ ] Header shows "Templates" title, "+ New template" button, and a back-to-home link
+- [ ] Empty state shows "No templates yet…" placeholder
+- [ ] Each template row shows display name and a 1-line content preview
+- [ ] Hovering a template row reveals Edit/Delete actions
+- [ ] Clicking a row (or its Edit action) opens the inline editor for that template
+- [ ] "+ New template" opens a blank inline editor
+- [ ] Editor pane has a name input, a TipTap editor (reused from doc editing), and explicit Save/Cancel buttons
+- [ ] Templates do NOT auto-save on keystroke — only Save commits
+- [ ] Saving a renamed template moves the file on disk to the new slug
+- [ ] Delete prompts a confirmation modal; deleting does not affect tasks already created from the template
+- [ ] File watcher events under `.templates/` are routed to `IndexService.invalidateTemplates`, so templates stay in sync if files are edited externally
+
 ---
 
 ## 13. Modals

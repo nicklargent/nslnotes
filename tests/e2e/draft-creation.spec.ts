@@ -99,3 +99,47 @@ test.describe("Task draft creation", () => {
     await expect(input).not.toBeVisible({ timeout: 2000 });
   });
 });
+
+test.describe("Draft creation with trailing-slash rootPath", () => {
+  // Regression: settings.rootPath stored with a trailing "/" used to produce
+  // a "//tasks/foo.md" path that didn't match `joinPath(rootPath, "tasks")`
+  // in IndexService.invalidate, so newly created entities never landed in
+  // the index, createTask returned null, and the draft view stayed stuck
+  // after Enter.
+  let testRoot: string;
+
+  test.beforeEach(async ({ page }) => {
+    ({ testRoot } = await setupApp(page, { preset: "empty" }));
+    // Re-route /api/settings to send a rootPath WITH a trailing slash
+    await page.route("**/api/settings", async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ rootPath: testRoot + "/" }),
+        });
+      } else {
+        await route.fulfill({ status: 200, body: "{}" });
+      }
+    });
+    await page.reload();
+    await expect(page.locator("main").first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test.afterEach(() => teardownApp(testRoot));
+
+  test("Enter creates task and switches view (trailing-slash root)", async ({
+    page,
+  }) => {
+    await createTaskButton(page).click();
+    const input = centerPanel(page).locator("input[placeholder*='title']");
+    await expect(input).toBeVisible({ timeout: 2000 });
+    await input.fill("Trailing Slash Task");
+    await page.keyboard.press("Enter");
+    // The draft input should disappear and TaskDetail should render
+    await expect(input).not.toBeVisible({ timeout: 5000 });
+    await expect(centerPanel(page).getByText("Trailing Slash Task")).toBeVisible({
+      timeout: 5000,
+    });
+  });
+});

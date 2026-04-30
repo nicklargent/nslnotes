@@ -45,7 +45,12 @@ function activeNotebook(): Notebook | null {
  * `setActive` and can route writes to the wrong notebook.
  */
 function activeRoot(): string | null {
-  return activeNotebook()?.path ?? null;
+  const p = activeNotebook()?.path ?? null;
+  if (!p) return null;
+  // Strip trailing slashes so callers can safely do `${rootPath}/sub`
+  // without producing a `//` that breaks prefix checks downstream
+  // (e.g. IndexService.invalidate's `path.startsWith(joinPath(...))`).
+  return p.replace(/\/+$/, "");
 }
 
 export const notebooksApi = {

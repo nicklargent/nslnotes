@@ -18,3 +18,5 @@ export { NavigationService } from "./NavigationService";
 export { EntityService } from "./EntityService";
 
 export { ImageService } from "./ImageService";
+
+export { TemplateService } from "./TemplateService";

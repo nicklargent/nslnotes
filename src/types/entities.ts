@@ -72,3 +72,20 @@ export type Entity = Note | Task | Doc;
  * Entity type discriminator
  */
 export type EntityType = Entity["type"];
+
+/**
+ * Task template — predefined body content for new tasks.
+ * Stored as a plain markdown file under `${rootPath}/.templates/tasks/`,
+ * keyed by filename slug. Templates are not entities and are not
+ * indexed alongside notes/tasks/docs.
+ */
+export interface Template {
+  /** Slug identifier (filename without `.md`), e.g. "meeting-prep" */
+  id: string;
+  /** Human-readable name derived from the slug, e.g. "Meeting prep" */
+  displayName: string;
+  /** Absolute path to the template file */
+  path: string;
+  /** Raw markdown body content */
+  content: string;
+}

@@ -156,7 +156,11 @@ export const SettingsService = {
 
   getRootPath: async (): Promise<string | null> => {
     const settings = await SettingsService.loadSettings();
-    return settings.rootPath;
+    if (!settings.rootPath) return null;
+    // Strip trailing slashes so callers can safely do `${rootPath}/sub`
+    // without producing a `//` that breaks prefix checks downstream
+    // (e.g. IndexService.invalidate's `path.startsWith(joinPath(...))`).
+    return settings.rootPath.replace(/\/+$/, "");
   },
 
   /**

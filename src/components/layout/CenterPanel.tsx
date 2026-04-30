@@ -4,6 +4,7 @@ import { TaskDetail } from "../tasks/TaskDetail";
 import { DocView } from "../docs/DocView";
 import { TopicView } from "../topics/TopicView";
 import { SearchView } from "../search/SearchView";
+import { TemplatesView } from "../templates/TemplatesView";
 import { DraftView } from "../draft/DraftView";
 import { FindBar } from "../editor/FindBar";
 import { contextStore } from "../../stores/contextStore";
@@ -76,6 +77,9 @@ export function CenterPanel(props: CenterPanelProps) {
             </Match>
             <Match when={props.activeView === "search"}>
               <SearchView />
+            </Match>
+            <Match when={props.activeView === "templates"}>
+              <TemplatesView />
             </Match>
           </Switch>
         }

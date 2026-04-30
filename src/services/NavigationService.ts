@@ -270,6 +270,23 @@ export const NavigationService = {
   },
 
   /**
+   * Navigate to the template management view.
+   * Reached only from the "Manage templates…" entry in the new-task picker.
+   */
+  navigateToTemplates: (): void => {
+    setContextStore({
+      activeView: "templates",
+      activeEntity: null,
+      activeTopic: null,
+      relevanceWeights: new Map(),
+      isHomeState: false,
+      draft: null,
+      searchState: null,
+    });
+    pushHistory();
+  },
+
+  /**
    * Navigate to the search view.
    * Optionally pre-populates query and filter.
    */

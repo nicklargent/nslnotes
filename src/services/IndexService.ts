@@ -1,5 +1,6 @@
 import { FileService } from "./FileService";
 import { TopicService } from "./TopicService";
+import { TemplateService } from "./TemplateService";
 import { indexStore, setIndexStore } from "../stores/indexStore";
 import { parseNote, parseTask, parseDoc } from "../lib/entityParser";
 import {
@@ -21,7 +22,7 @@ import {
   type MtimeMap,
 } from "../lib/indexCache";
 import { notebooksApi } from "../stores/notebooksStore";
-import type { Note, Task, Doc, Entity } from "../types/entities";
+import type { Note, Task, Doc, Entity, Template } from "../types/entities";
 import type { TopicRef, Topic, EntityReference } from "../types/topics";
 import type { GroupedTasks, GroupedClosedTasks } from "../types/task-groups";
 import type { WikiLink } from "../types/inline";
@@ -121,6 +122,28 @@ function mtimesFromEntries(
   return out;
 }
 
+/** Load the task templates directory into a Map keyed by template id. */
+async function loadTemplatesMap(
+  rootPath: string
+): Promise<Map<string, Template>> {
+  const list = await TemplateService.list(rootPath).catch(() => []);
+  const map = new Map<string, Template>();
+  for (const t of list) map.set(t.id, t);
+  return map;
+}
+
+function templatesMapEqual(
+  a: Map<string, Template>,
+  b: Map<string, Template>
+): boolean {
+  if (a.size !== b.size) return false;
+  for (const [id, t] of a) {
+    const u = b.get(id);
+    if (!u || u.path !== t.path || u.content !== t.content) return false;
+  }
+  return true;
+}
+
 /**
  * IndexService manages the in-memory index of all entities.
  */
@@ -161,6 +184,11 @@ export const IndexService = {
       });
       currentMtimes = cached.mtimes;
       buildBacklinks();
+      // Templates aren't cached; load them in the background. The
+      // background `_rebuildFresh` below short-circuits when entity
+      // mtimes are unchanged, so it can't be relied on to populate
+      // templates.
+      void IndexService.invalidateTemplates(rootPath);
       const cachedTotal =
         cached.notes.size + cached.tasks.size + cached.docs.size;
       onProgress?.(cachedTotal, cachedTotal);
@@ -242,11 +270,15 @@ export const IndexService = {
     // Build topics from all entities
     const topics = buildTopics(notes, tasks, docs, topicsYaml);
 
+    // Load task templates (separate from entities; not cached)
+    const templates = await loadTemplatesMap(rootPath);
+
     // Update the store
     setIndexStore({
       notes,
       tasks,
       docs,
+      templates,
       topics,
       topicsYaml,
       lastIndexed: new Date(),
@@ -331,6 +363,8 @@ export const IndexService = {
       const topicsYaml = await TopicService.loadTopicsYaml(topicsYamlPath);
       const topics = buildTopics(notes, tasks, docs, topicsYaml);
 
+      // Templates are populated by `invalidateTemplates`, called by the
+      // cached-load entry point in `buildIndex` and by file-watcher events.
       setIndexStore({
         notes,
         tasks,
@@ -352,6 +386,24 @@ export const IndexService = {
     } finally {
       setIndexStore("indexing", false);
     }
+  },
+
+  /**
+   * Re-read all task templates from disk and update the store.
+   * Cheap (small directory); call after any TemplateService mutation
+   * and from the file watcher when paths under .templates/ change.
+   */
+  invalidateTemplates: async (rootPath: string): Promise<void> => {
+    const activeRoot = notebooksApi.activeRoot();
+    if (
+      !activeRoot ||
+      activeRoot.replace(/\/+$/, "") !== rootPath.replace(/\/+$/, "")
+    ) {
+      return;
+    }
+    const templates = await loadTemplatesMap(rootPath);
+    if (templatesMapEqual(indexStore.templates, templates)) return;
+    setIndexStore("templates", templates);
   },
 
   /**
@@ -380,6 +432,12 @@ export const IndexService = {
     const notesDir = joinPath(rootPath, "notes");
     const tasksDir = joinPath(rootPath, "tasks");
     const docsDir = joinPath(rootPath, "docs");
+    const templatesDir = joinPath(rootPath, ".templates");
+
+    if (path.startsWith(templatesDir)) {
+      await IndexService.invalidateTemplates(rootPath);
+      return;
+    }
 
     const exists = await FileService.exists(path);
 
