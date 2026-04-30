@@ -12,6 +12,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { AppErrorBoundary } from "./components/ErrorBoundary";
 import { runtime, AUTH_EXPIRED_EVENT } from "./lib/runtime";
 import { ToastContainer, showToast } from "./components/Toast";
+import { UpdatePrompt } from "./components/UpdatePrompt";
 import { SplashScreen, type LoadProgress } from "./components/SplashScreen";
 import { KeyboardShortcutsModal } from "./components/modals/KeyboardShortcutsModal";
 import { QuickCapture } from "./components/QuickCapture";
@@ -555,6 +556,7 @@ function App() {
 
       <ImagePreview />
       <ToastContainer />
+      <UpdatePrompt />
     </AppErrorBoundary>
   );
 }
