@@ -31,6 +31,28 @@ pub async fn start_watch_handler(
     State(state): State<AppState>,
     Json(body): Json<WatchBody>,
 ) -> Response {
+    // Idempotency: a browser reload re-issues this without ever calling
+    // /api/watch/stop, so the second call would otherwise hit "Already
+    // watching" from the core watcher and 500. Short-circuit when the
+    // existing watcher is already on the requested path; the original bridge
+    // thread is still forwarding events to broadcast_tx.
+    match nslnotes_core::watcher::get_watcher_status(&state.watcher_state) {
+        Ok((true, Some(ref current))) if current == &body.path => {
+            return StatusCode::OK.into_response();
+        }
+        Ok((true, _)) => {
+            // Different path — caller should stop first. Surface a 409 so the
+            // frontend can react instead of getting an opaque 500.
+            return (
+                StatusCode::CONFLICT,
+                "Watcher is already running on a different path; call /api/watch/stop first",
+            )
+                .into_response();
+        }
+        Ok(_) => {}
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+    }
+
     let broadcast_tx = state.broadcast_tx.clone();
 
     // Create mpsc channel for core watcher → bridge

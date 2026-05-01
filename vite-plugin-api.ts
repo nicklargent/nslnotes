@@ -257,6 +257,30 @@ async function handleApi(
       }
     }
 
+    // /api/watch/* — no-op stubs so dev:web doesn't 404 on the file watcher.
+    // The real watcher lives in src-web (axum + nslnotes-core::watcher) and
+    // isn't worth duplicating in TS just for browser dev. Live updates are
+    // unavailable in dev:web; reload the page to see external file changes.
+    if (pathname === "/api/watch/start" && req.method === "POST") {
+      // Drain the body so the client doesn't stall on a half-read request.
+      await parseBody(req);
+      return sendJson(res, { ok: true });
+    }
+    if (pathname === "/api/watch/stop" && req.method === "POST") {
+      return sendJson(res, { ok: true });
+    }
+    if (pathname === "/api/watch/events" && req.method === "GET") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      // Hold the connection open with no events; close cleanly when the
+      // EventSource disconnects.
+      req.on("close", () => res.end());
+      return;
+    }
+
     sendError(res, "Not found", 404);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
