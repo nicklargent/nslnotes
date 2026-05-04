@@ -303,6 +303,13 @@
 }
 
 /* TODO markers */
+.todo-node {
+  cursor: pointer;
+  user-select: none;
+  display: inline;
+  white-space: nowrap;
+}
+
 .todo-marker {
   cursor: pointer;
   user-select: none;

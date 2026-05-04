@@ -1,31 +1,8 @@
 import { onMount, onCleanup, createEffect } from "solid-js";
 import { Editor } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import { common, createLowlight } from "lowlight";
-import nginx from "highlight.js/lib/languages/nginx";
-import dockerfile from "highlight.js/lib/languages/dockerfile";
-import protobuf from "highlight.js/lib/languages/protobuf";
-import { CodeBlockWithLines } from "./CodeBlockView";
-
-const lowlightInstance = (() => {
-  const ll = createLowlight(common);
-  ll.register("nginx", nginx);
-  ll.register("dockerfile", dockerfile);
-  ll.register("protobuf", protobuf);
-  return ll;
-})();
-
 import Placeholder from "@tiptap/extension-placeholder";
-import Link from "@tiptap/extension-link";
-import Image from "@tiptap/extension-image";
-import { Table } from "@tiptap/extension-table";
-import { TableRow } from "@tiptap/extension-table-row";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { TableHeader } from "@tiptap/extension-table-header";
-import { TaskList } from "@tiptap/extension-task-list";
-import { TaskItem } from "@tiptap/extension-task-item";
-import { DOMSerializer, Slice } from "@tiptap/pm/model";
-import { Plugin, PluginKey, Selection, TextSelection } from "@tiptap/pm/state";
+import { Slice } from "@tiptap/pm/model";
+import { Selection, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import {
   clearPointerWikilinkDrag,
@@ -34,20 +11,23 @@ import {
   isWikilinkDragActive,
   WIKILINK_MIME,
 } from "../../lib/drag";
-import Strike from "@tiptap/extension-strike";
+import { editorExtensions } from "./schemaExtensions";
 import { InlineDecorations } from "./InlineDecorations";
+import { nextState } from "./TodoMarker";
+import type { TodoState } from "../../types/inline";
 import { PromoteHighlightPlugin } from "./PromoteHighlightPlugin";
 import { FindHighlightPlugin } from "./FindHighlightPlugin";
 import { ImageResizePlugin } from "./ImageResizePlugin";
 import { ImageMagnifyPlugin } from "./ImageMagnifyPlugin";
-import Underline from "@tiptap/extension-underline";
 import { ImageService, rootPathFromEntity } from "../../services/ImageService";
 import { showToast } from "../Toast";
 import { IMAGE_MIME_TYPES } from "../../types/images";
 import { runtime } from "../../lib/runtime";
-import { isExternalUrl } from "../../lib/url";
-import { htmlFromMarkdown } from "./markdownToHtml";
-import { markdownFromHtml } from "./htmlToMarkdown";
+import {
+  parseMarkdown,
+  serializeMarkdown,
+  schema as pmSchema,
+} from "./pmMarkdown";
 
 /** Read a File as base64, stripping the data URL prefix. */
 function readFileAsBase64(file: File): Promise<string> {
@@ -64,33 +44,24 @@ function readFileAsBase64(file: File): Promise<string> {
   });
 }
 
-const TODO_MARKER_RE = /[☐▣⊡⊟☑]/;
-
-// Click cycles TODO→DOING→DONE→TODO; WAITING and LATER both jump to DONE.
-const NEXT_TODO_MARKER: Record<string, string> = {
-  "☐": "▣",
-  "▣": "☑",
-  "☑": "☐",
-  "⊡": "☑",
-  "⊟": "☑",
-};
-
 /**
- * Find a TODO marker character at or adjacent to the given doc position.
- * Returns the marker char and its position, or empty string + -1 if none.
+ * Find a TodoMarker node at or adjacent to the given doc position.
+ * Returns the node and its position, or null if none.
  */
-function findTodoMarker(
+function findTodoMarkerNode(
   view: EditorView,
   pos: number
-): { markerChar: string; markerPos: number } {
-  const docSize = view.state.doc.content.size;
-  const charAt = pos < docSize ? view.state.doc.textBetween(pos, pos + 1) : "";
-  const charBefore = pos > 0 ? view.state.doc.textBetween(pos - 1, pos) : "";
-  if (TODO_MARKER_RE.test(charAt))
-    return { markerChar: charAt, markerPos: pos };
-  if (TODO_MARKER_RE.test(charBefore))
-    return { markerChar: charBefore, markerPos: pos - 1 };
-  return { markerChar: "", markerPos: -1 };
+): { state: TodoState; nodePos: number } | null {
+  const doc = view.state.doc;
+  const at = pos < doc.content.size ? doc.nodeAt(pos) : null;
+  if (at?.type.name === "todoMarker") {
+    return { state: at.attrs["state"] as TodoState, nodePos: pos };
+  }
+  const before = pos > 0 ? doc.nodeAt(pos - 1) : null;
+  if (before?.type.name === "todoMarker") {
+    return { state: before.attrs["state"] as TodoState, nodePos: pos - 1 };
+  }
+  return null;
 }
 
 interface ProseEditorProps {
@@ -136,19 +107,24 @@ export function ProseEditor(props: ProseEditorProps) {
     props.entityPath ? rootPathFromEntity(props.entityPath) : undefined;
 
   /**
-   * Cycle a TODO marker if the click position has one. Returns true if a
-   * cycle happened. Used by all three click handlers (single, double,
+   * Cycle a TodoMarker node if the click position lands on one. Returns true
+   * if a cycle happened. Used by all three click handlers (single, double,
    * triple) so rapid clicks keep cycling instead of selecting text.
    */
   const cycleTodoIfMarker = (view: EditorView, pos: number): boolean => {
-    const { markerChar, markerPos } = findTodoMarker(view, pos);
-    if (!markerChar) return false;
-    const nextChar = NEXT_TODO_MARKER[markerChar] ?? "☐";
+    const found = findTodoMarkerNode(view, pos);
+    if (!found) return false;
+    const next = nextState(found.state);
     editor!
       .chain()
       .focus()
       .command(({ tr }) => {
-        tr.insertText(nextChar, markerPos, markerPos + 1);
+        const node = view.state.doc.nodeAt(found.nodePos);
+        if (!node || node.type.name !== "todoMarker") return false;
+        tr.setNodeMarkup(found.nodePos, undefined, {
+          ...node.attrs,
+          state: next,
+        });
         return true;
       })
       .run();
@@ -160,137 +136,24 @@ export function ProseEditor(props: ProseEditorProps) {
 
     editor = new Editor({
       element: containerRef,
-      extensions: [
-        StarterKit.configure({
-          heading: { levels: [1, 2, 3] },
-          dropcursor: { color: "var(--color-link)", width: 2 },
-          codeBlock: false,
-          strike: false,
-        }),
-        Strike.extend({ keepOnSplit: false }),
-        CodeBlockWithLines.configure({
-          lowlight: lowlightInstance,
-          defaultLanguage: "plaintext",
-        }),
-        Placeholder.configure({
-          placeholder: props.placeholder ?? "Start writing...",
-        }),
-        Link.extend({
-          // Disable Link's built-in paste rules — we handle links as raw
-          // markdown text and convert via linkMarkToRawText plugin.
-          addPasteRules() {
-            return [];
-          },
-          renderHTML({ HTMLAttributes }) {
-            // Render without href/target to prevent browser navigation.
-            // Store href as data-href; mark attributes retain the real href.
-            const attrs = HTMLAttributes as Record<string, unknown>;
-            const href = attrs["href"];
-            const out: Record<string, unknown> = { "data-href": href };
-            if (typeof href === "string" && isExternalUrl(href)) {
-              out["data-external"] = "true";
-            }
-            return ["a", out, 0];
-          },
-          parseHTML() {
-            return [
-              {
-                tag: "a[href]",
-                getAttrs: (node: string | HTMLElement) => {
-                  if (typeof node === "string") return false;
-                  const href = node.getAttribute("href");
-                  return href ? { href } : false;
-                },
-              },
-              {
-                tag: "a[data-href]",
-                getAttrs: (node: string | HTMLElement) => {
-                  if (typeof node === "string") return false;
-                  const href = node.getAttribute("data-href");
-                  return href ? { href } : false;
-                },
-              },
-            ];
-          },
-        }).configure({
-          openOnClick: false,
-          autolink: false,
-          linkOnPaste: false,
-        }),
-        Image.extend({
-          addAttributes() {
-            return {
-              ...this.parent?.(),
-              width: {
-                default: null,
-                parseHTML: (element) => element.getAttribute("width"),
-                renderHTML: (attributes) => {
-                  if (!attributes["width"]) return {};
-                  return {
-                    width: attributes["width"],
-                    style: `width: ${attributes["width"]}px`,
-                  };
-                },
-              },
-            };
-          },
-          // Ensure a paragraph always exists after block nodes (images,
-          // code blocks, tables, etc.) so the cursor has a valid landing
-          // spot. Without this, block nodes at the end of the doc leave
-          // no place to click/type.
-          addProseMirrorPlugins() {
-            return [
-              new Plugin({
-                key: new PluginKey("trailingParagraph"),
-                appendTransaction(_transactions, _oldState, newState) {
-                  if (!_transactions.some((t) => t.docChanged)) return null;
-                  const { doc, schema, tr } = newState;
-                  const paragraph = schema.nodes["paragraph"];
-                  if (!paragraph) return null;
-                  // Block types that trap the cursor (no text insertion point)
-                  const trapping = new Set([
-                    "image",
-                    "codeBlock",
-                    "table",
-                    "horizontalRule",
-                  ]);
-                  let changed = false;
-                  for (let i = doc.childCount - 1; i >= 0; i--) {
-                    const child = doc.child(i);
-                    if (!trapping.has(child.type.name)) continue;
-                    const isLast = i === doc.childCount - 1;
-                    const nextIsTrapping =
-                      !isLast && trapping.has(doc.child(i + 1).type.name);
-                    if (isLast || nextIsTrapping) {
-                      let pos = 0;
-                      for (let j = 0; j <= i; j++) pos += doc.child(j).nodeSize;
-                      tr.insert(pos, paragraph.create());
-                      changed = true;
-                    }
-                  }
-                  return changed ? tr : null;
-                },
-              }),
-            ];
-          },
-        }).configure({
-          inline: false,
-          allowBase64: false,
-        }),
-        Underline,
-        TaskList,
-        TaskItem.configure({ nested: true }),
-        Table.configure({ resizable: true, handleWidth: 5, cellMinWidth: 80 }),
-        TableRow,
-        TableHeader,
-        TableCell,
-        InlineDecorations,
-        PromoteHighlightPlugin,
-        FindHighlightPlugin,
-        ImageResizePlugin,
-        ImageMagnifyPlugin,
-      ],
-      content: htmlFromMarkdown(props.content, props.entityPath, rootPath()),
+      extensions: editorExtensions({
+        placeholder: props.placeholder,
+        uiPlugins: [
+          Placeholder.configure({
+            placeholder: props.placeholder ?? "Start writing...",
+          }),
+          InlineDecorations,
+          PromoteHighlightPlugin,
+          FindHighlightPlugin,
+          ImageResizePlugin,
+          ImageMagnifyPlugin,
+        ],
+      }),
+      content: parseMarkdown(
+        props.content,
+        props.entityPath,
+        rootPath()
+      ).toJSON(),
       autofocus: false,
       onUpdate: ({ editor: e }) => {
         if (skipNextUpdate) {
@@ -298,7 +161,7 @@ export function ProseEditor(props: ProseEditorProps) {
           return;
         }
         lastUserInteraction = Date.now();
-        const md = markdownFromHtml(e.getHTML(), props.entityPath, rootPath());
+        const md = serializeMarkdown(e.state.doc, props.entityPath, rootPath());
         props.onUpdate(md);
       },
       editorProps: {
@@ -345,14 +208,10 @@ export function ProseEditor(props: ProseEditorProps) {
           return slice;
         },
         clipboardTextSerializer: (slice) => {
-          const serializer = DOMSerializer.fromSchema(editor!.schema);
-          const wrapper = document.createElement("div");
-          wrapper.appendChild(serializer.serializeFragment(slice.content));
-          return markdownFromHtml(
-            wrapper.innerHTML,
-            props.entityPath,
-            rootPath()
-          );
+          // Wrap the slice's fragment in a synthetic doc so the markdown
+          // serializer can walk it the same way it walks a full document.
+          const wrapped = pmSchema.nodes["doc"]!.create(null, slice.content);
+          return serializeMarkdown(wrapped, props.entityPath, rootPath());
         },
         handlePaste: (_view, event) => {
           const items = event.clipboardData?.items;
@@ -1074,15 +933,15 @@ export function ProseEditor(props: ProseEditorProps) {
       if (editor.isFocused) return;
     }
     lastEntityPath = entityPath;
-    const currentMd = markdownFromHtml(
-      editor.getHTML(),
+    const currentMd = serializeMarkdown(
+      editor.state.doc,
       entityPath,
       rootPath()
     );
     if (currentMd !== newContent) {
       skipNextUpdate = true;
       editor.commands.setContent(
-        htmlFromMarkdown(newContent, entityPath, rootPath())
+        parseMarkdown(newContent, entityPath, rootPath()).toJSON()
       );
       // setContent is synchronous — if it triggered onUpdate, the flag was
       // already cleared inside the handler.  If it did NOT trigger onUpdate

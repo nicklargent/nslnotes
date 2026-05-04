@@ -189,7 +189,7 @@ describe("indexCache", () => {
       storage.set(
         `nslnotes-index-cache:${NB}`,
         JSON.stringify({
-          version: 1,
+          version: 2,
           timestamp: twoHoursAgo,
           notes: [],
           tasks: [],
@@ -205,7 +205,7 @@ describe("indexCache", () => {
       storage.set(
         `nslnotes-index-cache:${NB}`,
         JSON.stringify({
-          version: 1,
+          version: 2,
           timestamp: thirtyMinutesAgo,
           notes: [],
           tasks: [],

@@ -266,6 +266,12 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] `Alt+Up` reorders list item up (if supported by extension)
 - [ ] `Alt+Down` reorders list item down (if supported by extension)
 
+### Code Blocks (`CodeBlockView.ts`)
+- [ ] Fenced code block (```` ``` ````) renders with line numbers, copy button, and a language selector dropdown
+- [ ] Click copy button: copies block contents to clipboard, swaps icon to check for ~1.5s
+- [ ] Language dropdown: change updates the node's `language` attr (re-highlights)
+- [ ] `ArrowDown` at the last line of a code block moves cursor to whatever follows in the parent. If the code block is the last child of a list item, cursor jumps OUT of the list item to the first valid next-sibling — does NOT synthesize a fresh paragraph after the code block (the upstream `exitOnArrowDown` default would, which historically appeared as a transient blank line during navigation)
+
 ### Tables
 - [ ] `/table` slash command inserts a 3x3 table with header row
 - [ ] `Tab` in table navigates to next cell
@@ -293,14 +299,17 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Nested task items supported
 - [ ] Coexists with custom TODO system (TODO/DOING/WAITING/LATER/DONE)
 
-### TODO Checkbox (`TodoCheckbox.tsx`)
-- [ ] Click cycles state: TODO → DOING → DONE → TODO
-- [ ] Additional states: WAITING, LATER
-- [ ] Click: `preventDefault`, `stopPropagation`, fires `onCycle`
-- [ ] Unicode icons: ☐ (TODO), ▣ (DOING), ⊡ (WAITING), ▢ (LATER), ☑ (DONE)
-- [ ] Colors: gray-400 (TODO), blue-500 (DOING), amber-500 (WAITING), purple-500 (LATER), green-500 (DONE)
-- [ ] Markers render in both bulleted list items (`- TODO foo`) and standalone paragraphs (`TODO foo`)
-- [ ] Typing `TODO ` (or other keyword + space) at the start of a paragraph or list item auto-replaces the keyword with the marker glyph
+### TODO Markers (`TodoMarker.ts`)
+- [ ] Implemented as a TipTap inline atom node (`todoMarker`) with a `state` attribute, not text-with-decorations. Selecting/copying a TODO line yields the keyword as text, not the unicode glyph.
+- [ ] Click cycles state: TODO → DOING → DONE → TODO. WAITING and LATER both jump to DONE.
+- [ ] Click target is the entire `span[data-todo]` wrapper — both the glyph and the keyword label cycle when clicked
+- [ ] Cycling mutates the node's `state` attr via `setNodeMarkup` (single transaction, undo-friendly)
+- [ ] Unicode icons rendered by the NodeView: ☐ (TODO), ▣ (DOING), ⊡ (WAITING), ⊟ (LATER), ☑ (DONE)
+- [ ] CSS classes: `.todo-marker.todo-open` (TODO), `.todo-doing`, `.todo-waiting`, `.todo-later`, `.todo-done` — applied to both the glyph span and the label span
+- [ ] Colors via CSS variables: `--color-todo-open` (gray), `--color-todo-doing` (blue), `--color-todo-waiting` (amber), `--color-todo-later` (purple), `--color-todo-done` (green)
+- [ ] Markers render in both bulleted list items (`- TODO foo`) and standalone paragraphs (`TODO foo`); skipped inside headings, table cells, blockquotes
+- [ ] Typing `TODO ` (or other keyword + space) at the start of a paragraph or list item triggers an InputRule that replaces the keyword with the schema node + a space. PasteRule does the same for pasted markdown.
+- [ ] DONE state: a `strike` mark is applied to the rest of the current line (until the next hardBreak); removed when the state leaves DONE. Strike is scoped to the line — sibling lines in the same paragraph aren't affected.
 
 ### Wikilinks (InlineDecorations)
 - [ ] Wikilink renders as inline widget when cursor is not inside it

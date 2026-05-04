@@ -109,143 +109,19 @@ function createResolvedSpan(
 
 /**
  * ProseMirror decoration plugin that scans document text for inline patterns
- * (TODO markers, wikilinks, topic refs) and applies CSS classes for visual styling.
+ * (wikilinks, topic refs, markdown links) and applies CSS classes for visual styling.
  *
  * ProseMirror strips custom <span> elements not defined in the schema, so we use
  * decorations to re-add styling classes without modifying the document.
+ *
+ * NOTE: TODO marker handling has moved to the TodoMarker schema node — it's no
+ * longer a decoration on text content.
  */
 export const InlineDecorations = Extension.create({
   name: "inlineDecorations",
 
   addProseMirrorPlugins() {
     return [
-      // Plugin to auto-replace TODO/DOING/DONE text with Unicode markers
-      new Plugin({
-        key: new PluginKey("todoAutoReplace"),
-        appendTransaction(
-          transactions: readonly Transaction[],
-          oldState,
-          newState
-        ) {
-          // Only process if document changed
-          if (!transactions.some((tr) => tr.docChanged)) return null;
-
-          const tr = newState.tr;
-          let changed = false;
-          const strikeMark = newState.schema.marks["strike"];
-
-          const replacements: Array<{
-            from: number;
-            to: number;
-            text: string;
-          }> = [];
-          const strikeOps: Array<{ from: number; to: number; add: boolean }> =
-            [];
-
-          // Build a map of old marker characters by node position for comparison
-          const unicodeMarkerRe = /^([\u2610\u25a3\u22A1\u229F\u2611])\s/;
-          const oldMarkers = new Map<number, string>();
-          oldState.doc.descendants((node, pos) => {
-            if (!node.isTextblock) return;
-            const m = unicodeMarkerRe.exec(node.textContent);
-            if (m) oldMarkers.set(pos, m[1]!);
-          });
-
-          newState.doc.descendants((node, pos, parent) => {
-            if (!node.isTextblock) return;
-            // Auto-replace inside list items (`- TODO foo`) and top-level
-            // paragraphs (standalone `TODO foo`). Skip headings, table
-            // cells, blockquotes, etc.
-            const parentName = parent?.type.name;
-            const inListItem = parentName === "listItem";
-            const inTopLevelParagraph =
-              parentName === "doc" && node.type.name === "paragraph";
-            if (!inListItem && !inTopLevelParagraph) return;
-            const text = node.textContent;
-
-            // Match TODO/DOING/WAITING/LATER/DONE text that needs replacing with Unicode
-            const textMatch = /^(TODO|DOING|WAITING|LATER|DONE) /.exec(text);
-            if (textMatch) {
-              const marker = textMatch[1];
-              const unicode =
-                marker === "TODO"
-                  ? "\u2610"
-                  : marker === "DOING"
-                    ? "\u25a3"
-                    : marker === "WAITING"
-                      ? "\u22A1"
-                      : marker === "LATER"
-                        ? "\u229F"
-                        : "\u2611";
-              replacements.push({
-                from: pos + 1,
-                to: pos + 1 + marker!.length,
-                text: unicode,
-              });
-              // Strike the rest of the text for DONE
-              if (strikeMark && node.textContent.length > textMatch[0].length) {
-                const contentFrom = pos + 1 + unicode.length + 1; // after marker + space
-                const contentTo = pos + node.nodeSize - 1;
-                strikeOps.push({
-                  from: contentFrom,
-                  to: contentTo,
-                  add: marker === "DONE",
-                });
-              }
-              return;
-            }
-
-            // Handle existing Unicode markers — only manage strike when marker changed
-            const unicodeMatch = unicodeMarkerRe.exec(text);
-            if (unicodeMatch && strikeMark && text.length > 2) {
-              const currentMarker = unicodeMatch[1]!;
-              // Map this position back to oldState to find the old marker
-              const mappedPos = transactions.reduce(
-                (p, t) => t.mapping.invert().map(p),
-                pos
-              );
-              const oldMarker = oldMarkers.get(mappedPos);
-
-              // Only enforce strike changes when the marker itself changed
-              if (oldMarker !== undefined && oldMarker !== currentMarker) {
-                const isDone = currentMarker === "\u2611";
-                const contentFrom = pos + 1 + 2; // after marker char + space
-                const contentTo = pos + node.nodeSize - 1;
-                if (contentFrom < contentTo) {
-                  strikeOps.push({
-                    from: contentFrom,
-                    to: contentTo,
-                    add: isDone,
-                  });
-                }
-              }
-            }
-          });
-
-          // Apply text replacements in reverse order to preserve positions
-          for (let i = replacements.length - 1; i >= 0; i--) {
-            const r = replacements[i]!;
-            tr.insertText(r.text, r.from, r.to);
-            changed = true;
-          }
-
-          // Apply strike operations (positions may have shifted from replacements)
-          for (const op of strikeOps) {
-            const from = tr.mapping.map(op.from);
-            const to = tr.mapping.map(op.to);
-            if (from < to) {
-              if (op.add) {
-                tr.addMark(from, to, strikeMark!.create());
-              } else {
-                tr.removeMark(from, to, strikeMark);
-              }
-              changed = true;
-            }
-          }
-
-          return changed ? tr : null;
-        },
-      }),
       // Plugin to convert any link marks (from paste, etc.) back to raw [text](url)
       new Plugin({
         key: new PluginKey("linkMarkToRawText"),
@@ -364,49 +240,6 @@ export const InlineDecorations = Extension.create({
             state.doc.descendants((node, pos) => {
               if (!node.isText) return;
               const text = node.text || "";
-
-              // TODO markers (☐ = \u2610, ◣ = \u25a3, ⌛ = \u231B, ▷ = \u25B7, ☑ = \u2611)
-              const todoMatch = /^([\u2610\u25a3\u22A1\u229F\u2611])/.exec(
-                text
-              );
-              if (todoMatch) {
-                const ch = todoMatch[1]!;
-                const cls =
-                  ch === "\u2610"
-                    ? "todo-marker todo-open"
-                    : ch === "\u25a3"
-                      ? "todo-marker todo-doing"
-                      : ch === "\u22A1"
-                        ? "todo-marker todo-waiting"
-                        : ch === "\u229F"
-                          ? "todo-marker todo-later"
-                          : "todo-marker todo-done";
-                decorations.push(
-                  Decoration.inline(pos, pos + 1, { class: cls })
-                );
-                const label =
-                  ch === "\u2610"
-                    ? "TODO"
-                    : ch === "\u25a3"
-                      ? "DOING"
-                      : ch === "\u22A1"
-                        ? "WAITING"
-                        : ch === "\u229F"
-                          ? "LATER"
-                          : "DONE";
-                decorations.push(
-                  Decoration.widget(
-                    pos + 1,
-                    () => {
-                      const span = document.createElement("span");
-                      span.className = `todo-label ${cls.replace("todo-marker ", "")}`;
-                      span.textContent = label;
-                      return span;
-                    },
-                    { side: -1, key: `todo-label:${pos}:${label}` }
-                  )
-                );
-              }
 
               // Wikilinks [[type:target]]
               WIKILINK_RE.lastIndex = 0;

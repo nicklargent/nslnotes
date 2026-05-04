@@ -1,7 +1,6 @@
 import { createSignal, Show, onCleanup } from "solid-js";
-import { DOMSerializer } from "@tiptap/pm/model";
 import { ProseEditor } from "./ProseEditor";
-import { markdownFromHtml } from "./htmlToMarkdown";
+import { serializeMarkdown, schema as pmSchema } from "./pmMarkdown";
 import { CommandMenu, filterCommands } from "./CommandMenu";
 import { BubbleMenu } from "./BubbleMenu";
 import { TableToolbar } from "./TableToolbar";
@@ -277,14 +276,11 @@ export function Editor(props: EditorProps) {
   function rangeToMarkdown(from: number, to: number): string {
     if (!editorRef) return "";
     const fragment = editorRef.state.doc.slice(from, to).content;
-    const serializer = DOMSerializer.fromSchema(editorRef.state.schema);
-    const dom = serializer.serializeFragment(fragment);
-    const wrapper = document.createElement("div");
-    wrapper.appendChild(dom);
+    const wrapped = pmSchema.nodes["doc"]!.create(null, fragment);
     const rp = props.entityPath
       ? rootPathFromEntity(props.entityPath)
       : undefined;
-    return markdownFromHtml(wrapper.innerHTML, props.entityPath, rp);
+    return serializeMarkdown(wrapped, props.entityPath, rp);
   }
 
   /**

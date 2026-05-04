@@ -1,5 +1,6 @@
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import type { Editor } from "@tiptap/core";
+import { Selection } from "@tiptap/pm/state";
 
 /** Languages available in lowlight's common bundle */
 const LANGUAGES = [
@@ -56,6 +57,55 @@ function displayName(lang: string): string {
  * Extends CodeBlockLowlight with line numbers and an inline language selector.
  */
 export const CodeBlockWithLines = CodeBlockLowlight.extend({
+  addKeyboardShortcuts() {
+    const parent = this.parent?.() ?? {};
+    return {
+      ...parent,
+      // Override the upstream ArrowDown handler. The default calls
+      // `editor.commands.exitCode()` (inserting a fresh paragraph after the
+      // code block) when there's no node immediately after the code block in
+      // its direct parent. That happens routinely when a code block is the
+      // last child of a list item: the inserted paragraph never makes it
+      // into the saved markdown, so it appears, persists in the live editor,
+      // and vanishes on the next save+reload.
+      //
+      // Walk up the ancestor chain instead and place the cursor at the first
+      // valid position OUTSIDE the trapping parent. If every ancestor is
+      // also at its end, fall through to the original handler so we still
+      // get a paragraph at the very end of the document.
+      ArrowDown: ({ editor }) => {
+        const { state } = editor as Editor;
+        const { selection, doc } = state;
+        const { $from, empty } = selection;
+        if (!empty || $from.parent.type !== this.type) {
+          return false;
+        }
+        const isAtEnd = $from.parentOffset === $from.parent.nodeSize - 2;
+        if (!isAtEnd) return false;
+
+        // Walk up looking for the nearest ancestor whose own next-sibling
+        // position resolves to a real node — that's where the cursor should
+        // land instead of synthesizing a paragraph.
+        for (let depth = $from.depth; depth > 0; depth--) {
+          const after = $from.after(depth);
+          if (after === undefined || after >= doc.content.size) continue;
+          const nodeAfter = doc.nodeAt(after);
+          if (!nodeAfter) continue;
+          const tr = state.tr.setSelection(Selection.near(doc.resolve(after)));
+          (editor as Editor).view.dispatch(tr);
+          return true;
+        }
+        // Fall through to the upstream behaviour when there is genuinely
+        // nothing left in the document.
+        const arrow = (parent as Record<string, unknown>)["ArrowDown"];
+        return typeof arrow === "function"
+          ? (arrow as (props: { editor: Editor }) => boolean)({
+              editor: editor as Editor,
+            })
+          : false;
+      },
+    };
+  },
   addNodeView() {
     return ({ node, editor, getPos }) => {
       const wrapper = document.createElement("div");
