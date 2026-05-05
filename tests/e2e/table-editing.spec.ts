@@ -85,7 +85,9 @@ test.describe("Table editing", () => {
     await page.keyboard.press("Tab");
     await page.keyboard.type("Second");
     await page.keyboard.press("Shift+Tab");
-    // Now we should be back in first cell — type more
+    // prosemirror-tables Shift+Tab selects the previous cell's content; press
+    // End to collapse to the cursor at end so the next keystrokes append.
+    await page.keyboard.press("End");
     await page.keyboard.type(" updated");
 
     const firstHeader = editor.locator("table th").first();
@@ -271,8 +273,10 @@ test.describe("Table editing", () => {
     // Hover near the right edge of the cell
     await page.mouse.move(box!.x + box!.width - 2, box!.y + box!.height / 2);
 
-    // The column-resize-handle should appear
-    const resizeHandle = editor.locator(".column-resize-handle");
+    // The column-resize-handle should appear. prosemirror-tables renders
+    // multiple handles (one per cell in the hovered column), so scope to the
+    // first one.
+    const resizeHandle = editor.locator(".column-resize-handle").first();
     await expect(resizeHandle).toBeVisible({ timeout: 2000 });
   });
 

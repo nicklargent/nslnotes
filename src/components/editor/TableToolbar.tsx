@@ -78,9 +78,14 @@ export function TableToolbar(props: TableToolbarProps) {
     });
 
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef && !menuRef.contains(e.target as Node)) {
-        props.onClose();
-      }
+      // Ignore clicks inside the editor — selectionUpdate decides whether the
+      // toolbar should stay (cursor still in a table) or hide (cursor moved
+      // out). Treating same-cell mousedowns as "outside" closed the toolbar
+      // without a follow-up selectionUpdate to reopen it.
+      const target = e.target as Node;
+      if (menuRef?.contains(target)) return;
+      if (props.editor.view.dom.contains(target)) return;
+      props.onClose();
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -109,6 +114,7 @@ export function TableToolbar(props: TableToolbarProps) {
         const tr = state.tr.insert(insertPos, paragraph);
         tr.setSelection(TextSelection.create(tr.doc, insertPos + 1));
         props.editor.view.dispatch(tr);
+        props.editor.commands.focus();
         props.onClose();
         return;
       }
@@ -125,6 +131,7 @@ export function TableToolbar(props: TableToolbarProps) {
         const tr = state.tr.insert(insertPos, paragraph);
         tr.setSelection(TextSelection.create(tr.doc, insertPos + 1));
         props.editor.view.dispatch(tr);
+        props.editor.commands.focus();
         props.onClose();
         return;
       }
