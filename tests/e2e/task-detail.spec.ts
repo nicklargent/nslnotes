@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { setupApp, teardownApp } from "./helpers/app-setup";
 import {
   rightPanel,
+  rightPanelTask,
   centerPanel,
   markDoneButton,
   cancelTaskButton,
@@ -20,9 +21,9 @@ test.describe("Task detail", () => {
   test.beforeEach(async ({ page }) => {
     ({ testRoot } = await setupApp(page));
     // Open Fix Login Bug task
-    const taskButton = rightPanel(page).locator("button", { hasText: "Fix Login Bug" });
-    await expect(taskButton.first()).toBeVisible({ timeout: 10_000 });
-    await taskButton.first().click();
+    const taskRow = rightPanelTask(page, "Fix Login Bug");
+    await expect(taskRow.first()).toBeVisible({ timeout: 10_000 });
+    await taskRow.first().click();
     await page.waitForTimeout(500);
   });
 
@@ -32,8 +33,8 @@ test.describe("Task detail", () => {
 
   test("displays task title and metadata", async ({ page }) => {
     await expect(centerPanel(page).getByText("Fix Login Bug")).toBeVisible();
-    // Should show wikilink slug
-    await expect(centerPanel(page).locator("code", { hasText: "[[task:fix-login-bug]]" })).toBeVisible();
+    // Wikilink slug chip is collapsed (max-w-0) until hovered; check attachment.
+    await expect(centerPanel(page).locator("code", { hasText: "[[task:fix-login-bug]]" })).toBeAttached();
     // Should show status badge
     await expect(centerPanel(page).getByText("open")).toBeVisible();
     // Should show due date
@@ -105,7 +106,7 @@ test.describe("Task detail", () => {
     await expect(confirmModal(page)).toBeVisible({ timeout: 2000 });
     await confirmDeleteButton(page).click();
     await expect(
-      rightPanel(page).locator("button", { hasText: "Fix Login Bug" }),
+      rightPanelTask(page, "Fix Login Bug"),
     ).not.toBeVisible({ timeout: 5000 });
   });
 

@@ -53,9 +53,13 @@ test.describe("Wikilink autocomplete", () => {
   test("type prefix filters to specific type", async ({ page }) => {
     const editor = tiptapEditor(page);
     await editor.click();
-    await page.keyboard.type("[[task:");
-    await page.waitForTimeout(300);
+    // Open the popup with `[[`, then type the prefix. The popup unmounts
+    // briefly when the in-progress filter ("task") matches no entities and
+    // remounts once `:` activates the type filter, so wait for it again.
+    await page.keyboard.type("[[");
     const popup = wikilinkAutocomplete(page);
+    await expect(popup).toBeVisible({ timeout: 2000 });
+    await page.keyboard.type("task:");
     await expect(popup).toBeVisible({ timeout: 2000 });
     // All visible badges should be "task"
     const badges = popup.locator("span.inline-flex");

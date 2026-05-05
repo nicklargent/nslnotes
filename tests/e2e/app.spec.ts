@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { setupApp, teardownApp } from "./helpers/app-setup";
-import { sidebar, centerPanel, rightPanel } from "./helpers/selectors";
+import { sidebar, centerPanel, rightPanel, rightPanelTask } from "./helpers/selectors";
 
 test.describe("App launch", () => {
   let testRoot: string;
@@ -26,7 +26,7 @@ test.describe("App launch", () => {
   });
 
   test("right panel shows tasks", async ({ page }) => {
-    await expect(rightPanel(page).locator("button", { hasText: "Fix Login Bug" })).toBeVisible({
+    await expect(rightPanelTask(page, "Fix Login Bug")).toBeVisible({
       timeout: 5000,
     });
   });

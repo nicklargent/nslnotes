@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import * as path from "node:path";
 import { setupApp, teardownApp } from "./helpers/app-setup";
-import { sidebar, centerPanel, rightPanel } from "./helpers/selectors";
+import { sidebar, centerPanel, rightPanel, rightPanelTask } from "./helpers/selectors";
 import { waitForSave } from "./helpers/editor";
 import { expectFrontmatter } from "./helpers/assertions";
 
@@ -73,7 +73,7 @@ test.describe("Metadata editing", () => {
   test.describe("EditableDate", () => {
     test("click to edit due date", async ({ page }) => {
       // Open a task with a due date
-      await rightPanel(page).locator("button", { hasText: "Fix Login Bug" }).first().click();
+      await rightPanelTask(page, "Fix Login Bug").first().click();
       await page.waitForTimeout(500);
       // Click the due date to edit
       const dueLabel = centerPanel(page).locator("span", { hasText: "2026-03-28" });
@@ -84,7 +84,7 @@ test.describe("Metadata editing", () => {
     });
 
     test("onChange saves new date", async ({ page }) => {
-      await rightPanel(page).locator("button", { hasText: "Fix Login Bug" }).first().click();
+      await rightPanelTask(page, "Fix Login Bug").first().click();
       await page.waitForTimeout(500);
       const dueLabel = centerPanel(page).locator("span", { hasText: "2026-03-28" });
       await dueLabel.first().click();
@@ -101,7 +101,7 @@ test.describe("Metadata editing", () => {
     });
 
     test("blur saves date and exits edit mode", async ({ page }) => {
-      await rightPanel(page).locator("button", { hasText: "Fix Login Bug" }).first().click();
+      await rightPanelTask(page, "Fix Login Bug").first().click();
       await page.waitForTimeout(500);
       const dueLabel = centerPanel(page).locator("span", { hasText: "2026-03-28" });
       await dueLabel.first().click();
@@ -119,8 +119,8 @@ test.describe("Metadata editing", () => {
     test("click to edit topics, Enter saves", async ({ page }) => {
       await sidebar(page).locator("button", { hasText: "API Reference" }).first().click();
       await page.waitForTimeout(500);
-      const topicChip = centerPanel(page).locator("span", { hasText: "#frontend" });
-      await topicChip.click();
+      const editTopics = centerPanel(page).locator("button[aria-label='Edit topics']");
+      await editTopics.click();
       const input = centerPanel(page).locator("input[placeholder='#topic1, @person']");
       await expect(input).toBeVisible({ timeout: 2000 });
       // Trailing space prevents autocomplete from opening on last token
@@ -142,8 +142,8 @@ test.describe("Metadata editing", () => {
     test("Escape cancels topic edit", async ({ page }) => {
       await sidebar(page).locator("button", { hasText: "API Reference" }).first().click();
       await page.waitForTimeout(500);
-      const topicChip = centerPanel(page).locator("span", { hasText: "#frontend" });
-      await topicChip.click();
+      const editTopics = centerPanel(page).locator("button[aria-label='Edit topics']");
+      await editTopics.click();
       const input = centerPanel(page).locator("input[placeholder='#topic1, @person']");
       await input.fill("#should-not-save");
       await page.keyboard.press("Escape");

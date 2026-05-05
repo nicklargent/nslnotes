@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { setupApp, teardownApp } from "./helpers/app-setup";
-import { sidebar, centerPanel, rightPanel } from "./helpers/selectors";
+import { sidebar, centerPanel, rightPanel, rightPanelTask } from "./helpers/selectors";
 
 test.describe("Backlinks", () => {
   let testRoot: string;
@@ -17,18 +17,18 @@ test.describe("Backlinks", () => {
     // Open Project Plan doc — it's referenced by notes via [[doc:project-plan]]
     await sidebar(page).locator("button", { hasText: "Project Plan" }).first().click();
     await page.waitForTimeout(500);
-    // Backlinks section heading is "Referenced by (N)"
+    // Backlinks live in the center panel under the "Backlinks" heading
     await expect(
-      rightPanel(page).getByText("Referenced by", { exact: false }),
+      centerPanel(page).getByText("Backlinks", { exact: false }),
     ).toBeVisible({ timeout: 5000 });
   });
 
   test("backlinks section shown for tasks", async ({ page }) => {
     // Open Fix Login Bug task — referenced by today's note
-    await rightPanel(page).locator("button", { hasText: "Fix Login Bug" }).first().click();
+    await rightPanelTask(page, "Fix Login Bug").first().click();
     await page.waitForTimeout(500);
     await expect(
-      rightPanel(page).getByText("Referenced by", { exact: false }),
+      centerPanel(page).getByText("Backlinks", { exact: false }),
     ).toBeVisible({ timeout: 5000 });
   });
 

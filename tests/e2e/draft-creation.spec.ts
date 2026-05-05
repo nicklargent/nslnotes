@@ -4,6 +4,7 @@ import {
   sidebar,
   centerPanel,
   rightPanel,
+  rightPanelTask,
   createTaskButton,
   draftInput,
 } from "./helpers/selectors";
@@ -87,7 +88,7 @@ test.describe("Task draft creation", () => {
     await expect(centerPanel(page).getByText("New Test Task")).toBeVisible({ timeout: 5000 });
     // Should appear in right panel
     await expect(
-      rightPanel(page).locator("button", { hasText: "New Test Task" }),
+      rightPanelTask(page, "New Test Task"),
     ).toBeVisible({ timeout: 5000 });
   });
 

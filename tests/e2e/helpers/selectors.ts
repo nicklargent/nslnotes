@@ -148,6 +148,27 @@ export function createTaskButton(page: Page): Locator {
   return rightPanel(page).getByRole("button", { name: "+" });
 }
 
+/**
+ * A row in the right-panel task list. The row is a clickable <div> wrapping
+ * the title span — getByText targets the inner span and clicks bubble up to
+ * the row's onClick handler.
+ */
+export function rightPanelTask(page: Page, title: string): Locator {
+  return rightPanel(page).getByText(title, { exact: true });
+}
+
+/**
+ * Read the current font size from the increase-font button's title attribute
+ * ("Increase font size (now 16px)"). The on-screen font-size display was
+ * removed when the controls moved to the header bar.
+ */
+export async function readFontSize(page: Page): Promise<number> {
+  const title = await fontIncreaseButton(page).getAttribute("title");
+  const match = /now (\d+)px/.exec(title ?? "");
+  if (!match) throw new Error(`could not parse font size from title: ${title}`);
+  return Number(match[1]);
+}
+
 // --- Bubble menu ---
 export function bubbleMenu(page: Page): Locator {
   return page.locator(".animate-bubble-up").first();

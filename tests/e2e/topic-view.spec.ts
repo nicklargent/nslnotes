@@ -55,9 +55,10 @@ test.describe("Topic view", () => {
   test("clicking task navigates to task detail", async ({ page }) => {
     const taskBtn = centerPanel(page).locator("button", { hasText: "Fix Login Bug" });
     await taskBtn.first().click();
+    // Wikilink chip is collapsed (max-w-0) until hovered; check attachment.
     await expect(
       centerPanel(page).locator("code", { hasText: "[[task:fix-login-bug]]" }),
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeAttached({ timeout: 5000 });
   });
 
   test("clicking doc navigates to doc view", async ({ page }) => {
@@ -65,7 +66,7 @@ test.describe("Topic view", () => {
     await docBtn.first().click();
     await expect(
       centerPanel(page).locator("code", { hasText: "[[doc:project-plan]]" }),
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeAttached({ timeout: 5000 });
   });
 
   test("shows closed tasks section with strikethrough title", async ({ page }) => {

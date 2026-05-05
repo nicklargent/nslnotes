@@ -32,8 +32,9 @@ test.describe("Doc view", () => {
 
   test("displays doc title and metadata", async ({ page }) => {
     await expect(centerPanel(page).getByText("API Reference")).toBeVisible();
-    // Should show the wikilink slug
-    await expect(centerPanel(page).locator("code", { hasText: "[[doc:api-reference]]" })).toBeVisible();
+    // Should show the wikilink slug. The chip is collapsed (max-w-0) until
+    // hovered, so check attachment rather than visibility.
+    await expect(centerPanel(page).locator("code", { hasText: "[[doc:api-reference]]" })).toBeAttached();
     // Should show created date
     await expect(centerPanel(page).getByText("Created")).toBeVisible();
   });
@@ -57,9 +58,10 @@ test.describe("Doc view", () => {
   });
 
   test("topics are editable", async ({ page }) => {
-    // Click a topic chip to start editing
-    const topicChip = centerPanel(page).locator("span", { hasText: "#frontend" }).first();
-    await topicChip.click();
+    // Click the pencil "Edit topics" button — clicking the chip itself
+    // navigates to the topic view in EditableTopics.
+    const editTopics = centerPanel(page).locator("button[aria-label='Edit topics']").first();
+    await editTopics.click();
     // Input placeholder is "#topic1, @person"
     const input = centerPanel(page).locator("input[placeholder='#topic1, @person']");
     await expect(input).toBeVisible({ timeout: 2000 });

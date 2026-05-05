@@ -19,6 +19,16 @@ export interface SetupResult {
 }
 
 /**
+ * Frozen "today" for all E2E tests, aligned with the fixture data dates so
+ * journal/month/date assertions stay valid as real time advances.
+ *
+ * setFixedTime — not install — is intentional: Date.now()/new Date() return
+ * this value, but timers (setTimeout/setInterval used by debounces) keep
+ * ticking on real wall time.
+ */
+const TEST_TODAY = "2026-03-24T12:00:00Z";
+
+/**
  * Set up a test: create a temp dir with fixture files, intercept the settings
  * API so the app uses our test root, navigate to /, and wait for the app to
  * be ready.
@@ -27,6 +37,8 @@ export async function setupApp(
   page: Page,
   options: SetupOptions = {},
 ): Promise<SetupResult> {
+  await page.clock.setFixedTime(new Date(TEST_TODAY));
+
   const preset = options.preset ?? "full";
   const testRoot = createTestRoot(preset);
 

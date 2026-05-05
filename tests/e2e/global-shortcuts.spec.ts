@@ -8,6 +8,7 @@ import {
   shortcutsModal,
   searchInput,
   sidebar,
+  readFontSize,
 } from "./helpers/selectors";
 
 test.describe("Global keyboard shortcuts", () => {
@@ -62,20 +63,18 @@ test.describe("Global keyboard shortcuts", () => {
   });
 
   test("Ctrl+= increases font size", async ({ page }) => {
-    const fontDisplay = sidebar(page).locator("span.min-w-\\[3ch\\]");
-    const initialSize = await fontDisplay.textContent();
+    const initialSize = await readFontSize(page);
     await page.keyboard.press("Control+=");
     await page.waitForTimeout(200);
-    const newSize = await fontDisplay.textContent();
-    expect(Number(newSize)).toBe(Number(initialSize) + 1);
+    const newSize = await readFontSize(page);
+    expect(newSize).toBe(initialSize + 1);
   });
 
   test("Ctrl+- decreases font size", async ({ page }) => {
-    const fontDisplay = sidebar(page).locator("span.min-w-\\[3ch\\]");
-    const initialSize = await fontDisplay.textContent();
+    const initialSize = await readFontSize(page);
     await page.keyboard.press("Control+-");
     await page.waitForTimeout(200);
-    const newSize = await fontDisplay.textContent();
-    expect(Number(newSize)).toBe(Number(initialSize) - 1);
+    const newSize = await readFontSize(page);
+    expect(newSize).toBe(initialSize - 1);
   });
 });

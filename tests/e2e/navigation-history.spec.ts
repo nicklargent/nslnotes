@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { setupApp, teardownApp } from "./helpers/app-setup";
-import { sidebar, centerPanel, rightPanel, todayButton } from "./helpers/selectors";
+import { sidebar, centerPanel, rightPanel, rightPanelTask, todayButton } from "./helpers/selectors";
 
 test.describe("Navigation history", () => {
   let testRoot: string;
@@ -44,7 +44,7 @@ test.describe("Navigation history", () => {
     await expect(centerPanel(page).getByText("API Reference")).toBeVisible({ timeout: 5000 });
 
     // Visit task
-    await rightPanel(page).locator("button", { hasText: "Fix Login Bug" }).first().click();
+    await rightPanelTask(page, "Fix Login Bug").first().click();
     await expect(centerPanel(page).getByText("Fix Login Bug")).toBeVisible({ timeout: 5000 });
 
     // Back should go to doc

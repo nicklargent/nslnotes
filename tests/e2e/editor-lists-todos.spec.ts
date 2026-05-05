@@ -90,8 +90,8 @@ test.describe("Editor lists and TODOs", () => {
 
   test("TODO checkbox rendering in task body", async ({ page }) => {
     // Open a task with TODO items
-    const { rightPanel } = await import("./helpers/selectors");
-    await rightPanel(page).locator("button", { hasText: "Fix Login Bug" }).first().click();
+    const { rightPanelTask } = await import("./helpers/selectors");
+    await rightPanelTask(page, "Fix Login Bug").first().click();
     await page.waitForTimeout(500);
     // The task body has "- [ ] Reproduce the issue" etc.
     // TipTap should render checkbox widgets
