@@ -626,9 +626,12 @@
   display: block;
 }
 
-/* Broken image placeholder */
-.prose-editor .tiptap img[src=""],
-.prose-editor .tiptap img:not([src]) {
+/* Broken image placeholder. ProseMirror inserts <img class="ProseMirror-
+   separator"> (no src) around contenteditable=false atoms; those must be
+   excluded or they render as a 100x60 gray placeholder block after every
+   TODO marker and image. */
+.prose-editor .tiptap img[src=""]:not(.ProseMirror-separator),
+.prose-editor .tiptap img:not([src]):not(.ProseMirror-separator) {
   display: inline-block;
   min-height: 60px;
   min-width: 100px;
