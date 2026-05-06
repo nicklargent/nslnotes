@@ -428,6 +428,38 @@ export function ProseEditor(props: ProseEditorProps) {
 
           return false;
         },
+        handleDOMEvents: {
+          beforeinput: (view, event) => {
+            const ie = event as InputEvent;
+            // Firefox/WebKit: deleteContentBackward at the end of a text node
+            // that follows a contenteditable=false atom (e.g. TodoMarker,
+            // image) leaves the targeted character in place and instead
+            // splits the parent list item, producing "- TODO t\n- " from
+            // typing `- TODO t<Backspace>`. Intercept the targeted range and
+            // delete it explicitly via PM.
+            //
+            // Only applies when the entire range lives inside a single text
+            // node — block-boundary cases (joinBackward, lift) still need to
+            // fall through to PM's keymap chain.
+            if (ie.inputType !== "deleteContentBackward") return false;
+            const ranges = ie.getTargetRanges?.() ?? [];
+            if (ranges.length !== 1) return false;
+            const r = ranges[0]!;
+            if (r.collapsed) return false;
+            if (r.startContainer !== r.endContainer) return false;
+            if (r.startContainer.nodeType !== Node.TEXT_NODE) return false;
+            const fromPos = view.posAtDOM(r.startContainer, r.startOffset, -1);
+            const toPos = view.posAtDOM(r.endContainer, r.endOffset, 1);
+            if (fromPos == null || toPos == null || fromPos >= toPos) {
+              return false;
+            }
+            event.preventDefault();
+            view.dispatch(
+              view.state.tr.delete(fromPos, toPos).scrollIntoView()
+            );
+            return true;
+          },
+        },
         handleKeyDown: (view, event) => {
           // Tab/Shift+Tab in tables: navigate cells
           if (event.key === "Tab" && editor?.isActive("table")) {
