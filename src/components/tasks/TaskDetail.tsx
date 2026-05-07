@@ -34,6 +34,7 @@ export function TaskDetail(props: TaskDetailProps) {
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
   let rawFlush: (() => Promise<void>) | null = null;
+  let toggling = false;
 
   // Reactively look up the latest task from index store so metadata edits are reflected
   const liveTask = () =>
@@ -69,23 +70,29 @@ export function TaskDetail(props: TaskDetailProps) {
   }
 
   async function toggleRawMode() {
-    if (rawMode()) {
-      // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
-      if (rawFlush) await rawFlush();
-      const fileContent = await FileService.read(props.task.path);
-      const parsed = parse(fileContent);
-      if (parsed) {
-        setContent(parsed.body);
+    if (toggling) return;
+    toggling = true;
+    try {
+      if (rawMode()) {
+        // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
+        if (rawFlush) await rawFlush();
+        const fileContent = await FileService.read(props.task.path);
+        const parsed = parse(fileContent);
+        if (parsed) {
+          setContent(parsed.body);
+        }
+        rawFlush = null;
+        setRawMode(false);
+      } else {
+        // Rendered → Raw: flush pending TipTap save first
+        if (saveTimeout) {
+          window.clearTimeout(saveTimeout);
+          await saveTask(props.task.path, content());
+        }
+        setRawMode(true);
       }
-      rawFlush = null;
-      setRawMode(false);
-    } else {
-      // Rendered → Raw: flush pending TipTap save first
-      if (saveTimeout) {
-        window.clearTimeout(saveTimeout);
-        await saveTask(props.task.path, content());
-      }
-      setRawMode(true);
+    } finally {
+      toggling = false;
     }
   }
 

@@ -3,6 +3,7 @@ import {
   type FileChangeEvent,
   type FileWatchCallback,
 } from "../lib/runtime";
+import { SnapshotService } from "./SnapshotService";
 
 /**
  * File entry metadata
@@ -99,6 +100,7 @@ export const FileService = {
    * @param content - Content to write
    */
   write: async (path: string, content: string): Promise<void> => {
+    await SnapshotService.maybeBackup(path);
     recentWrites.set(path, Date.now());
     cleanupRecentWrites();
     return runtime.writeFile(path, content);

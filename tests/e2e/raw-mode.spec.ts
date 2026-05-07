@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { setupApp, teardownApp } from "./helpers/app-setup";
 import { sidebar, centerPanel, rawModeToggle, tiptapEditor } from "./helpers/selectors";
@@ -144,5 +145,72 @@ test.describe("Raw mode", () => {
     );
     await page.keyboard.press("Tab");
     await waitForFileContent(page, filePath, "  INDENT_ME", 5000);
+  });
+
+  // Regression for the "raw toggle wipes body" bug: input or flushes during
+  // the async-load window must not write empty content to disk.
+  test.describe("load-window race protection", () => {
+    test("textarea is disabled until file content has loaded", async ({ page }) => {
+      // Slow the file read so the load window is observable.
+      await page.route("**/api/files?path=*", async (route) => {
+        await new Promise((r) => setTimeout(r, 600));
+        await route.continue();
+      });
+
+      await rawModeToggle(page).click();
+      const textarea = centerPanel(page).locator("textarea");
+      await expect(textarea).toBeVisible({ timeout: 2000 });
+      await expect(textarea).toBeDisabled();
+      await expect(textarea).toBeEnabled({ timeout: 5000 });
+      expect(await textarea.inputValue()).toContain("Endpoints");
+    });
+
+    test("typing during the load window cannot wipe the file body", async ({ page }) => {
+      const filePath = path.join(testRoot, "docs", "api-reference.md");
+      const original = fs.readFileSync(filePath, "utf-8");
+
+      await page.route("**/api/files?path=*", async (route) => {
+        await new Promise((r) => setTimeout(r, 600));
+        await route.continue();
+      });
+
+      await rawModeToggle(page).click();
+      const textarea = centerPanel(page).locator("textarea");
+      await expect(textarea).toBeVisible({ timeout: 2000 });
+
+      // Try every plausible accidental input while disabled. The browser
+      // refuses input on a disabled textarea, but this also exercises the
+      // belt-and-braces handleInput / handleKeyDown guards.
+      await textarea.click({ force: true }).catch(() => {});
+      await page.keyboard.press("Backspace").catch(() => {});
+      await page.keyboard.press("a").catch(() => {});
+      await page.keyboard.press("Tab").catch(() => {});
+
+      await expect(textarea).toBeEnabled({ timeout: 5000 });
+      // Wait through the 300ms save debounce.
+      await page.waitForTimeout(500);
+
+      const after = fs.readFileSync(filePath, "utf-8");
+      expect(after).toBe(original);
+    });
+
+    test("rapid double-click on raw toggle does not lose body", async ({ page }) => {
+      const filePath = path.join(testRoot, "docs", "api-reference.md");
+      const original = fs.readFileSync(filePath, "utf-8");
+
+      const toggle = rawModeToggle(page);
+      await expect(toggle).toBeVisible({ timeout: 2000 });
+
+      // Fire two click events synchronously on the same button so the second
+      // re-enters toggleRawMode while the first is still awaiting async work.
+      await toggle.evaluate((btn: HTMLButtonElement) => {
+        btn.click();
+        btn.click();
+      });
+      await page.waitForTimeout(800);
+
+      const after = fs.readFileSync(filePath, "utf-8");
+      expect(after).toBe(original);
+    });
   });
 });

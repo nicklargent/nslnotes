@@ -84,9 +84,19 @@ export const NavigationService = {
   restoreState: (entry: NavHistoryEntry): void => {
     suppressHistoryDepth++;
 
+    // The history entry holds a JSON-cloned snapshot of the entity from when
+    // the entry was pushed — its `content` is frozen at that moment. Resolve
+    // the live entity from the index so we don't show pre-edit content after
+    // back/forward. Fall back to the frozen entry if the entity no longer
+    // exists in the index (deleted, renamed, notebook switched).
+    const liveEntity = entry.activeEntity
+      ? (IndexService.resolveEntityByPath(entry.activeEntity.path) ??
+        entry.activeEntity)
+      : null;
+
     setContextStore({
       activeView: entry.activeView,
-      activeEntity: entry.activeEntity,
+      activeEntity: liveEntity,
       activeTopic: entry.activeTopic,
       isHomeState: entry.isHomeState,
       journalAnchorDate: entry.journalAnchorDate,

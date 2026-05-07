@@ -40,6 +40,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
   let saveTimeout: number | undefined;
   let lastLocalContent: string | undefined;
   let rawFlush: (() => Promise<void>) | null = null;
+  let toggling = false;
 
   // Reactively look up the latest note from the index store so edits are reflected
   const liveNote = createMemo(() => {
@@ -91,24 +92,30 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
   }
 
   async function toggleRawMode() {
-    if (rawMode()) {
-      // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
-      if (rawFlush) await rawFlush();
-      const fileContent = await FileService.read(props.note.path);
-      const parsed = parse(fileContent);
-      if (parsed) {
-        lastLocalContent = parsed.body;
-        setContent(parsed.body);
+    if (toggling) return;
+    toggling = true;
+    try {
+      if (rawMode()) {
+        // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
+        if (rawFlush) await rawFlush();
+        const fileContent = await FileService.read(props.note.path);
+        const parsed = parse(fileContent);
+        if (parsed) {
+          lastLocalContent = parsed.body;
+          setContent(parsed.body);
+        }
+        rawFlush = null;
+        setRawMode(false);
+      } else {
+        // Rendered → Raw: flush pending TipTap save first
+        if (saveTimeout) {
+          window.clearTimeout(saveTimeout);
+          await saveNamedNote(props.note.path, content());
+        }
+        setRawMode(true);
       }
-      rawFlush = null;
-      setRawMode(false);
-    } else {
-      // Rendered → Raw: flush pending TipTap save first
-      if (saveTimeout) {
-        window.clearTimeout(saveTimeout);
-        await saveNamedNote(props.note.path, content());
-      }
-      setRawMode(true);
+    } finally {
+      toggling = false;
     }
   }
 

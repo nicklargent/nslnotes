@@ -15,11 +15,17 @@ interface RawEditorProps {
  */
 export function RawEditor(props: RawEditorProps) {
   const [text, setText] = createSignal("");
+  const [loaded, setLoaded] = createSignal(false);
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; content: string } | null = null;
+  let loadedPath: string | null = null;
 
   async function flush() {
     if (saveTimeout) window.clearTimeout(saveTimeout);
+    if (!loaded()) {
+      pendingSave = null;
+      return;
+    }
     if (pendingSave) {
       await saveRaw(pendingSave.path, pendingSave.content);
       pendingSave = null;
@@ -34,19 +40,30 @@ export function RawEditor(props: RawEditorProps) {
   // Load file content on mount / path change
   createEffect(() => {
     const path = props.filePath;
-    // Flush any pending save for a different path
-    if (pendingSave && pendingSave.path !== path) {
+    // Flush any pending save for a different path (only if it had finished loading)
+    if (
+      pendingSave &&
+      pendingSave.path !== path &&
+      pendingSave.path === loadedPath
+    ) {
       window.clearTimeout(saveTimeout);
       void saveRaw(pendingSave.path, pendingSave.content);
-      pendingSave = null;
     }
+    pendingSave = null;
+    setLoaded(false);
+    loadedPath = null;
     void FileService.read(path).then((content) => {
+      // Bail if a newer path has been requested in the meantime
+      if (props.filePath !== path) return;
       setText(content);
+      setLoaded(true);
+      loadedPath = path;
       setEditorStore("isDirty", false);
     });
   });
 
   function handleInput(value: string) {
+    if (!loaded()) return;
     const path = props.filePath;
     setText(value);
     setEditorStore("isDirty", true);
@@ -65,6 +82,7 @@ export function RawEditor(props: RawEditorProps) {
     e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }
   ) {
     if (e.key !== "Tab") return;
+    if (!loaded()) return;
     e.preventDefault();
     const ta = e.currentTarget;
     const value = ta.value;
@@ -132,6 +150,10 @@ export function RawEditor(props: RawEditorProps) {
 
   onCleanup(() => {
     if (saveTimeout) window.clearTimeout(saveTimeout);
+    if (!loaded()) {
+      pendingSave = null;
+      return;
+    }
     if (pendingSave) {
       void saveRaw(pendingSave.path, pendingSave.content);
       pendingSave = null;
@@ -140,8 +162,9 @@ export function RawEditor(props: RawEditorProps) {
 
   return (
     <textarea
-      class="w-full min-h-[60vh] resize-y rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 font-mono text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500"
+      class="w-full min-h-[60vh] resize-y rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 font-mono text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 disabled:cursor-wait disabled:opacity-60"
       spellcheck={false}
+      disabled={!loaded()}
       value={text()}
       onInput={(e) => handleInput(e.currentTarget.value)}
       onKeyDown={handleKeyDown}

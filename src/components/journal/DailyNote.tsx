@@ -31,6 +31,7 @@ export function DailyNote(props: DailyNoteProps) {
   let savingPromise: Promise<void> | null = null;
   let rawFlush: (() => Promise<void>) | null = null;
   let lastLocalContent: string | undefined;
+  let toggling = false;
 
   // Only sync content when the note identity (path) changes, not on every re-parse
   createEffect(
@@ -157,24 +158,30 @@ export function DailyNote(props: DailyNoteProps) {
   }
 
   async function toggleRawMode() {
-    const resolved = resolveDailyNotePath();
-    if (!resolved) return;
-    const { path } = resolved;
+    if (toggling) return;
+    toggling = true;
+    try {
+      const resolved = resolveDailyNotePath();
+      if (!resolved) return;
+      const { path } = resolved;
 
-    if (rawMode()) {
-      // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
-      if (rawFlush) await rawFlush();
-      const fileContent = await FileService.read(path);
-      const parsed = parse(fileContent);
-      if (parsed) {
-        setContent(parsed.body);
+      if (rawMode()) {
+        // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
+        if (rawFlush) await rawFlush();
+        const fileContent = await FileService.read(path);
+        const parsed = parse(fileContent);
+        if (parsed) {
+          setContent(parsed.body);
+        }
+        rawFlush = null;
+        setRawMode(false);
+      } else {
+        // Rendered → Raw: flush pending TipTap save first
+        await flushPendingSave();
+        setRawMode(true);
       }
-      rawFlush = null;
-      setRawMode(false);
-    } else {
-      // Rendered → Raw: flush pending TipTap save first
-      await flushPendingSave();
-      setRawMode(true);
+    } finally {
+      toggling = false;
     }
   }
 

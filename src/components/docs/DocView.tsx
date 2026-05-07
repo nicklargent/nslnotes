@@ -34,6 +34,7 @@ export function DocView(props: DocViewProps) {
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; body: string } | null = null;
   let rawFlush: (() => Promise<void>) | null = null;
+  let toggling = false;
 
   // Reactively look up the latest doc from index store so metadata edits are reflected
   const liveDoc = () =>
@@ -70,24 +71,30 @@ export function DocView(props: DocViewProps) {
   }
 
   async function toggleRawMode() {
-    if (rawMode()) {
-      // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
-      if (rawFlush) await rawFlush();
-      const fileContent = await FileService.read(props.doc.path);
-      const parsed = parse(fileContent);
-      if (parsed) {
-        setContent(parsed.body);
+    if (toggling) return;
+    toggling = true;
+    try {
+      if (rawMode()) {
+        // Raw → Rendered: flush raw save (which invalidates index), re-read file for updated content
+        if (rawFlush) await rawFlush();
+        const fileContent = await FileService.read(props.doc.path);
+        const parsed = parse(fileContent);
+        if (parsed) {
+          setContent(parsed.body);
+        }
+        rawFlush = null;
+        setRawMode(false);
+      } else {
+        // Rendered → Raw: flush pending TipTap save first
+        if (pendingSave) {
+          window.clearTimeout(saveTimeout);
+          await saveDoc(pendingSave.path, pendingSave.body);
+          pendingSave = null;
+        }
+        setRawMode(true);
       }
-      rawFlush = null;
-      setRawMode(false);
-    } else {
-      // Rendered → Raw: flush pending TipTap save first
-      if (pendingSave) {
-        window.clearTimeout(saveTimeout);
-        await saveDoc(pendingSave.path, pendingSave.body);
-        pendingSave = null;
-      }
-      setRawMode(true);
+    } finally {
+      toggling = false;
     }
   }
 
