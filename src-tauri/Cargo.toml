@@ -20,3 +20,14 @@ tauri-plugin-dialog = "2.6.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { version = "1", features = ["rt"] }
+
+# Linux-only: middle-click in webkit2gtk pastes from CLIPBOARD instead of
+# the X11/Wayland PRIMARY selection (the standard Linux convention) for
+# HTML editable regions. We intercept button-2 events on the WebKitWebView
+# via the GTK signal that WebKit upstream exposes for exactly this purpose
+# (see WebKit bug 247375), then read PRIMARY ourselves with arboard so the
+# JS layer can paste it at the click point.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+webkit2gtk = "2"
+arboard = { version = "3", default-features = false, features = ["wayland-data-control"] }

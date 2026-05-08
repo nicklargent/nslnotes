@@ -1,4 +1,5 @@
 import { onMount, onCleanup, createEffect } from "solid-js";
+import { invoke } from "@tauri-apps/api/core";
 import { Editor } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Slice } from "@tiptap/pm/model";
@@ -842,6 +843,46 @@ export function ProseEditor(props: ProseEditorProps) {
     // The event is global, so we hit-test against this editor's container
     // to only handle drops that land within this specific editor instance.
     let tauriUnlisten: (() => void) | null = null;
+    let middleClickUnlisten: (() => void) | null = null;
+
+    // Tauri Linux: webkit2gtk pastes from CLIPBOARD on middle-click (wrong
+    // for the X11/Wayland convention) and the Rust setup hook swallows the
+    // GTK event before webkit can deliver mousedown/up to JS. The Rust
+    // side re-emits the click coords here; we hit-test, read PRIMARY, and
+    // insert at the click point — same effect as native middle-click paste.
+    if (runtime.isNative() && runtime.isLinux()) {
+      import("@tauri-apps/api/event").then(({ listen }) => {
+        listen<[number, number]>("nslnotes://middle-click", (event) => {
+          if (!editor || editor.isDestroyed || !containerRef) return;
+          const [x, y] = event.payload;
+          const rect = containerRef.getBoundingClientRect();
+          if (
+            x < rect.left ||
+            x > rect.right ||
+            y < rect.top ||
+            y > rect.bottom
+          ) {
+            return;
+          }
+          const coords = editor.view.posAtCoords({ left: x, top: y });
+          if (!coords) return;
+          const insertPos = coords.pos;
+          void invoke<string | null>("read_primary_selection")
+            .then((text) => {
+              if (!text || !editor || editor.isDestroyed) return;
+              const tr = editor.state.tr.insertText(text, insertPos);
+              tr.setSelection(
+                TextSelection.create(tr.doc, insertPos + text.length)
+              );
+              editor.view.dispatch(tr);
+              editor.view.focus();
+            })
+            .catch(() => {});
+        }).then((unlisten) => {
+          middleClickUnlisten = unlisten;
+        });
+      });
+    }
     if (runtime.isNative() && props.entityPath) {
       import("@tauri-apps/api/event").then(({ listen }) => {
         listen<{ paths: string[]; position: { x: number; y: number } }>(
@@ -904,6 +945,7 @@ export function ProseEditor(props: ProseEditorProps) {
 
     onCleanup(() => {
       tauriUnlisten?.();
+      middleClickUnlisten?.();
       containerRef!.removeEventListener("click", handleLinkClick, true);
       containerRef!.removeEventListener("inline-edit", handleInlineEdit);
       containerRef!.removeEventListener("mousedown", handleMouseDown, true);

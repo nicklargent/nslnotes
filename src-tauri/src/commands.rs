@@ -80,3 +80,29 @@ pub async fn create_backup(
     .await
     .map_err(|e| format!("Backup task panicked: {}", e))?
 }
+
+// Linux only: pair of the button-2 interceptor in lib.rs. The frontend
+// calls this on middle-click and inserts the returned text at the click
+// position, restoring the standard X11/Wayland PRIMARY paste behavior
+// that webkit2gtk silently broke for HTML editable regions.
+#[cfg(target_os = "linux")]
+#[tauri::command]
+pub async fn read_primary_selection() -> Result<Option<String>, String> {
+    tokio::task::spawn_blocking(|| -> Option<String> {
+        use arboard::{Clipboard, GetExtLinux, LinuxClipboardKind};
+        let mut clipboard = Clipboard::new().ok()?;
+        clipboard
+            .get()
+            .clipboard(LinuxClipboardKind::Primary)
+            .text()
+            .ok()
+    })
+    .await
+    .map_err(|e| format!("Primary selection task panicked: {}", e))
+}
+
+#[cfg(not(target_os = "linux"))]
+#[tauri::command]
+pub async fn read_primary_selection() -> Result<Option<String>, String> {
+    Ok(None)
+}
