@@ -199,4 +199,17 @@ describe("pm-markdown round-trip: regression guards", () => {
     expect(rt("##### h5")).toBe("##### h5");
     expect(rt("###### h6")).toBe("###### h6");
   });
+
+  it("blank lines between adjacent top-level bullets don't drop content", () => {
+    // markdown-it merges adjacent same-marker lists, so the blank gap ends up
+    // between two list_items inside one bullet_list. The blank-line-gaps
+    // plugin used to insert an empty paragraph there — an invalid sibling of
+    // listItem under bulletList — which made PM reject the whole list, leaving
+    // an empty doc on reload.
+    expect(rt("- a\n- b\n\n- c\n- d")).toBe("- a\n- b\n- c\n- d");
+    expect(rt("- a\n\n\n- b")).toBe("- a\n- b");
+    expect(rt("- a\n  - sub1\n\n- b\n  - sub2")).toBe(
+      "- a\n  - sub1\n- b\n  - sub2"
+    );
+  });
 });

@@ -376,6 +376,14 @@ function blankLineGapsPlugin(md: MarkdownIt): void {
       // Only consider opening (nesting=1) and self-closing (nesting=0) at
       // block level; closes don't start a new sibling.
       if (tok.nesting === -1) continue;
+      // Skip list items: their parent is a list container that accepts only
+      // listItem/taskItem children, so an inserted paragraph would be an
+      // invalid sibling and PM rejects the whole list. Blank lines inside a
+      // list have different semantics (loose-list spacing) which markdown-it
+      // already handles via paragraph wrapping.
+      if (tok.type === "list_item_open" || tok.type === "task_item_open") {
+        continue;
+      }
 
       const prevEnd = prevSiblingEnd(i, tok.level);
       if (prevEnd === null) continue;
