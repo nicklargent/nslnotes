@@ -54,7 +54,7 @@ test.describe("Task list (right panel)", () => {
     const taskRow = rightPanel(page).getByText("Write Docs");
     await taskRow.first().click();
     await expect(centerPanel(page).getByText("Write Docs")).toBeVisible({ timeout: 5000 });
-    // Should show task detail view (SlugBadge code is collapsed via max-w-0 until hover —
+    // Should show task detail view (SlugBadge code is hidden via opacity:0 until hover —
     // assert presence via text content rather than visibility)
     await expect(
       centerPanel(page).locator("code").filter({ hasText: "[[task:write-docs]]" }),
