@@ -71,7 +71,7 @@
         # Prefetch npm dependencies for offline build
         npmDeps = pkgs.fetchNpmDeps {
           src = ./.;
-          hash = "sha256-xYrdwMHrl5ykc619LQBvr6585szdsNaTt0RxHwTrOIU=";
+          hash = "sha256-MXOqht+22EQvU/oPg3aFi4x0zbyWsS10kDSbMqDwgeU=";
         };
 
       in
