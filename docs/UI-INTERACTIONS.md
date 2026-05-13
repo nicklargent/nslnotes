@@ -320,6 +320,9 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Markdown links render as inline decoration
 - [ ] `Cmd+Click` / `Ctrl+Click` opens link in browser
 - [ ] Native `<a>` clicks captured and prevented (capture-phase DOM listener on container)
+- [ ] Paste a URL with no selection: inserts `[url](url)` with the label portion selected so the user can immediately type a label
+- [ ] Paste a URL with text selected: replaces the selection with `[<selected text>](url)` and leaves the label portion selected
+- [ ] Paste a URL while the cursor is inside an existing markdown link: inserts the raw URL (no nested link)
 
 ### Image Handling
 - [ ] Image paste: converts to base64, inserts as `<img>`, auto-saves to disk

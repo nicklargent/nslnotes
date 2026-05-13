@@ -245,15 +245,25 @@ export function ProseEditor(props: ProseEditorProps) {
             ) {
               insideLink = true;
             }
+            // If the user has text selected (and isn't inside an existing
+            // link), use that selection as the link label.
+            const labelText =
+              !state.selection.empty && !insideLink
+                ? state.doc.textBetween(
+                    state.selection.from,
+                    state.selection.to,
+                    " "
+                  )
+                : plainText;
             const toInsert = insideLink
               ? plainText
-              : `[${plainText}](${plainText})`;
+              : `[${labelText}](${plainText})`;
             editor!.commands.insertContent(toInsert);
             if (!insideLink) {
-              // Select the link text so the user can immediately type a label
+              // Select the link text so the user can immediately retype a label
               const endPos = editor!.state.selection.from;
               const linkTextStart = endPos - toInsert.length + 1; // after "["
-              const linkTextEnd = linkTextStart + plainText.length; // before "]("
+              const linkTextEnd = linkTextStart + labelText.length; // before "]("
               editor!.commands.setTextSelection({
                 from: linkTextStart,
                 to: linkTextEnd,
