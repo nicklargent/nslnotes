@@ -2,7 +2,7 @@ import { onMount, onCleanup, createEffect } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { Editor } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Slice } from "@tiptap/pm/model";
+import { Fragment, Slice, type Node as PMNode } from "@tiptap/pm/model";
 import { Selection, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import {
@@ -92,6 +92,37 @@ interface ProseEditorProps {
   onTopicClick?: ((ref: string) => void) | undefined;
   /** When true, suppress scroll-to-selection (for embedded/journal editors). */
   embedded?: boolean | undefined;
+}
+
+const LIST_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
+
+/**
+ * Re-base a nested list selection to its shallowest real level. When the copied
+ * fragment is a single-item list whose item carries no text of its own (just an
+ * empty leading paragraph wrapping a deeper list), descend into that deeper
+ * list. This discards ancestor nesting that isn't part of the selection, so
+ * copying child bullets yields the same text as copying the same bullets from a
+ * flat list — no blank parent bullet injected.
+ */
+function unwrapDanglingListWrappers(fragment: Fragment): Fragment {
+  let current = fragment;
+  while (
+    current.childCount === 1 &&
+    LIST_TYPES.has(current.firstChild!.type.name)
+  ) {
+    const list = current.firstChild!;
+    if (list.childCount !== 1) break; // a real branch point — keep this level
+    const item = list.firstChild!; // listItem / taskItem
+    const nestedLists: PMNode[] = [];
+    let hasOwnText = false;
+    item.forEach((child) => {
+      if (LIST_TYPES.has(child.type.name)) nestedLists.push(child);
+      else if (child.content.size > 0) hasOwnText = true;
+    });
+    if (hasOwnText || nestedLists.length !== 1) break;
+    current = Fragment.from(nestedLists[0]!);
+  }
+  return current;
 }
 
 /**
@@ -209,9 +240,27 @@ export function ProseEditor(props: ProseEditorProps) {
           return slice;
         },
         clipboardTextSerializer: (slice) => {
-          // Wrap the slice's fragment in a synthetic doc so the markdown
-          // serializer can walk it the same way it walks a full document.
-          const wrapped = pmSchema.nodes["doc"]!.create(null, slice.content);
+          // A selection contained within a single block — e.g. part of one
+          // bullet's text — copies just that inline content, without the block
+          // marker (bullet, heading, blockquote, …). A selection that spans
+          // multiple blocks keeps full markdown structure (bullets, nesting).
+          const textblocks: PMNode[] = [];
+          slice.content.descendants((node) => {
+            if (node.isTextblock) textblocks.push(node);
+          });
+          const single = textblocks.length === 1 ? textblocks[0]! : null;
+          // Wrap the fragment in a synthetic doc so the markdown serializer can
+          // walk it the same way it walks a full document; for a single block
+          // re-wrap its inline content in a bare paragraph to drop the marker.
+          const wrapped = single
+            ? pmSchema.nodes["doc"]!.create(
+                null,
+                pmSchema.nodes["paragraph"]!.create(null, single.content)
+              )
+            : pmSchema.nodes["doc"]!.create(
+                null,
+                unwrapDanglingListWrappers(slice.content)
+              );
           return serializeMarkdown(wrapped, props.entityPath, rootPath());
         },
         handlePaste: (_view, event) => {
@@ -300,6 +349,25 @@ export function ProseEditor(props: ProseEditorProps) {
                 });
               return true;
             }
+          }
+
+          // Plain-text markdown paste. When the clipboard carries no usable
+          // text/html (an internal copy under webkit2gtk, or a markdown snippet
+          // from an external source), ProseMirror would insert the raw text
+          // literally — bullets become hyphens and indentation is lost. Parse it
+          // back through the markdown parser so it round-trips into real nodes.
+          // Rich HTML pastes still flow through ProseMirror's default DOM
+          // parsing, which already round-trips losslessly.
+          const html = event.clipboardData?.getData("text/html");
+          const text = event.clipboardData?.getData("text/plain");
+          const inCode = _view.state.selection.$from.parent.type.spec.code;
+          if (!html && text && editor && !inCode) {
+            event.preventDefault();
+            const json = parseMarkdown(text, entityPath, root).toJSON() as {
+              content?: unknown[];
+            };
+            editor.commands.insertContent(json.content ?? []);
+            return true;
           }
           return false;
         },

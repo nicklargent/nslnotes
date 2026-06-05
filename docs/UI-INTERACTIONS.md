@@ -324,6 +324,13 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Paste a URL with text selected: replaces the selection with `[<selected text>](url)` and leaves the label portion selected
 - [ ] Paste a URL while the cursor is inside an existing markdown link: inserts the raw URL (no nested link)
 
+### Copy / Paste (markdown round-trip)
+- [ ] Copy serializes the selection to markdown onto the clipboard (`clipboardTextSerializer`)
+- [ ] A selection contained within a single block (e.g. part of one bullet line) copies just the inline text, without the block marker (`- `, `#`, `> `, …); a selection spanning multiple blocks keeps the full markdown structure (bullets, nesting)
+- [ ] Paste of plain-text markdown (no usable `text/html` on the clipboard — e.g. an internal copy under webkit2gtk, or a markdown snippet from elsewhere) is parsed back into real nodes via `parseMarkdown`, so a bulleted/ordered/task list round-trips as a real nested list rather than literal hyphen text
+- [ ] Rich HTML pastes (clipboard carries `text/html`) still flow through ProseMirror's default DOM parsing
+- [ ] Paste inside a code block is left as literal text (not markdown-parsed)
+
 ### Image Handling
 - [ ] Image paste: converts to base64, inserts as `<img>`, auto-saves to disk
 - [ ] Image drop: same base64 conversion and insertion
