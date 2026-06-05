@@ -128,6 +128,36 @@ describe("pm-markdown round-trip: regression guards", () => {
     );
   });
 
+  it("fully-bold numbered heading does not gain a backslash", () => {
+    // Regression: `**1. Title**` is a paragraph with one bold text node, not an
+    // ordered list. The leading-list-marker escape wrongly fired on the marked
+    // text and injected `\` before the number (`**\1. Title**`) on every save.
+    expect(rt("**1. Product-Driven Work Engagement**")).toBe(
+      "**1. Product-Driven Work Engagement**"
+    );
+    const md =
+      "**1. Product-Driven Work Engagement**\n" +
+      "How do we engage with the work?\n\n" +
+      "**2. Opportunity Backlog**\n" +
+      "How do we build the backlog?\n\n" +
+      "**3. Team Fungibility**";
+    expect(rt(md)).toBe(md);
+  });
+
+  it("italic/code/underline leading-number markers are not escaped", () => {
+    expect(rt("*1. foo*")).toBe("*1. foo*");
+    expect(rt("`1. foo`")).toBe("`1. foo`");
+    expect(rt("<u>1. foo</u>")).toBe("<u>1. foo</u>");
+  });
+
+  it("unmarked escaped leading number stays escaped (not promoted to a list)", () => {
+    expect(rt("\\1. plain text")).toBe("\\1. plain text");
+  });
+
+  it("real ordered list with bold item content is unaffected", () => {
+    expect(rt("1. **Title**\n2. **Other**")).toBe("1. **Title**\n2. **Other**");
+  });
+
   it("ordered-list item with a second paragraph", () => {
     expect(rt("1. first\n\n   more\n2. second")).toBe(
       "1. first\n\n   more\n2. second"

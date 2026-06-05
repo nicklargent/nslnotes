@@ -202,12 +202,17 @@ export const serializer = new MarkdownSerializer(
 
     text(state, node, parent, index) {
       const prev = index > 0 ? parent.child(index - 1) : null;
-      // Escape a leading list-marker (`- `, `* `, `+ `, `1. `) when this text
-      // begins a new line so the re-parser doesn't promote it to a list item.
+      // Escape a leading list-marker (`- `, `* `, `+ `, `1. `) only when this
+      // text actually begins a new line — i.e. it carries no inline marks.
+      // When the text is wrapped in a mark, the mark's opening delimiter
+      // (`**`, `*`, `` ` ``, `<u>`, `[`) is emitted first, so the marker is no
+      // longer at the line start and won't be re-parsed as a list item;
+      // escaping it there would corrupt the source (e.g. a fully-bold
+      // `**1. Title**` would round-trip to `**\1. Title**`).
       // Two cases: (1) immediately after a hardBreak; (2) at the very start
       // of a paragraph that's a top-level block.
       const looksLikeListMarker = /^(?:[-*+]\s|\d+\.\s)/.test(node.text ?? "");
-      if (looksLikeListMarker) {
+      if (looksLikeListMarker && node.marks.length === 0) {
         if (prev?.type.name === "hardBreak") {
           state.text("\\" + node.text!, false);
           return;
