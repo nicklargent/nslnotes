@@ -4,6 +4,8 @@ import {
   parseISODate,
   getToday,
   getTodayISO,
+  todayISO,
+  refreshTodayISO,
   getRelativeDays,
   isWithinDays,
   isOverdue,
@@ -97,6 +99,37 @@ describe("getToday and getTodayISO", () => {
     const today = getToday();
     const todayISO = getTodayISO();
     expect(toISODate(today)).toBe(todayISO);
+  });
+});
+
+describe("todayISO reactive signal", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("advances when the day changes (e.g. waking from sleep past midnight)", () => {
+    vi.setSystemTime(new Date(2026, 2, 10, 12, 0, 0)); // March 10, noon
+    refreshTodayISO();
+    expect(todayISO()).toBe("2026-03-10");
+
+    // Simulate the machine sleeping and waking up on the next day.
+    vi.setSystemTime(new Date(2026, 2, 11, 0, 30, 0)); // March 11, 00:30
+    refreshTodayISO();
+    expect(todayISO()).toBe("2026-03-11");
+  });
+
+  it("is a no-op within the same day", () => {
+    vi.setSystemTime(new Date(2026, 2, 10, 9, 0, 0));
+    refreshTodayISO();
+    expect(todayISO()).toBe("2026-03-10");
+
+    vi.setSystemTime(new Date(2026, 2, 10, 23, 59, 0));
+    refreshTodayISO();
+    expect(todayISO()).toBe("2026-03-10");
   });
 });
 

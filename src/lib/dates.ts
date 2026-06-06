@@ -91,23 +91,36 @@ export function getTodayISO(): string {
  */
 const [todayISO, setTodayISO] = createSignal(getTodayISO());
 
-let midnightTimer: ReturnType<typeof setTimeout> | undefined;
-
-function scheduleMidnightUpdate() {
-  if (midnightTimer !== undefined) clearTimeout(midnightTimer);
-  const now = new Date();
-  const midnight = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1
-  );
-  const ms = midnight.getTime() - now.getTime() + 100; // 100ms buffer past midnight
-  midnightTimer = setTimeout(() => {
-    setTodayISO(getTodayISO());
-    scheduleMidnightUpdate();
-  }, ms);
+/**
+ * Recompute today's date and advance the signal if the day has changed.
+ * Cheap and idempotent — only triggers reactivity on an actual day change,
+ * so it's safe to call frequently.
+ */
+export function refreshTodayISO(): void {
+  const current = getTodayISO();
+  if (current !== todayISO()) setTodayISO(current);
 }
-scheduleMidnightUpdate();
+
+// Sleep-resilient day-rollover detection.
+//
+// A single setTimeout aimed at the next midnight is unreliable on desktop
+// (Tauri): when the machine sleeps, JS timers pause, and a timer whose deadline
+// passed during sleep may never fire — freezing the date on yesterday. Instead:
+//   1. Poll on an interval (a cheap string compare) as a self-healing safety
+//      net — setInterval resumes ticking after wake, unlike a one-shot timer.
+//   2. Recheck immediately whenever the app regains focus/visibility, which is
+//      exactly when the user looks at a machine that just woke.
+const DATE_CHECK_INTERVAL_MS = 60 * 1000;
+
+if (typeof window !== "undefined") {
+  setInterval(refreshTodayISO, DATE_CHECK_INTERVAL_MS);
+  window.addEventListener("focus", refreshTodayISO);
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") refreshTodayISO();
+    });
+  }
+}
 
 export { todayISO };
 
