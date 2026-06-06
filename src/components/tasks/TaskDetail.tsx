@@ -21,6 +21,7 @@ import { DeleteIconButton } from "../buttons/DeleteIconButton";
 import { RenameConvertButton } from "../buttons/RenameConvertButton";
 import { BacklinksSection } from "../backlinks/BacklinksSection";
 import { NavigationService } from "../../services/NavigationService";
+import { StarIcon } from "../icons/StarIcon";
 import type { Task } from "../../types/entities";
 
 interface TaskDetailProps {
@@ -179,6 +180,22 @@ export function TaskDetail(props: TaskDetailProps) {
             />
           </div>
           <div class="flex items-center gap-2">
+            <button
+              class={`flex items-center gap-1 rounded px-3 py-1 text-xs font-medium ${
+                liveTask().pinned
+                  ? "bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                  : "bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-400"
+              }`}
+              onClick={() =>
+                void EntityService.updateFrontmatter(props.task.path, {
+                  pinned: liveTask().pinned ? null : true,
+                })
+              }
+              title={liveTask().pinned ? "Unpin task" : "Pin task"}
+            >
+              <StarIcon class="h-3 w-3" filled={liveTask().pinned} />
+              {liveTask().pinned ? "Pinned" : "Pin"}
+            </button>
             <Show when={liveTask().status === "open"}>
               <button
                 class="rounded bg-green-50 dark:bg-green-900/30 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40"

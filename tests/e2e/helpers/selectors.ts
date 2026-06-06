@@ -26,6 +26,22 @@ export function searchButton(page: Page): Locator {
   return sidebar(page).locator("button", { hasText: "Search" });
 }
 
+// Clickable star toggle on a doc row in the sidebar Docs list.
+// Pinned docs expose an "Unpin doc" star; unpinned docs an "Pin doc" star.
+export function sidebarDocUnpinStar(page: Page, title: string): Locator {
+  return sidebar(page)
+    .locator("button")
+    .filter({ hasText: title })
+    .getByRole("button", { name: "Unpin doc" });
+}
+
+export function sidebarDocPinStar(page: Page, title: string): Locator {
+  return sidebar(page)
+    .locator("button")
+    .filter({ hasText: title })
+    .getByRole("button", { name: "Pin doc" });
+}
+
 export function fontDecreaseButton(page: Page): Locator {
   return page.locator("button[title^='Decrease font size']");
 }
@@ -70,13 +86,14 @@ export function findBarClose(page: Page): Locator {
   return page.locator("button[title='Close (Escape)']");
 }
 
-// --- Pin button ---
+// --- Doc Pin button (center panel; scoped so it doesn't match the
+// right-panel "Pinned" task-filter tab) ---
 export function pinButton(page: Page): Locator {
-  return page.locator("button", { hasText: /^Pin$/ });
+  return centerPanel(page).getByRole("button", { name: /^Pin$/ });
 }
 
 export function pinnedButton(page: Page): Locator {
-  return page.locator("button", { hasText: "Pinned" });
+  return centerPanel(page).getByRole("button", { name: /^Pinned$/ });
 }
 
 // --- Confirm modal ---
@@ -139,13 +156,33 @@ export function rawModeToggle(page: Page): Locator {
   return centerPanel(page).locator("button[title='View source'], button[title='Switch to editor']");
 }
 
-// --- Right panel task toggle ---
-export function openClosedToggle(page: Page): Locator {
-  return rightPanel(page).locator("button", { hasText: /^(Open|Closed)$/ });
+// --- Right panel task view tabs (Open | Pinned | Closed) ---
+export function taskViewTab(
+  page: Page,
+  name: "Open" | "Pinned" | "Closed",
+): Locator {
+  return rightPanel(page).getByRole("button", { name, exact: true });
 }
 
 export function createTaskButton(page: Page): Locator {
   return rightPanel(page).getByRole("button", { name: "+" });
+}
+
+// --- Pin toggle (task row in right panel) ---
+export function taskRowPinButton(page: Page, title: string): Locator {
+  return rightPanel(page)
+    .locator("div.group")
+    .filter({ hasText: title })
+    .getByRole("button", { name: /^(Pin|Unpin) task$/ });
+}
+
+// --- Pin toggle (task detail action row) ---
+export function detailPinButton(page: Page): Locator {
+  return centerPanel(page).getByRole("button", { name: /^Pin$/ });
+}
+
+export function detailPinnedButton(page: Page): Locator {
+  return centerPanel(page).getByRole("button", { name: /^Pinned$/ });
 }
 
 /**

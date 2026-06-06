@@ -78,6 +78,7 @@ export function parseTask(path: string, content: string): Task | null {
     created: fm.created,
     due: fm.due ?? null,
     title,
+    pinned: fm.pinned === true,
   };
 }
 

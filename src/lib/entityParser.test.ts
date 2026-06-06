@@ -137,6 +137,20 @@ Steps to reproduce`;
     expect(task!.title).toBe("Fix the bug");
     expect(task!.due).toBeNull();
     expect(task!.content).toBe("Steps to reproduce");
+    expect(task!.pinned).toBe(false);
+  });
+
+  it("parses pinned task", () => {
+    const content = `---
+type: "task"
+status: open
+created: "2026-03-10"
+title: "Focus task"
+pinned: true
+---
+body`;
+    const task = parseTask("/root/tasks/focus-task.md", content);
+    expect(task!.pinned).toBe(true);
   });
 
   it("parses task with due date", () => {

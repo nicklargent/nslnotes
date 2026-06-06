@@ -3,6 +3,7 @@ import { makePointerDragHandler, setWikilinkDragData } from "../../lib/drag";
 import { EntityService } from "../../services/EntityService";
 import { formatRelativeDate } from "../../lib/dates";
 import { UncheckedIndicator } from "../metadata/UncheckedIndicator";
+import { StarIcon } from "../icons/StarIcon";
 import type { Task } from "../../types/entities";
 
 interface TaskItemProps {
@@ -16,32 +17,32 @@ interface TaskItemProps {
  * Shows title and due date. Supports status updates with brief visual feedback.
  */
 export function TaskItem(props: TaskItemProps) {
-  const [completing, setCompleting] = createSignal<"done" | "cancelled" | null>(
-    null
-  );
+  const [completing, setCompleting] = createSignal(false);
 
-  async function handleStatusChange(
-    e: MouseEvent,
-    status: "done" | "cancelled"
-  ) {
+  async function handleMarkDone(e: MouseEvent) {
     e.stopPropagation();
-    setCompleting(status);
+    setCompleting(true);
     // Brief delay before updating (FR-ENT-013)
     await new Promise((r) => setTimeout(r, 600));
-    await EntityService.updateTaskStatus(props.task.path, status);
-    setCompleting(null);
+    await EntityService.updateTaskStatus(props.task.path, "done");
+    setCompleting(false);
+  }
+
+  function handlePinToggle(e: MouseEvent) {
+    e.stopPropagation();
+    void EntityService.updateFrontmatter(props.task.path, {
+      pinned: props.task.pinned ? null : true,
+    });
   }
 
   return (
     <div
       class={`group flex w-full cursor-pointer items-center gap-1 rounded px-2 py-1.5 text-left text-sm transition-all duration-200 ${
-        completing() === "done"
+        completing()
           ? "bg-green-50 dark:bg-green-900/30 opacity-60"
-          : completing() === "cancelled"
-            ? "bg-gray-50 dark:bg-gray-900 opacity-60"
-            : props.isHighlighted
-              ? "bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200"
-              : "hover:bg-gray-100 dark:hover:bg-gray-700"
+          : props.isHighlighted
+            ? "bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200"
+            : "hover:bg-gray-100 dark:hover:bg-gray-700"
       }`}
       draggable={true}
       onDragStart={(e: DragEvent) =>
@@ -55,10 +56,10 @@ export function TaskItem(props: TaskItemProps) {
       {/* Checkbox button for quick done */}
       <button
         class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-gray-300 dark:border-gray-600 text-xs text-transparent hover:border-green-400 hover:text-green-500"
-        onClick={(e) => void handleStatusChange(e, "done")}
+        onClick={(e) => void handleMarkDone(e)}
         title="Mark done"
       >
-        <Show when={completing() === "done"} fallback={"\u2713"}>
+        <Show when={completing()} fallback={"\u2713"}>
           <span class="text-green-500">{"\u2713"}</span>
         </Show>
       </button>
@@ -85,13 +86,17 @@ export function TaskItem(props: TaskItemProps) {
         </span>
       )}
 
-      {/* Cancel button - shown on hover */}
+      {/* Pin toggle - always visible when pinned, on hover otherwise */}
       <button
-        class="flex-shrink-0 text-xs text-transparent group-hover:text-gray-300 dark:group-hover:text-gray-600 group-hover:hover:text-red-400"
-        onClick={(e) => void handleStatusChange(e, "cancelled")}
-        title="Cancel task"
+        class={`flex-shrink-0 pl-1 ${
+          props.task.pinned
+            ? "text-amber-500 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-300"
+            : "text-transparent group-hover:text-gray-300 dark:group-hover:text-gray-600 group-hover:hover:text-amber-400"
+        }`}
+        onClick={handlePinToggle}
+        title={props.task.pinned ? "Unpin task" : "Pin task"}
       >
-        {"\u2715"}
+        <StarIcon class="h-3.5 w-3.5" filled={props.task.pinned} />
       </button>
     </div>
   );

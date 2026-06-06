@@ -35,6 +35,42 @@ import type { ImageRef, ImageFile } from "../types/images";
 import type { BacklinkEntry } from "../types/backlinks";
 
 /**
+ * Bucket open tasks into right-panel due-date groups (overdue / this week /
+ * next week / later), sorting dated groups by due date.
+ */
+function groupByDue(tasks: Task[]): GroupedTasks {
+  const endOfThisWeek = getEndOfWeek();
+  const endOfNextWeek = getEndOfNextWeek();
+  const overdue: Task[] = [];
+  const thisWeek: Task[] = [];
+  const nextWeek: Task[] = [];
+  const later: Task[] = [];
+
+  for (const task of tasks) {
+    if (task.due) {
+      if (isOverdue(task.due)) {
+        overdue.push(task);
+      } else if (task.due <= endOfThisWeek) {
+        thisWeek.push(task);
+      } else if (task.due <= endOfNextWeek) {
+        nextWeek.push(task);
+      } else {
+        later.push(task);
+      }
+    } else {
+      later.push(task);
+    }
+  }
+
+  const byDue = (a: Task, b: Task) => (a.due ?? "").localeCompare(b.due ?? "");
+  overdue.sort(byDue);
+  thisWeek.sort(byDue);
+  nextWeek.sort(byDue);
+
+  return { overdue, thisWeek, nextWeek, later };
+}
+
+/**
  * Join path segments (simple implementation).
  */
 function joinPath(...segments: string[]): string {
@@ -607,38 +643,14 @@ export const IndexService = {
    * @returns Grouped tasks
    */
   getGroupedTasks: (): GroupedTasks => {
-    const openTasks = IndexService.getOpenTasks();
-    const endOfThisWeek = getEndOfWeek();
-    const endOfNextWeek = getEndOfNextWeek();
-    const overdue: Task[] = [];
-    const thisWeek: Task[] = [];
-    const nextWeek: Task[] = [];
-    const later: Task[] = [];
+    return groupByDue(IndexService.getOpenTasks());
+  },
 
-    for (const task of openTasks) {
-      if (task.due) {
-        if (isOverdue(task.due)) {
-          overdue.push(task);
-        } else if (task.due <= endOfThisWeek) {
-          thisWeek.push(task);
-        } else if (task.due <= endOfNextWeek) {
-          nextWeek.push(task);
-        } else {
-          later.push(task);
-        }
-      } else {
-        later.push(task);
-      }
-    }
-
-    // Sort overdue by due date (most overdue first)
-    overdue.sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
-
-    // Sort this week and next week by due date
-    thisWeek.sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
-    nextWeek.sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
-
-    return { overdue, thisWeek, nextWeek, later };
+  /**
+   * Get open pinned (focus) tasks grouped by due date for the right panel.
+   */
+  getGroupedPinnedTasks: (): GroupedTasks => {
+    return groupByDue(IndexService.getOpenTasks().filter((t) => t.pinned));
   },
 
   /**

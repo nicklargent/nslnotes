@@ -4,7 +4,7 @@ import { setupApp, teardownApp } from "./helpers/app-setup";
 import {
   rightPanel,
   centerPanel,
-  openClosedToggle,
+  taskViewTab,
   createTaskButton,
 } from "./helpers/selectors";
 import { waitForSave } from "./helpers/editor";
@@ -22,7 +22,6 @@ test.describe("Task list (right panel)", () => {
   });
 
   test("shows open tasks by default", async ({ page }) => {
-    await expect(rightPanel(page).getByText("Open Tasks")).toBeVisible({ timeout: 5000 });
     await expect(
       rightPanel(page).getByText("Fix Login Bug"),
     ).toBeVisible({ timeout: 5000 });
@@ -31,9 +30,8 @@ test.describe("Task list (right panel)", () => {
     ).toBeVisible({ timeout: 5000 });
   });
 
-  test("toggle switches to closed tasks", async ({ page }) => {
-    await openClosedToggle(page).click();
-    await expect(rightPanel(page).getByText("Closed Tasks")).toBeVisible({ timeout: 5000 });
+  test("Closed tab switches to closed tasks", async ({ page }) => {
+    await taskViewTab(page, "Closed").click();
     // Closed tasks: Old Feature (done) and Abandoned Work (cancelled)
     await expect(
       rightPanel(page).getByText("Old Feature"),
@@ -41,13 +39,15 @@ test.describe("Task list (right panel)", () => {
     await expect(
       rightPanel(page).getByText("Abandoned Work"),
     ).toBeVisible({ timeout: 5000 });
+    // Open task no longer shown
+    await expect(rightPanel(page).getByText("Fix Login Bug")).toHaveCount(0);
   });
 
-  test("toggle back to open tasks", async ({ page }) => {
-    await openClosedToggle(page).click();
-    await expect(rightPanel(page).getByText("Closed Tasks")).toBeVisible({ timeout: 3000 });
-    await openClosedToggle(page).click();
-    await expect(rightPanel(page).getByText("Open Tasks")).toBeVisible({ timeout: 3000 });
+  test("tabs switch back to open tasks", async ({ page }) => {
+    await taskViewTab(page, "Closed").click();
+    await expect(rightPanel(page).getByText("Old Feature")).toBeVisible({ timeout: 3000 });
+    await taskViewTab(page, "Open").click();
+    await expect(rightPanel(page).getByText("Fix Login Bug")).toBeVisible({ timeout: 3000 });
   });
 
   test("clicking task navigates to task detail", async ({ page }) => {

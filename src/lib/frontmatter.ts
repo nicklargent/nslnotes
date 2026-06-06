@@ -36,6 +36,7 @@ export interface TaskFrontmatter {
   due?: string;
   title?: string;
   topics?: TopicRef[];
+  pinned?: boolean;
 }
 
 /**
@@ -334,6 +335,10 @@ export function validateTask(
 
   if (topicsResult.valid && topicsResult.topics.length > 0) {
     result.topics = topicsResult.topics;
+  }
+
+  if (frontmatter["pinned"] === true) {
+    result.pinned = true;
   }
 
   return { valid: true, data: result };

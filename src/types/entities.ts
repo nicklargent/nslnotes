@@ -48,6 +48,8 @@ export interface Task extends BaseEntity {
   due: string | null;
   /** Title extracted from first line or slug */
   title: string;
+  /** Whether this task is pinned (focus flag) */
+  pinned: boolean;
 }
 
 /**

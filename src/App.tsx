@@ -439,6 +439,10 @@ function App() {
     return IndexService.getGroupedTasks();
   });
 
+  const groupedPinnedTasks = createMemo(() => {
+    return IndexService.getGroupedPinnedTasks();
+  });
+
   const groupedClosedTasks = createMemo(() => {
     return IndexService.getGroupedClosedTasks();
   });
@@ -521,6 +525,7 @@ function App() {
           right={
             <RightPanel
               groupedTasks={groupedTasks()}
+              groupedPinnedTasks={groupedPinnedTasks()}
               groupedClosedTasks={groupedClosedTasks()}
               highlightedTaskPath={highlightedTaskPath()}
               onTaskClick={(task) => NavigationService.navigateTo(task)}

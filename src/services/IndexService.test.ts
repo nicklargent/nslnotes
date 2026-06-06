@@ -34,6 +34,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     created: "2026-03-10",
     due: null,
     title: "My Task",
+    pinned: false,
     ...overrides,
   };
 }

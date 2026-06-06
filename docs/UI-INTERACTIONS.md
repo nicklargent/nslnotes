@@ -109,7 +109,7 @@ Source: `src/components/layout/LeftSidebar.tsx`, `src/components/sidebar/`
 - [ ] `+` button starts doc draft creation
 - [ ] Doc click navigates to doc view
 - [ ] Active doc highlighted
-- [ ] Pinned docs show pin indicator
+- [ ] Every doc row has a pin toggle (filled star icon, shared `StarIcon`): amber/filled and always visible when pinned; gray outline on row hover otherwise; click toggles `pinned` frontmatter (`stopPropagation`, no navigation) — same behavior as the task-list pin toggle
 
 ### Section Expand/Collapse
 - [ ] Topics section header toggles expand/collapse
@@ -445,6 +445,7 @@ Source: `src/components/tasks/TaskDetail.tsx`
 - [ ] Title row: title + slug on left; Raw-mode toggle + Delete trash icon right-aligned
 - [ ] Topics row: topics on left; Created date right-aligned (read-only)
 - [ ] Status/action row: status pill + Due date on left; status change buttons right-aligned
+- [ ] Pin toggle button (amber when pinned, gray otherwise) sets/clears `pinned` frontmatter; available regardless of status
 - [ ] Open task: "Mark Done" button (green), "Cancel" button (gray)
 - [ ] Done/cancelled task: "Reopen" button (blue)
 - [ ] Status change updates frontmatter
@@ -461,14 +462,14 @@ Source: `src/components/tasks/TaskDetail.tsx`
 Source: `src/components/layout/RightPanel.tsx`, `src/components/tasks/TaskItem.tsx`, `TaskGroup.tsx`, `ClosedTaskItem.tsx`
 
 ### Panel Controls
-- [ ] Open/Closed toggle switches between active and closed task lists
-- [ ] `+` button starts task draft creation
+- [ ] Open / Pinned / Closed filter tabs switch between active, pinned-focus, and closed task lists (active tab highlighted)
+- [ ] `+` button starts task draft creation (always visible, regardless of active filter)
+- [ ] Pinned view: open tasks with `pinned: true`, grouped by due date; empty-state message when none are pinned
 
 ### Open Task Item (`TaskItem.tsx`)
 - [ ] Checkbox click: 600ms delay before marking done (visual feedback: `bg-green-50` opacity-60)
 - [ ] Checkbox mousedown: `stopPropagation` prevents task click
-- [ ] Cancel button (X) visible on hover; click marks as cancelled (visual: `bg-gray-50` opacity-60)
-- [ ] Cancel button click: `stopPropagation`
+- [ ] Pin toggle button: amber/filled and always visible when pinned; gray outline on row hover otherwise; click toggles `pinned` frontmatter (`stopPropagation`)
 - [ ] Title click navigates to task detail
 - [ ] Due date shown on right if present
 - [ ] Draggable: `onDragStart` sets WIKILINK_MIME data
