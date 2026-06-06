@@ -328,8 +328,15 @@ Source: `src/components/editor/ProseEditor.tsx`, `Editor.tsx`
 - [ ] Copy serializes the selection to markdown onto the clipboard (`clipboardTextSerializer`)
 - [ ] A selection contained within a single block (e.g. part of one bullet line) copies just the inline text, without the block marker (`- `, `#`, `> `, …); a selection spanning multiple blocks keeps the full markdown structure (bullets, nesting)
 - [ ] Paste of plain-text markdown (no usable `text/html` on the clipboard — e.g. an internal copy under webkit2gtk, or a markdown snippet from elsewhere) is parsed back into real nodes via `parseMarkdown`, so a bulleted/ordered/task list round-trips as a real nested list rather than literal hyphen text
-- [ ] Rich HTML pastes (clipboard carries `text/html`) still flow through ProseMirror's default DOM parsing
+- [ ] Rich HTML pastes (clipboard carries `text/html`) flow through ProseMirror's default DOM parsing, then `transformPasted` normalizes them: the parsed slice is run through a markdown round trip and, if it would survive unchanged, inserted verbatim (no behaviour change); if it would NOT survive (e.g. an Outlook table with a line break or block content in a cell), the savable form is inserted instead so the editor immediately shows exactly what will persist — no silent loss on the next reload
 - [ ] Paste inside a code block is left as literal text (not markdown-parsed)
+
+### Save Integrity Check (`pmMarkdown/roundTrip.ts`, `saveIntegrity.ts`)
+Background safety net (approach A) complementing paste normalization. After edits settle (~800 ms idle, off the typing path), the live doc is run through a markdown round trip (`serialize → parse`) and compared, ignoring blank-line cosmetics. If the content would lose data on a save/reload (something the serializer cannot represent), the user is warned **before** the loss is realized.
+- [ ] Editing a note with content that round-trips cleanly shows only the normal `Saving…` status — no warning. The comparison ignores benign normalizations markdown applies by design — blank-line gaps, paragraph-break vs. hard-break (interchangeable under markdown-it `breaks: true`), leading/trailing whitespace trimmed at paragraph/heading edges (e.g. a trailing space at end of line, a leading space in a bullet; `codeBlock` whitespace is preserved), and adjacent same-type lists (which markdown reflows into one — e.g. a blank line splitting a list mid-edit) — so ordinary edits never false-positive; calibrated against the full notes corpus (0 false positives)
+- [ ] When the current content would not survive a save/reload, an amber warning toast appears (longer-lived than status toasts) and the per-note save-status text is replaced by a persistent `⚠ Save may be incomplete — review this note` indicator (DocView, TaskDetail, DailyNote, NamedNoteCard)
+- [ ] The warning only re-toasts on ok↔warning transitions, not on every keystroke; the inline indicator clears when a later check passes or when switching to another note
+- [ ] In practice paste normalization (`transformPasted`) prevents the common case, so this backstop fires mainly for non-paste edits or future serializer gaps
 
 ### Image Handling
 - [ ] Image paste: converts to base64, inserts as `<img>`, auto-saves to disk

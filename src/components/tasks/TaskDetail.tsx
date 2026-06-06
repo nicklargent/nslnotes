@@ -8,6 +8,9 @@ import { notebooksApi } from "../../stores/notebooksStore";
 import { EntityService } from "../../services/EntityService";
 import { parse, serialize } from "../../lib/frontmatter";
 import { editorStore, setEditorStore } from "../../stores/editorStore";
+import { reportIntegrity } from "../editor/saveIntegrity";
+import { SaveWarningIndicator } from "../editor/SaveWarningIndicator";
+import type { RoundTripCheck } from "../editor/pmMarkdown";
 import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
@@ -31,6 +34,7 @@ interface TaskDetailProps {
 export function TaskDetail(props: TaskDetailProps) {
   const [content, setContent] = createSignal("");
   const [rawMode, setRawMode] = createSignal(false);
+  const [saveWarning, setSaveWarning] = createSignal(false);
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
   let rawFlush: (() => Promise<void>) | null = null;
@@ -43,11 +47,16 @@ export function TaskDetail(props: TaskDetailProps) {
   // Sync content when task changes
   createEffect(() => {
     setContent(props.task.content);
+    setSaveWarning(false);
     setEditorStore({
       activeFile: props.task.path,
       isDirty: false,
     });
   });
+
+  function handleIntegrity(result: RoundTripCheck) {
+    setSaveWarning(reportIntegrity(result, { title: liveTask().title }));
+  }
 
   function handleUpdate(newContent: string) {
     setContent(newContent);
@@ -206,6 +215,7 @@ export function TaskDetail(props: TaskDetailProps) {
                 autofocus={shouldAutofocus}
                 entityPath={props.task.path}
                 onUpdate={handleUpdate}
+                onIntegrity={handleIntegrity}
               />
             }
           >
@@ -218,13 +228,20 @@ export function TaskDetail(props: TaskDetailProps) {
           </Show>
         </div>
 
-        <div
-          class="mt-2 text-right text-xs text-gray-300 transition-opacity dark:text-gray-600"
-          classList={{ "opacity-0": !editorStore.isDirty }}
-          aria-hidden={!editorStore.isDirty}
+        <Show
+          when={saveWarning()}
+          fallback={
+            <div
+              class="mt-2 text-right text-xs text-gray-300 transition-opacity dark:text-gray-600"
+              classList={{ "opacity-0": !editorStore.isDirty }}
+              aria-hidden={!editorStore.isDirty}
+            >
+              Saving...
+            </div>
+          }
         >
-          Saving...
-        </div>
+          <SaveWarningIndicator class="mt-2" />
+        </Show>
 
         <BacklinksSection
           backlinks={indexStore.backlinkIndex.get(props.task.path) ?? []}

@@ -27,7 +27,10 @@ import { runtime } from "../../lib/runtime";
 import {
   parseMarkdown,
   serializeMarkdown,
+  roundTripDoc,
+  checkRoundTrip,
   schema as pmSchema,
+  type RoundTripCheck,
 } from "./pmMarkdown";
 
 /** Read a File as base64, stripping the data URL prefix. */
@@ -71,6 +74,13 @@ interface ProseEditorProps {
   autofocus?: boolean | undefined;
   entityPath?: string | undefined;
   onUpdate: (markdown: string) => void;
+  /**
+   * Background save-integrity check (approach A). Fired only on ok↔warning
+   * transitions after edits settle, when the current content would (or would no
+   * longer) lose data on a save/reload round trip. Lets the host surface a
+   * persistent warning indicator.
+   */
+  onIntegrity?: ((result: RoundTripCheck) => void) | undefined;
   onSlashKey?:
     | ((pos: { top: number; left: number }, cursorPos: number) => void)
     | undefined;
@@ -126,6 +136,36 @@ function unwrapDanglingListWrappers(fragment: Fragment): Fragment {
 }
 
 /**
+ * Wrap a slice's content in a synthetic doc so the markdown serializer can walk
+ * it the same way it walks a full document. A selection within a single
+ * textblock re-wraps its inline content in a bare paragraph (dropping the block
+ * marker); a multi-block slice keeps its structure, re-based via
+ * {@link unwrapDanglingListWrappers}. Returns the wrapped doc plus the single
+ * textblock (or null) so callers can preserve inline-vs-block intent. Shared by
+ * clipboardTextSerializer (copy) and transformPasted (paste normalization).
+ */
+function sliceToSerializableDoc(slice: Slice): {
+  doc: PMNode;
+  single: PMNode | null;
+} {
+  const textblocks: PMNode[] = [];
+  slice.content.descendants((node) => {
+    if (node.isTextblock) textblocks.push(node);
+  });
+  const single = textblocks.length === 1 ? textblocks[0]! : null;
+  const doc = single
+    ? pmSchema.nodes["doc"]!.create(
+        null,
+        pmSchema.nodes["paragraph"]!.create(null, single.content)
+      )
+    : pmSchema.nodes["doc"]!.create(
+        null,
+        unwrapDanglingListWrappers(slice.content)
+      );
+  return { doc, single };
+}
+
+/**
  * Prose mode editor using TipTap (T5.3).
  * Renders content as formatted markdown with headings, paragraphs, and blocks.
  */
@@ -137,6 +177,31 @@ export function ProseEditor(props: ProseEditorProps) {
   let lastEntityPath: string | undefined;
   const rootPath = () =>
     props.entityPath ? rootPathFromEntity(props.entityPath) : undefined;
+
+  // Background save-integrity check (approach A). Debounced so it runs once the
+  // user pauses, off the typing path; only emits on ok↔warning transitions so a
+  // persistent problem doesn't re-toast on every keystroke.
+  let integrityTimeout: number | undefined;
+  let lastIntegrityOk = true;
+  const scheduleIntegrityCheck = (doc: PMNode, md: string) => {
+    const onIntegrity = props.onIntegrity;
+    if (!onIntegrity) return;
+    // Capture the path context synchronously so the deferred check runs against
+    // exactly the context in which `doc` was serialized.
+    const entityPath = props.entityPath;
+    const root = rootPath();
+    window.clearTimeout(integrityTimeout);
+    integrityTimeout = window.setTimeout(() => {
+      // PM docs are immutable, so the captured `doc` is exactly what was
+      // serialized when the check was scheduled. Reuse the already-computed `md`
+      // so the check doesn't serialize the same doc a second time.
+      const result = checkRoundTrip(doc, entityPath, root, md);
+      if (result.ok !== lastIntegrityOk) {
+        lastIntegrityOk = result.ok;
+        onIntegrity(result);
+      }
+    }, 800);
+  };
 
   /**
    * Cycle a TodoMarker node if the click position lands on one. Returns true
@@ -195,6 +260,7 @@ export function ProseEditor(props: ProseEditorProps) {
         lastUserInteraction = Date.now();
         const md = serializeMarkdown(e.state.doc, props.entityPath, rootPath());
         props.onUpdate(md);
+        scheduleIntegrityCheck(e.state.doc, md);
       },
       editorProps: {
         // In embedded editors (e.g. journal cards inside a virtual scroller)
@@ -244,24 +310,46 @@ export function ProseEditor(props: ProseEditorProps) {
           // bullet's text — copies just that inline content, without the block
           // marker (bullet, heading, blockquote, …). A selection that spans
           // multiple blocks keeps full markdown structure (bullets, nesting).
-          const textblocks: PMNode[] = [];
-          slice.content.descendants((node) => {
-            if (node.isTextblock) textblocks.push(node);
-          });
-          const single = textblocks.length === 1 ? textblocks[0]! : null;
-          // Wrap the fragment in a synthetic doc so the markdown serializer can
-          // walk it the same way it walks a full document; for a single block
-          // re-wrap its inline content in a bare paragraph to drop the marker.
-          const wrapped = single
-            ? pmSchema.nodes["doc"]!.create(
-                null,
-                pmSchema.nodes["paragraph"]!.create(null, single.content)
-              )
-            : pmSchema.nodes["doc"]!.create(
-                null,
-                unwrapDanglingListWrappers(slice.content)
-              );
-          return serializeMarkdown(wrapped, props.entityPath, rootPath());
+          const { doc } = sliceToSerializableDoc(slice);
+          return serializeMarkdown(doc, props.entityPath, rootPath());
+        },
+        transformPasted: (slice, view) => {
+          // Normalize-on-paste: a rich HTML paste (e.g. an Outlook table) is
+          // parsed by ProseMirror into schema-valid nodes that the markdown
+          // serializer cannot always represent — most commonly tables with
+          // multi-line / block-content cells, or deeply nested structures.
+          // Those parts are silently dropped on save and only resurface as
+          // missing content on the next reload. Run the pasted slice through a
+          // markdown round trip: if it survives unchanged (the common case),
+          // insert it verbatim — zero behaviour change. If it does NOT survive,
+          // insert the savable form instead so the editor and the file always
+          // agree and the user sees immediately what will persist.
+          const entityPath = props.entityPath;
+          const root = rootPath();
+          if (!entityPath || slice.content.size === 0) return slice;
+
+          const { doc: wrapped, single } = sliceToSerializableDoc(slice);
+          try {
+            const { reDoc, ok } = roundTripDoc(wrapped, entityPath, root);
+            if (ok) return slice;
+            // Lossy paste — rebuild a slice from the reparsed (savable) doc.
+            // reDoc comes from the standalone pmSchema; rebuild its content in
+            // the editor's own schema (via JSON) so the slice is insertable. For
+            // an inline (single-textblock) paste, unwrap to the reparsed
+            // paragraph's inline content and keep the original open depths; for a
+            // block paste, insert the reparsed blocks as complete (closed) nodes.
+            const json = single
+              ? (reDoc.firstChild?.content.toJSON() ?? [])
+              : reDoc.content.toJSON();
+            const content = Fragment.fromJSON(view.state.schema, json);
+            return single
+              ? new Slice(content, slice.openStart, slice.openEnd)
+              : new Slice(content, 0, 0);
+          } catch {
+            // Serialization/slice-construction failed — fall back to the
+            // original paste (pre-existing behaviour); approach A still warns.
+            return slice;
+          }
         },
         handlePaste: (_view, event) => {
           const items = event.clipboardData?.items;
@@ -356,8 +444,9 @@ export function ProseEditor(props: ProseEditorProps) {
           // from an external source), ProseMirror would insert the raw text
           // literally — bullets become hyphens and indentation is lost. Parse it
           // back through the markdown parser so it round-trips into real nodes.
-          // Rich HTML pastes still flow through ProseMirror's default DOM
-          // parsing, which already round-trips losslessly.
+          // Rich HTML pastes flow through ProseMirror's default DOM parsing and
+          // are normalized by transformPasted above (which substitutes a savable
+          // form when the parsed content would not survive a markdown round trip).
           const html = event.clipboardData?.getData("text/html");
           const text = event.clipboardData?.getData("text/plain");
           const inCode = _view.state.selection.$from.parent.type.spec.code;
@@ -1104,6 +1193,7 @@ export function ProseEditor(props: ProseEditorProps) {
   });
 
   onCleanup(() => {
+    window.clearTimeout(integrityTimeout);
     editor?.destroy();
   });
 

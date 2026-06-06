@@ -1,5 +1,8 @@
 import { createSignal, createEffect, on, onCleanup, Show } from "solid-js";
 import { Editor } from "../editor/Editor";
+import { reportIntegrity } from "../editor/saveIntegrity";
+import { SaveWarningIndicator } from "../editor/SaveWarningIndicator";
+import type { RoundTripCheck } from "../editor/pmMarkdown";
 import { RawEditor } from "../editor/RawEditor";
 import { RawModeToggle } from "../editor/RawModeToggle";
 import { serialize } from "../../lib/frontmatter";
@@ -27,6 +30,11 @@ export function DailyNote(props: DailyNoteProps) {
   const [content, setContent] = createSignal("");
   const [created, setCreated] = createSignal(false);
   const [rawMode, setRawMode] = createSignal(false);
+  const [saveWarning, setSaveWarning] = createSignal(false);
+
+  function handleIntegrity(result: RoundTripCheck) {
+    setSaveWarning(reportIntegrity(result, { title: props.date }));
+  }
   let saveTimeout: number | undefined;
   let savingPromise: Promise<void> | null = null;
   let rawFlush: (() => Promise<void>) | null = null;
@@ -38,6 +46,7 @@ export function DailyNote(props: DailyNoteProps) {
     on(
       () => props.note?.path,
       () => {
+        setSaveWarning(false);
         const noteContent = props.note?.content ?? "";
         // Skip echoes of our own save. When we DO sync, keep
         // `lastLocalContent` in lockstep with `content()` so a
@@ -203,6 +212,7 @@ export function DailyNote(props: DailyNoteProps) {
                 entityPath={resolveDailyNotePath()?.path ?? props.note?.path}
                 embedded={true}
                 onUpdate={handleUpdate}
+                onIntegrity={handleIntegrity}
                 onFlushSave={flushPendingSave}
               />
             }
@@ -213,6 +223,9 @@ export function DailyNote(props: DailyNoteProps) {
                 rawFlush = fn;
               }}
             />
+          </Show>
+          <Show when={saveWarning()}>
+            <SaveWarningIndicator class="mt-1" />
           </Show>
         </div>
         <Show when={created()}>

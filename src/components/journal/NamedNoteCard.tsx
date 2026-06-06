@@ -6,6 +6,9 @@ import {
   Show,
 } from "solid-js";
 import { Editor } from "../editor/Editor";
+import { reportIntegrity } from "../editor/saveIntegrity";
+import { SaveWarningIndicator } from "../editor/SaveWarningIndicator";
+import type { RoundTripCheck } from "../editor/pmMarkdown";
 import { RawEditor } from "../editor/RawEditor";
 import { RawModeToggle } from "../editor/RawModeToggle";
 import { FileService } from "../../services/FileService";
@@ -37,6 +40,7 @@ interface NamedNoteCardProps {
 export function NamedNoteCard(props: NamedNoteCardProps) {
   const [content, setContent] = createSignal("");
   const [rawMode, setRawMode] = createSignal(false);
+  const [saveWarning, setSaveWarning] = createSignal(false);
   let saveTimeout: number | undefined;
   let lastLocalContent: string | undefined;
   let rawFlush: (() => Promise<void>) | null = null;
@@ -57,6 +61,14 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
       lastLocalContent = noteContent;
     }
   });
+
+  function handleIntegrity(result: RoundTripCheck) {
+    setSaveWarning(
+      reportIntegrity(result, {
+        title: liveNote().title ?? liveNote().slug,
+      })
+    );
+  }
 
   // Pending save snapshot. We capture the path at edit time and reuse it
   // on cleanup so a notebook switch (which can cause `props.note` to
@@ -195,6 +207,7 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
               entityPath={props.note.path}
               embedded={true}
               onUpdate={handleUpdate}
+              onIntegrity={handleIntegrity}
             />
           }
         >
@@ -204,6 +217,9 @@ export function NamedNoteCard(props: NamedNoteCardProps) {
               rawFlush = fn;
             }}
           />
+        </Show>
+        <Show when={saveWarning()}>
+          <SaveWarningIndicator class="mt-1" />
         </Show>
       </div>
     </div>

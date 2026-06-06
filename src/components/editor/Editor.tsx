@@ -1,6 +1,10 @@
 import { createSignal, Show, onCleanup } from "solid-js";
 import { ProseEditor } from "./ProseEditor";
-import { serializeMarkdown, schema as pmSchema } from "./pmMarkdown";
+import {
+  serializeMarkdown,
+  schema as pmSchema,
+  type RoundTripCheck,
+} from "./pmMarkdown";
 import { CommandMenu, filterCommands } from "./CommandMenu";
 import { BubbleMenu } from "./BubbleMenu";
 import { TableToolbar } from "./TableToolbar";
@@ -27,6 +31,7 @@ interface EditorProps {
   autofocus?: boolean | undefined;
   entityPath?: string | undefined;
   onUpdate: (content: string) => void;
+  onIntegrity?: ((result: RoundTripCheck) => void) | undefined;
   onFlushSave?: () => Promise<void>;
   /** When true, suppress scroll-to-selection (for embedded/journal editors). */
   embedded?: boolean | undefined;
@@ -530,6 +535,7 @@ export function Editor(props: EditorProps) {
         entityPath={props.entityPath}
         embedded={props.embedded}
         onUpdate={handleContentUpdate}
+        onIntegrity={props.onIntegrity}
         onSlashKey={handleSlashKey}
         onHashOrAt={handleHashOrAt}
         onDoubleBracket={handleDoubleBracket}

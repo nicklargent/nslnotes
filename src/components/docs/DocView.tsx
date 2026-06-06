@@ -8,6 +8,9 @@ import { notebooksApi } from "../../stores/notebooksStore";
 import { EntityService } from "../../services/EntityService";
 import { parse, serialize } from "../../lib/frontmatter";
 import { editorStore, setEditorStore } from "../../stores/editorStore";
+import { reportIntegrity } from "../editor/saveIntegrity";
+import { SaveWarningIndicator } from "../editor/SaveWarningIndicator";
+import type { RoundTripCheck } from "../editor/pmMarkdown";
 import { indexStore } from "../../stores/indexStore";
 import { EditableText } from "../metadata/EditableText";
 import { EditableTopics } from "../metadata/EditableTopics";
@@ -30,6 +33,7 @@ interface DocViewProps {
 export function DocView(props: DocViewProps) {
   const [content, setContent] = createSignal("");
   const [rawMode, setRawMode] = createSignal(false);
+  const [saveWarning, setSaveWarning] = createSignal(false);
   const shouldAutofocus = consumeAutofocus();
   let saveTimeout: number | undefined;
   let pendingSave: { path: string; body: string } | null = null;
@@ -49,6 +53,7 @@ export function DocView(props: DocViewProps) {
       pendingSave = null;
     }
     setContent(docContent);
+    setSaveWarning(false);
     setEditorStore({
       activeFile: props.doc.path,
       isDirty: false,
@@ -68,6 +73,10 @@ export function DocView(props: DocViewProps) {
         pendingSave = null;
       }
     }, 300);
+  }
+
+  function handleIntegrity(result: RoundTripCheck) {
+    setSaveWarning(reportIntegrity(result, { title: liveDoc().title }));
   }
 
   async function toggleRawMode() {
@@ -209,6 +218,7 @@ export function DocView(props: DocViewProps) {
                 autofocus={shouldAutofocus}
                 entityPath={props.doc.path}
                 onUpdate={handleUpdate}
+                onIntegrity={handleIntegrity}
               />
             }
           >
@@ -221,13 +231,20 @@ export function DocView(props: DocViewProps) {
           </Show>
         </div>
 
-        <div
-          class="mt-2 text-right text-xs text-gray-300 transition-opacity dark:text-gray-600"
-          classList={{ "opacity-0": !editorStore.isDirty }}
-          aria-hidden={!editorStore.isDirty}
+        <Show
+          when={saveWarning()}
+          fallback={
+            <div
+              class="mt-2 text-right text-xs text-gray-300 transition-opacity dark:text-gray-600"
+              classList={{ "opacity-0": !editorStore.isDirty }}
+              aria-hidden={!editorStore.isDirty}
+            >
+              Saving...
+            </div>
+          }
         >
-          Saving...
-        </div>
+          <SaveWarningIndicator class="mt-2" />
+        </Show>
 
         <BacklinksSection
           backlinks={indexStore.backlinkIndex.get(props.doc.path) ?? []}
