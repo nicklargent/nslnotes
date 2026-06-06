@@ -59,9 +59,8 @@
           cargo-watch
           cargo-tauri
 
-          # Node.js for frontend
-          nodejs_20
-          nodePackages.npm
+          # Node.js for frontend (npm is bundled with nodejs)
+          nodejs_22
 
           # Development utilities
           jq
@@ -71,7 +70,7 @@
         # Prefetch npm dependencies for offline build
         npmDeps = pkgs.fetchNpmDeps {
           src = ./.;
-          hash = "sha256-MXOqht+22EQvU/oPg3aFi4x0zbyWsS10kDSbMqDwgeU=";
+          hash = "sha256-N00EMV61TEWYaNA5pwKLoNVwVX2aZEm8WwEeuHUL9U4=";
         };
 
       in
@@ -138,8 +137,7 @@
 
           nativeBuildInputs = with pkgs; [
             pkg-config
-            nodejs_20
-            nodePackages.npm
+            nodejs_22
             npmHooks.npmConfigHook
             cargo-tauri
           ] ++ lib.optionals isLinux [
@@ -207,13 +205,15 @@ DESKTOP
 
           nativeBuildInputs = with pkgs; [
             pkg-config
-            nodejs_20
-            nodePackages.npm
+            nodejs_22
             npmHooks.npmConfigHook
           ];
 
           buildInputs = with pkgs; [
             openssl
+          ] ++ lib.optionals isLinux [
+            # libsmbclient for the `smb` feature (pavao-sys); see linuxBuildInputs
+            samba
           ];
 
           inherit npmDeps;
