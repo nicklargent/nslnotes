@@ -28,6 +28,24 @@ function isBlankParagraph(n: NodeJSON): boolean {
 }
 
 /**
+ * An empty list item (after normalization its blank paragraph has been
+ * filtered, leaving no content). The serializer drops these as transient
+ * outliner state, so the reloaded doc lacks them; treating present and absent
+ * as equivalent keeps that from registering as loss.
+ */
+function isEmptyListItem(n: NodeJSON): boolean {
+  return (
+    (n.type === "listItem" || n.type === "taskItem") &&
+    (!n.content || n.content.length === 0)
+  );
+}
+
+/** A list left with no items once its empty items were removed. */
+function isEmptyList(n: NodeJSON): boolean {
+  return LIST_TYPES.has(n.type) && (!n.content || n.content.length === 0);
+}
+
+/**
  * Split a paragraph's inline content on hard breaks into one paragraph per line.
  * Non-paragraph nodes pass through unchanged.
  */
@@ -116,13 +134,17 @@ function trimInlineEdges(content: NodeJSON[]): NodeJSON[] {
  * It also (case 3) trims leading/trailing whitespace at paragraph/heading edges
  * — markdown drops a trailing space at the end of a line or a leading space in a
  * bullet, so the live doc carries whitespace the reload won't; codeBlock is
- * excluded since its whitespace is significant — and (case 4) merges adjacent
+ * excluded since its whitespace is significant — (case 4) merges adjacent
  * same-type lists, which markdown always reflows into one on reload (e.g. when a
- * blank line splits a list mid-edit). These only flip a verdict where markdown
+ * blank line splits a list mid-edit), and (cases 5 & 6) drops empty list items
+ * and the lists left empty by their removal: the serializer omits empty bullets
+ * (transient outliner state that has no faithful markdown form), so the live doc
+ * carries them but the reload won't. These only flip a verdict where markdown
  * actually normalizes, so they cannot mask real loss:
  * dropped or flattened content leaves a different node/text sequence behind (e.g.
- * a list inside a table cell collapsing to plain text). Calibrated against the
- * full notes corpus (404 notes, 0 false positives) and the crafted-loss tests.
+ * a list inside a table cell collapsing to plain text), and empty items/lists
+ * carry no text or nodes to lose. Calibrated against the full notes corpus
+ * (404 notes, 0 false positives) and the crafted-loss tests.
  */
 function normalize(n: NodeJSON): NodeJSON {
   if (!n.content) return n;
@@ -133,7 +155,9 @@ function normalize(n: NodeJSON): NodeJSON {
     }
   }
   if (TRIM_EDGE_WHITESPACE.has(n.type)) content = trimInlineEdges(content);
-  content = content.filter((c) => !isBlankParagraph(c));
+  content = content.filter(
+    (c) => !isBlankParagraph(c) && !isEmptyListItem(c) && !isEmptyList(c)
+  );
   content = mergeAdjacentLists(content);
   return { ...n, content };
 }

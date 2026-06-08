@@ -10,6 +10,7 @@ import { ImageService } from "../../../services/ImageService";
 // ---------------------------------------------------------------------------
 const md = new MarkdownIt({ html: false, linkify: false, breaks: true });
 md.disable("link"); // links stay as raw `[text](url)` text in the doc
+md.disable("lheading"); // app emits ATX headings only; `text\n-` must never become a setext heading
 md.enable(["strikethrough", "table"]);
 
 // ---------------------------------------------------------------------------

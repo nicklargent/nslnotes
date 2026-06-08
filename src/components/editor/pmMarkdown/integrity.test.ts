@@ -101,6 +101,59 @@ describe("checkRoundTrip: ignores block-structure churn (no false positives)", (
     expect(checkRoundTrip(leadingInBullet).ok).toBe(true);
   });
 
+  it("treats a transient empty nested bullet as no loss", () => {
+    // Indenting a fresh empty bullet under "item 2" leaves a nested list with a
+    // single empty item. The serializer drops it (an empty `- ` under text has
+    // no faithful markdown form), so this must NOT warn.
+    const doc = pmSchema.nodeFromJSON({
+      type: "doc",
+      content: [
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "item 2" }],
+                },
+                {
+                  type: "bulletList",
+                  content: [
+                    { type: "listItem", content: [{ type: "paragraph" }] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(checkRoundTrip(doc).ok).toBe(true);
+  });
+
+  it("treats a trailing flat empty bullet as no loss", () => {
+    const doc = pmSchema.nodeFromJSON({
+      type: "doc",
+      content: [
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                { type: "paragraph", content: [{ type: "text", text: "a" }] },
+              ],
+            },
+            { type: "listItem", content: [{ type: "paragraph" }] },
+          ],
+        },
+      ],
+    });
+    expect(checkRoundTrip(doc).ok).toBe(true);
+  });
+
   it("treats two same-type lists split by a blank line as one list", () => {
     // "two bullets, cursor at end of first, Enter twice" leaves two separate
     // lists with an empty paragraph between; markdown reflows them into one list

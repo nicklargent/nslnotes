@@ -118,6 +118,47 @@ test.describe("Editor lists and TODOs", () => {
     expect(content).toBeTruthy();
   });
 
+  test("indenting an empty bullet does not corrupt the parent or warn", async ({ page }) => {
+    // Regression: a freshly-indented empty bullet under "item 2" serialized to a
+    // bare `- ` line directly under the parent text, which CommonMark reads as a
+    // setext H2 underline — promoting "item 2" to a heading and dropping the
+    // bullet on reload, plus firing the save-integrity warning. Empty bullets are
+    // now dropped on save, so the parent stays a bullet and no warning appears.
+    const editor = tiptapEditor(page);
+    await editor.click();
+    await page.keyboard.press("Control+a");
+    await page.keyboard.press("Delete");
+    await page.keyboard.type("- item 1");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("item 2");
+    await page.keyboard.press("Enter");
+    // A new, empty bullet — indent it under "item 2".
+    await page.keyboard.press("Tab");
+    // Let the debounced (~800ms) integrity check run.
+    await page.waitForTimeout(1200);
+
+    // No save-integrity warning surfaced.
+    await expect(
+      page.getByText("Save may be incomplete", { exact: false }),
+    ).toHaveCount(0);
+
+    const docPath = path.join(testRoot, "docs", "meeting-template.md");
+    await waitForFileContent(page, docPath, "- item 2");
+    const saved = fs.readFileSync(docPath, "utf8");
+    // The parent is still a bullet, not a setext heading, and no bare `-` line.
+    expect(saved).not.toMatch(/^#{1,6} item 2/m);
+    expect(saved).not.toMatch(/^\s*-\s*$/m);
+
+    // Reload: the parent renders as a list item, never a heading.
+    await page.reload();
+    await expect(page.locator("main").first()).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    await sidebar(page).locator("button", { hasText: "Meeting Template" }).first().click();
+    await page.waitForTimeout(500);
+    await expect(editor.locator("ul li", { hasText: "item 2" })).toHaveCount(1);
+    await expect(editor.locator("h1, h2, h3, h4, h5, h6", { hasText: "item 2" })).toHaveCount(0);
+  });
+
   test("Shift+Tab outdents list item", async ({ page }) => {
     const editor = tiptapEditor(page);
     await editor.click();

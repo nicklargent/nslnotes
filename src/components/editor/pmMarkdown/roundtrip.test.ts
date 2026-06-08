@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from "vitest";
 import { parseMarkdown, serializeMarkdown } from "./index";
+import { schema as pmSchema } from "./schema";
 
 /**
  * Round-trip tests for the new prosemirror-markdown pipeline.
@@ -95,5 +96,103 @@ describe("pm-markdown round-trip: images", () => {
 
   it("image with width suffix", () => {
     expect(rt("![pic](./a.png){width=400}")).toBe("![pic](./a.png){width=400}");
+  });
+});
+
+describe("pm-markdown round-trip: empty bullets are transient (dropped on save)", () => {
+  // A freshly-indented empty bullet under a parent item used to serialize to a
+  // bare `- ` line directly under the parent text, which CommonMark reads as a
+  // setext H2 underline — promoting the parent to a heading and dropping the
+  // bullet on reload. Empty bullets are now dropped at serialize time instead.
+  const nestedEmpty = pmSchema.nodeFromJSON({
+    type: "doc",
+    content: [
+      {
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "Item 1" }],
+              },
+            ],
+          },
+          {
+            type: "listItem",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "item 2" }],
+              },
+              {
+                type: "bulletList",
+                content: [
+                  { type: "listItem", content: [{ type: "paragraph" }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  it("serializes without a bare `-` line and never re-parses as a heading", () => {
+    const md = serializeMarkdown(nestedEmpty);
+    // No line is only a bullet marker (the empty-bullet → setext hazard).
+    for (const line of md.split("\n")) {
+      expect(line.trim()).not.toBe("-");
+    }
+    const reDoc = parseMarkdown(md);
+    let hasHeading = false;
+    reDoc.descendants((n) => {
+      if (n.type.name === "heading") hasHeading = true;
+    });
+    expect(hasHeading).toBe(false);
+    // The parent stays a normal bullet item; the empty child is gone.
+    const list = reDoc.firstChild!;
+    expect(list.type.name).toBe("bulletList");
+    expect(list.childCount).toBe(2);
+    expect(list.child(1).firstChild!.type.name).toBe("paragraph");
+  });
+
+  it("drops a trailing flat empty bullet", () => {
+    const flatEmpty = pmSchema.nodeFromJSON({
+      type: "doc",
+      content: [
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                { type: "paragraph", content: [{ type: "text", text: "a" }] },
+              ],
+            },
+            { type: "listItem", content: [{ type: "paragraph" }] },
+          ],
+        },
+      ],
+    });
+    expect(serializeMarkdown(flatEmpty).replace(/\n+$/, "")).toBe("- a");
+  });
+});
+
+describe("pm-markdown parsing: setext headings disabled", () => {
+  it("does not promote `text` over a `-` line to a heading", () => {
+    const doc = parseMarkdown("item 2\n- ");
+    let hasHeading = false;
+    doc.descendants((n) => {
+      if (n.type.name === "heading") hasHeading = true;
+    });
+    expect(hasHeading).toBe(false);
+  });
+
+  it("still parses ATX headings", () => {
+    const doc = parseMarkdown("## Real Heading");
+    expect(doc.firstChild!.type.name).toBe("heading");
+    expect(doc.firstChild!.attrs["level"]).toBe(2);
   });
 });

@@ -41,6 +41,35 @@ function closeBlockTight(
   }
 }
 
+/**
+ * An empty list item — its only child is an empty paragraph. These are
+ * transient outliner state (a freshly-indented bullet the user hasn't typed
+ * into yet). They cannot round-trip through plain markdown: an empty `- ` line
+ * directly under text either re-parses as a setext heading underline or as
+ * literal text, so we drop them on serialize rather than corrupt the file. The
+ * `childCount === 1` guard preserves items that hold real content — a leading
+ * empty-paragraph spacer before a block (image / code block) is `childCount > 1`
+ * and handled by the `listItem` serializer's `skipFirst`.
+ */
+function isEmptyListItem(item: PMNode): boolean {
+  return (
+    item.childCount === 1 &&
+    item.firstChild?.type.name === "paragraph" &&
+    item.firstChild.content.size === 0
+  );
+}
+
+/** A copy of a list node with its empty items removed (same node if none). */
+function withoutEmptyItems(node: PMNode): PMNode {
+  const kept: PMNode[] = [];
+  node.forEach((item) => {
+    if (!isEmptyListItem(item)) kept.push(item);
+  });
+  return kept.length === node.childCount
+    ? node
+    : node.type.create(node.attrs, kept, node.marks);
+}
+
 export const serializer = new MarkdownSerializer(
   {
     paragraph(state, node, parent, index) {
@@ -67,14 +96,18 @@ export const serializer = new MarkdownSerializer(
     },
 
     bulletList(state, node) {
-      state.renderList(node, "  ", () => "- ");
+      const list = withoutEmptyItems(node);
+      if (list.childCount === 0) return;
+      state.renderList(list, "  ", () => "- ");
     },
 
     orderedList(state, node) {
-      const start = (node.attrs["start"] as number) ?? 1;
-      const maxW = String(start + node.childCount - 1).length;
+      const list = withoutEmptyItems(node);
+      if (list.childCount === 0) return;
+      const start = (list.attrs["start"] as number) ?? 1;
+      const maxW = String(start + list.childCount - 1).length;
       const space = " ".repeat(maxW + 2);
-      state.renderList(node, space, (i: number) => {
+      state.renderList(list, space, (i: number) => {
         const nStr = String(start + i);
         return " ".repeat(maxW - nStr.length) + nStr + ". ";
       });
@@ -99,7 +132,9 @@ export const serializer = new MarkdownSerializer(
     },
 
     taskList(state, node) {
-      state.renderList(node, "  ", () => "- ");
+      const list = withoutEmptyItems(node);
+      if (list.childCount === 0) return;
+      state.renderList(list, "  ", () => "- ");
     },
 
     taskItem(state, node) {
