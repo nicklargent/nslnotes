@@ -263,6 +263,12 @@ export function ProseEditor(props: ProseEditorProps) {
         scheduleIntegrityCheck(e.state.doc, md);
       },
       editorProps: {
+        // Enable native spellcheck on the contenteditable. On macOS WKWebView
+        // this surfaces right-click spelling suggestions (and red squiggles on
+        // recent versions); harmless in web/browser mode.
+        attributes: {
+          spellcheck: "true",
+        },
         // In embedded editors (e.g. journal cards inside a virtual scroller)
         // suppress scroll-to-selection to avoid jumping the parent container.
         ...(props.embedded

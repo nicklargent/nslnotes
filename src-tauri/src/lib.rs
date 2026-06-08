@@ -80,6 +80,40 @@ pub fn run() {
                 let _ = window.set_decorations(false);
             }
 
+            // macOS WKWebView ships with continuous spell checking off, so
+            // `spellcheck="true"` on the editor only yields right-click
+            // suggestions with no red squiggle underlines. Unlike the legacy
+            // WebView, WKWebView has no public spell-checking setter; it exposes
+            // the responder action `toggleContinuousSpellChecking:` and reads
+            // its initial state from the global `WebContinuousSpellCheckingEnabled`
+            // user default (which WebKit keeps in sync). We toggle it on only
+            // when currently off, so this is idempotent across launches.
+            // `inner()` returns the WKWebView pointer (see tauri PlatformWebview).
+            #[cfg(target_os = "macos")]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.with_webview(|wv| {
+                    use objc2::runtime::AnyObject;
+                    use objc2::{msg_send, sel};
+                    use objc2_foundation::{ns_string, NSUserDefaults};
+
+                    let already_on = NSUserDefaults::standardUserDefaults()
+                        .boolForKey(ns_string!("WebContinuousSpellCheckingEnabled"));
+                    if !already_on {
+                        let webview = wv.inner() as *mut AnyObject;
+                        let toggle = sel!(toggleContinuousSpellChecking:);
+                        unsafe {
+                            let responds: bool =
+                                msg_send![webview, respondsToSelector: toggle];
+                            if responds {
+                                let sender: *mut AnyObject = std::ptr::null_mut();
+                                let _: () =
+                                    msg_send![webview, toggleContinuousSpellChecking: sender];
+                            }
+                        }
+                    }
+                });
+            }
+
             // webkit2gtk pastes from CLIPBOARD on middle-click in HTML
             // editable regions, breaking the X11/Wayland PRIMARY-selection
             // convention every other Linux app follows. WebKit upstream

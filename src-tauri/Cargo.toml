@@ -31,3 +31,10 @@ tokio = { version = "1", features = ["rt"] }
 gtk = "0.18"
 webkit2gtk = "2"
 arboard = { version = "3", default-features = false, features = ["wayland-data-control"] }
+
+# macOS-only: WKWebView leaves continuous spell checking off and shows no red
+# squiggle underlines unless explicitly enabled. We send the editing selectors
+# to the WKWebView via objc on startup (see lib.rs setup).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSUserDefaults", "NSString"] }
