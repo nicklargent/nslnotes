@@ -133,7 +133,7 @@
           inherit version;
           src = ./.;
 
-          cargoHash = "sha256-Rdvy4soIgwcmWBf76OOaaiE7QS4jn3EgdeV7JtUxdTM=";
+          cargoHash = "sha256-BuDMvwEmgUOWCOSAvOqIWanq3qAjznw44ZolUSdmO9Q=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
@@ -201,7 +201,7 @@ DESKTOP
           inherit version;
           src = ./.;
 
-          cargoHash = "sha256-Rdvy4soIgwcmWBf76OOaaiE7QS4jn3EgdeV7JtUxdTM=";
+          cargoHash = "sha256-BuDMvwEmgUOWCOSAvOqIWanq3qAjznw44ZolUSdmO9Q=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
